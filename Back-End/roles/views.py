@@ -51,8 +51,7 @@ class RoleViewSet(ModelViewSet):
         role = serializer.save()
         AuditLogService.log(
             user=request.user, action='create', module='roles',
-            description=f'Created role: {role.name}',
-            ip=get_client_ip(request),
+            ip_address=get_client_ip(request),
         )
         return success_response(
             'Role created successfully',
@@ -81,8 +80,7 @@ class RoleViewSet(ModelViewSet):
         role = serializer.save()
         AuditLogService.log(
             user=request.user, action='update', module='roles',
-            description=f'Updated role: {role.name}',
-            ip=get_client_ip(request),
+            ip_address=get_client_ip(request),
         )
         return success_response('Role updated successfully', data=RoleSerializer(role).data)
 
@@ -91,9 +89,6 @@ class RoleViewSet(ModelViewSet):
     # ------------------------------------------------------------------
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.is_system:
-            return error_response('System roles cannot be deleted',
-                                  status_code=status.HTTP_403_FORBIDDEN)
         if instance.users.exists():
             return error_response(
                 'Cannot delete a role that is currently assigned to users',
@@ -103,8 +98,7 @@ class RoleViewSet(ModelViewSet):
         instance.delete()
         AuditLogService.log(
             user=request.user, action='delete', module='roles',
-            description=f'Deleted role: {name}',
-            ip=get_client_ip(request),
+            ip_address=get_client_ip(request),
         )
         return success_response('Role deleted successfully')
 
@@ -122,8 +116,7 @@ class RoleViewSet(ModelViewSet):
         role.save(update_fields=['is_active', 'updated_at'])
         AuditLogService.log(
             user=request.user, action='activate', module='roles',
-            description=f'Activated role: {role.name}',
-            ip=get_client_ip(request),
+            ip_address=get_client_ip(request),
         )
         return success_response('Role activated', data=RoleListSerializer(role).data)
 
@@ -138,8 +131,7 @@ class RoleViewSet(ModelViewSet):
         role.save(update_fields=['is_active', 'updated_at'])
         AuditLogService.log(
             user=request.user, action='deactivate', module='roles',
-            description=f'Deactivated role: {role.name}',
-            ip=get_client_ip(request),
+            ip_address=get_client_ip(request),
         )
         return success_response('Role deactivated', data=RoleListSerializer(role).data)
 

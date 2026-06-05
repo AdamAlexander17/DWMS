@@ -16,9 +16,10 @@ class PaymentSource(models.Model):
         related_name='%(class)s_sources',
         db_index=True,
     )
-    range_from = models.DecimalField(max_digits=15, decimal_places=2)
-    range_to = models.DecimalField(max_digits=15, decimal_places=2)
-    is_active = models.BooleanField(default=True, db_index=True)
+    range_from  = models.DecimalField(max_digits=15, decimal_places=2)
+    range_to    = models.DecimalField(max_digits=15, decimal_places=2)
+    daily_limit = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    is_active   = models.BooleanField(default=True, db_index=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -36,7 +37,7 @@ class PaymentSource(models.Model):
 class QRCode(PaymentSource):
     """QR Code payment source."""
 
-    qr_name = models.CharField(max_length=100)
+    qr_name = models.CharField(max_length=100, unique=True)
     qr_image = models.FileField(upload_to=generate_qr_upload_path)
 
     class Meta(PaymentSource.Meta):

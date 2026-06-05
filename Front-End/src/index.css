@@ -16,7 +16,7 @@
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-accent text-sidebar-bg font-semibold rounded-lg
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-accent text-white font-semibold rounded-lg
            hover:bg-accent-dark transition-colors duration-150 text-sm shadow-sm;
   }
   .btn-secondary {
@@ -29,11 +29,11 @@
   }
   .input {
     @apply w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white
-           focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent
+           focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent
            placeholder-gray-400 transition-all duration-150;
   }
   .card {
-    @apply bg-surface rounded-xl shadow-card p-6;
+    @apply bg-surface rounded-xl shadow-card p-6 border border-gray-100;
   }
   .page-title {
     @apply text-2xl font-bold text-gray-900 tracking-tight;

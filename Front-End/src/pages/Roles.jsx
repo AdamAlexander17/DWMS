@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Shield, Plus, Edit2, Trash2, CheckCircle, XCircle, Lock } from 'lucide-react';
+import { Shield, Plus, Edit2, Trash2, CheckCircle, XCircle, Lock, Search } from 'lucide-react';
 import {
   getRoles, getRole, createRole, updateRole, deleteRole,
   activateRole, deactivateRole, getModules,
@@ -86,7 +86,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
             type="checkbox"
             checked={totalActions > 0 && selectedActions === totalActions}
             onChange={toggleAll}
-            className="w-4 h-4 rounded cursor-pointer accent-amber-500"
+            className="w-4 h-4 rounded cursor-pointer accent-blue-500"
           />
           Select All
         </label>
@@ -110,7 +110,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
                     type="checkbox"
                     checked={allModOn}
                     onChange={() => toggleModule(mod.value)}
-                    className="w-4 h-4 rounded cursor-pointer accent-amber-500"
+                    className="w-4 h-4 rounded cursor-pointer accent-blue-500"
                   />
                 </div>
               </div>
@@ -124,7 +124,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleAction(mod.value, action)}
-                        className="w-4 h-4 rounded cursor-pointer accent-amber-500"
+                        className="w-4 h-4 rounded cursor-pointer accent-blue-500"
                       />
                       <span className={`text-sm ${checked ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
                         {actionLabel(action, mod.label)}
@@ -236,7 +236,7 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
 
             {/* Basic Information */}
             <div>
-              <p className="text-xs font-bold tracking-widest uppercase text-amber-600 mb-3">Basic Information</p>
+          <p className="text-xs font-bold tracking-widest uppercase text-accent mb-3">Basic Information</p>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -248,12 +248,12 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
                     onChange={handleField}
                     disabled={isEdit && role?.is_system}
                     placeholder="e.g. Marketing Manager"
-                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40
                       ${errors.name ? 'border-red-400' : 'border-gray-300'}
                       ${isEdit && role?.is_system ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`}
                   />
                   {isEdit && role?.is_system && (
-                    <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
+                    <p className="text-xs text-accent mt-1 flex items-center gap-1">
                       <Lock size={11} /> System role — name locked
                     </p>
                   )}
@@ -266,7 +266,7 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
                     name="is_active"
                     value={form.is_active ? 'true' : 'false'}
                     onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.value === 'true' }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
                   >
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
@@ -281,7 +281,7 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
                   value={form.description}
                   onChange={handleField}
                   placeholder="Brief description of the role"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
               </div>
             </div>
@@ -300,7 +300,7 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50 rounded-b-2xl">
-            <span className="text-sm font-semibold text-amber-600">
+            <span className="text-sm font-semibold text-accent">
               {selectedCount} permission{selectedCount !== 1 ? 's' : ''} selected
             </span>
             <div className="flex gap-3">
@@ -314,7 +314,7 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold disabled:opacity-60"
+                className="px-5 py-2 rounded-lg bg-accent hover:bg-accent-dark text-white text-sm font-semibold disabled:opacity-60"
               >
                 {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Role'}
               </button>
@@ -334,7 +334,7 @@ function PermissionBadges({ role }) {
     sum + ['can_view','can_create','can_edit','can_delete','can_activate'].filter(k => p[k]).length, 0) ?? 0;
   if (count === 0) return <span className="text-xs text-gray-400">No permissions</span>;
   return (
-    <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 font-medium">
+    <span className="inline-flex items-center gap-1 text-xs bg-accent/10 text-accent border border-accent/20 rounded-full px-2.5 py-0.5 font-medium">
       <Lock size={10} />
       {count} permission{count !== 1 ? 's' : ''}
     </span>
@@ -348,6 +348,7 @@ export default function Roles() {
   const [roles,   setRoles]   = useState([]);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search,  setSearch]  = useState('');
   const [modal,   setModal]   = useState(null); // null | { mode: 'create'|'edit', role? }
   const [delConfirm, setDelConfirm] = useState(null);
 
@@ -395,109 +396,100 @@ export default function Roles() {
     }
   };
 
+  const filteredRoles = roles.filter(r =>
+    r.name.toLowerCase().includes(search.toLowerCase()) ||
+    (r.description || '').toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div className="p-6">
+    <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Roles</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage roles and their module permissions dynamically
-          </p>
+          <h1 className="page-title">Roles</h1>
+          <p className="page-subtitle">{roles.length} role{roles.length !== 1 ? 's' : ''}</p>
         </div>
-        <button
-          onClick={() => setModal({ mode: 'create' })}
-          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow"
-        >
+        <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
           <Plus size={16} /> Add Role
         </button>
       </div>
 
+      {/* Filter bar */}
+      <div className="card py-4">
+        <div className="relative max-w-xs">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input pl-9"
+            placeholder="Search roles…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="card p-0 overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-gray-400">Loading…</div>
-        ) : roles.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">
-            <Shield size={40} className="mx-auto mb-3 opacity-30" />
-            <p>No roles found</p>
-          </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Role</th>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Description</th>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Permissions</th>
-                <th className="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
-                <th className="text-center px-5 py-3 font-semibold text-gray-600">System</th>
-                <th className="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50 text-left">
+                {['Role', 'Description', 'Permissions', 'Status', 'System', 'Actions'].map((h) => (
+                  <th key={h} className={`px-5 py-3.5 font-semibold text-gray-600 text-xs uppercase tracking-wide ${h === 'Actions' ? 'text-right' : h === 'Status' || h === 'System' ? 'text-center' : ''}`}>{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody>
-              {roles.map((role) => (
-                <tr key={role.id} className="border-b border-gray-50 hover:bg-amber-50/30 transition-colors">
-                  <td className="px-5 py-3">
+            <tbody className="divide-y divide-gray-50">
+            {filteredRoles.length === 0 && (
+              <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">No roles found</td></tr>
+            )}
+            {filteredRoles.map((role, i) => (
+                <tr key={role.id} className="hover:bg-blue-50/30 transition-colors">
+                  <td className="px-5 py-4">
                     <span className="font-semibold text-gray-800 capitalize">{role.name.replace(/_/g, ' ')}</span>
                   </td>
-                  <td className="px-5 py-3 text-gray-500 max-w-xs truncate">{role.description || '—'}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-4 text-gray-500 max-w-xs truncate">{role.description || '—'}</td>
+                  <td className="px-5 py-4">
                     <PermissionBadges role={role} />
                   </td>
-                  <td className="px-5 py-3 text-center">
+                  <td className="px-5 py-4 text-center">
                     {role.is_active ? (
-                      <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 text-xs font-medium">
+                      <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
                         <CheckCircle size={10} /> Active
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 rounded-full px-2 py-0.5 text-xs font-medium">
+                      <span className="inline-flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
                         <XCircle size={10} /> Inactive
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-center">
+                  <td className="px-5 py-4 text-center">
                     {role.is_system ? (
-                      <span className="text-xs text-amber-600 font-medium flex items-center justify-center gap-1">
+                      <span className="text-xs text-accent font-medium flex items-center justify-center gap-1">
                         <Lock size={12} /> System
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400">Custom</span>
                     )}
                   </td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      {/* Edit */}
-                      <button
-                        onClick={() => setModal({ mode: 'edit', role })}
-                        className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-500 hover:text-amber-700"
-                        title="Edit role"
-                      >
-                        <Edit2 size={15} />
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button onClick={() => handleToggleActive(role)}
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${role.is_active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        title={role.is_active ? 'Deactivate' : 'Activate'}>
+                        {role.is_active ? <CheckCircle size={15} /> : <XCircle size={15} />}
                       </button>
-
-                      {/* Activate / Deactivate */}
-                      <button
-                        onClick={() => handleToggleActive(role)}
-                        className={`p-1.5 rounded-lg text-sm ${
-                          role.is_active
-                            ? 'hover:bg-red-50 text-red-400 hover:text-red-600'
-                            : 'hover:bg-green-50 text-green-500 hover:text-green-700'
-                        }`}
-                        title={role.is_active ? 'Deactivate' : 'Activate'}
-                      >
-                        {role.is_active ? <XCircle size={15} /> : <CheckCircle size={15} />}
+                      <button onClick={() => setModal({ mode: 'edit', role })}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors"
+                        title="Edit role">
+                        <Edit2 size={14} />
                       </button>
-
-                      {/* Delete — disabled for system roles */}
-                      {!role.is_system && (
-                        <button
-                          onClick={() => setDelConfirm(role)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600"
-                          title="Delete role"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
+                      <button onClick={() => setDelConfirm(role)}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                        title="Delete role">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -547,3 +539,4 @@ export default function Roles() {
     </div>
   );
 }
+

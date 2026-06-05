@@ -1,18 +1,27 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { User, Lock, Save } from 'lucide-react'
+import { User, Lock, Save, Pencil, Settings, Clock } from 'lucide-react'
 import { getProfile, changePassword } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
 import { PageSpinner } from '../components/ui/Spinner'
-import Badge from '../components/ui/Badge'
+
+const roleLabel = { admin: 'Admin', back_office: 'Back Office', rm: 'RM' }
+
+const NAV = [
+  { id: 'profile',     label: 'Profile',      icon: User,     active: true  },
+  { id: 'password',    label: 'Password',     icon: Lock,     active: true  },
+  { id: 'preferences', label: 'Preferences',  icon: Settings, active: false },
+  { id: 'activity',    label: 'Activity Log', icon: Clock,    active: false },
+]
 
 export default function Profile() {
   const { user: storeUser } = useAuthStore()
   const { data, isLoading } = useQuery({ queryKey: ['profile'], queryFn: getProfile })
-  const profile = data?.data?.data
+  const u = data?.data?.data || storeUser
 
-  const [pwForm, setPwForm] = useState({ old_password: '', new_password: '', confirm_password: '' })
-  const [pwMsg, setPwMsg]   = useState(null)
+  const [tab, setTab] = useState('profile')
+  const [pwForm, setPwForm]   = useState({ old_password: '', new_password: '', confirm_password: '' })
+  const [pwMsg, setPwMsg]     = useState(null)
   const [pwLoading, setPwLoading] = useState(false)
 
   const handleChangePw = async (e) => {
@@ -35,88 +44,141 @@ export default function Profile() {
 
   if (isLoading) return <PageSpinner />
 
-  const u = profile || storeUser
+  const initials = (u?.username || 'U')[0].toUpperCase()
+  const role     = roleLabel[u?.role] ?? u?.role
+  const brands   = u?.brands_detail?.length ? u.brands_detail.map(b => b.name).join(', ') : '—'
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <div>
-        <h1 className="page-title">Profile</h1>
-        <p className="page-subtitle">Your account information</p>
-      </div>
+    <div className="space-y-6">
+      <h1 className="page-title">Edit Profile</h1>
 
-      {/* Info card */}
-      <div className="card">
-        <div className="flex items-center gap-5 mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-sidebar-bg flex items-center justify-center shrink-0">
-            <span className="text-accent font-black text-2xl">
-              {(u?.username || 'U')[0].toUpperCase()}
-            </span>
+      <div className="grid gap-6" style={{ gridTemplateColumns: '260px 1fr' }}>
+
+        {/* ── Left sidebar ── */}
+        <div className="card flex flex-col items-center pt-8 pb-6 px-5">
+          {/* Avatar */}
+          <div className="w-24 h-24 rounded-full bg-accent/10 border-4 border-accent/20 flex items-center justify-center mb-3">
+            <span className="text-accent font-black text-4xl">{initials}</span>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">@{u?.username}</h2>
-            <p className="text-gray-400 text-sm">@{u?.username}</p>
-            <div className="flex gap-2 mt-2">
-              <Badge variant={u?.role} />
-              <Badge variant={u?.is_active ? 'active' : 'inactive'} />
-            </div>
-          </div>
+          <p className="text-base font-bold text-gray-800">@{u?.username}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{role}</p>
+
+          <div className="w-full border-t border-gray-100 my-5" />
+
+          {/* Nav */}
+          <nav className="w-full space-y-0.5">
+            {NAV.map(({ id, label, icon: Icon, active }) => (
+              <button
+                key={id}
+                onClick={() => active && setTab(id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left
+                  ${tab === id ? 'bg-accent/8 text-accent' : active ? 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' : 'text-gray-300 cursor-not-allowed'}`}
+              >
+                <Icon size={16} />
+                {label}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          {[
-            { label: 'Username',   value: u?.username },
-            { label: 'Mobile',     value: u?.mobile || '—' },
-            { label: 'Role',       value: u?.role },
-            { label: 'Brand',      value: u?.brand_detail?.name || '—' },
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-gray-50 rounded-lg px-4 py-3">
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">{label}</p>
-              <p className="text-gray-800 font-medium">{value}</p>
+        {/* ── Right content card ── */}
+        <div className="card p-0 overflow-hidden">
+
+          {/* Top bar */}
+          <div className="flex items-center gap-1 px-6 py-0 border-b border-gray-100">
+            <div className="flex items-stretch flex-1 gap-0">
+              {[
+                { id: 'profile',  label: 'Profile',         icon: User },
+                { id: 'password', label: 'Change Password',  icon: Lock },
+              ].map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => { setTab(id); setPwMsg(null) }}
+                  className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors
+                    ${tab === id ? 'border-accent text-accent' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              ))}
             </div>
-          ))}
+            {tab === 'password' && (
+              <button type="submit" form="pw-form" disabled={pwLoading} className="btn-primary ml-auto">
+                <Save size={14} /> {pwLoading ? 'Saving…' : 'Save'}
+              </button>
+            )}
+          </div>
+
+          {/* Content */}
+          <div className="px-8 py-7">
+
+            {/* Profile tab */}
+            {tab === 'profile' && (
+              <>
+                <div className="flex items-center gap-2.5 mb-4">
+                  <User size={18} className="text-gray-700" />
+                  <h2 className="text-base font-bold text-gray-800">Profile</h2>
+                </div>
+                <div className="border-t border-gray-100 mb-6" />
+                <div className="grid grid-cols-2 gap-x-10 gap-y-0">
+                  {[
+                    { label: 'Username', value: u?.username },
+                    { label: 'Role',     value: role },
+                    { label: 'Brand',    value: brands },
+                    { label: 'Status',   value: u?.is_active ? 'Active' : 'Inactive' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-center justify-between py-4 border-b border-gray-50">
+                      <span className="text-sm text-gray-500 font-medium">{label}:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-800">{value}</span>
+                        <button
+                          title={`Edit ${label}`}
+                          className="w-6 h-6 rounded-full bg-accent/10 text-accent flex items-center justify-center hover:bg-accent/20 transition-colors"
+                        >
+                          <Pencil size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Password tab */}
+            {tab === 'password' && (
+              <>
+                <div className="flex items-center gap-2.5 mb-4">
+                  <Lock size={18} className="text-gray-700" />
+                  <h2 className="text-base font-bold text-gray-800">Change Password</h2>
+                </div>
+                <div className="border-t border-gray-100 mb-6" />
+                <form id="pw-form" onSubmit={handleChangePw} className="space-y-4 max-w-sm">
+                  {[
+                    { key: 'old_password',     label: 'Current Password',     ph: 'Enter current password' },
+                    { key: 'new_password',     label: 'New Password',         ph: 'Min 8 characters' },
+                    { key: 'confirm_password', label: 'Confirm New Password', ph: 'Repeat new password' },
+                  ].map(({ key, label, ph }) => (
+                    <div key={key}>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{label}</label>
+                      <input
+                        type="password" placeholder={ph} className="input"
+                        value={pwForm[key]}
+                        onChange={(e) => setPwForm({ ...pwForm, [key]: e.target.value })}
+                        required minLength={key === 'new_password' ? 8 : undefined}
+                      />
+                    </div>
+                  ))}
+                  {pwMsg && (
+                    <div className={`px-3 py-2 rounded-lg text-xs ${pwMsg.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                      {pwMsg.text}
+                    </div>
+                  )}
+                </form>
+              </>
+            )}
+
+          </div>
         </div>
-      </div>
-
-      {/* Change password */}
-      <div className="card">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
-            <Lock size={17} className="text-accent-dark" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-800">Change Password</h3>
-            <p className="text-gray-400 text-xs">Keep your account secure</p>
-          </div>
-        </div>
-
-        <form onSubmit={handleChangePw} className="space-y-4 max-w-md">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Current Password</label>
-            <input type="password" className="input" value={pwForm.old_password}
-              onChange={(e) => setPwForm({ ...pwForm, old_password: e.target.value })} required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
-            <input type="password" className="input" value={pwForm.new_password}
-              onChange={(e) => setPwForm({ ...pwForm, new_password: e.target.value })} required minLength={8} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm New Password</label>
-            <input type="password" className="input" value={pwForm.confirm_password}
-              onChange={(e) => setPwForm({ ...pwForm, confirm_password: e.target.value })} required />
-          </div>
-
-          {pwMsg && (
-            <div className={`px-4 py-3 rounded-lg text-sm ${pwMsg.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-              {pwMsg.text}
-            </div>
-          )}
-
-          <button type="submit" disabled={pwLoading} className="btn-primary">
-            <Save size={15} />
-            {pwLoading ? 'Saving…' : 'Update Password'}
-          </button>
-        </form>
       </div>
     </div>
   )

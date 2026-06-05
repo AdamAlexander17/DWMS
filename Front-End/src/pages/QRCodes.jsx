@@ -1,22 +1,191 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Search, Image } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle, XCircle, Search, QrCode as QrIcon, MoreVertical, X, Download, Maximize2 } from 'lucide-react'
 import { getQRCodes, createQRCode, updateQRCode, deleteQRCode, activateQRCode, deactivateQRCode } from '../api/payments'
 import { getBrands } from '../api/brands'
-import Modal from '../components/ui/Modal'
+import Modal         from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import Badge from '../components/ui/Badge'
-import Pagination from '../components/ui/Pagination'
+import Pagination    from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
+import CapacityBar   from '../components/ui/CapacityBar'
 import { useAuthStore } from '../store/authStore'
 
+// ── Download helper ───────────────────────────────────────────────────────
+async function downloadQR(imageUrl, fileName) {
+  try {
+    const res  = await fetch(imageUrl)
+    const blob = await res.blob()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${fileName}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    window.location.href = imageUrl
+  }
+}
+
+// ── Three-dot dropdown menu ────────────────────────────────────────────────
+function CardMenu({ record, onEdit, onDelete, onToggle }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl border border-gray-200 shadow-lg z-20 overflow-hidden py-1">
+          <button
+            onClick={() => { onToggle(record); setOpen(false) }}
+            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-gray-50 ${record.is_active ? 'text-amber-600' : 'text-green-600'}`}
+          >
+            {record.is_active ? <XCircle size={14} /> : <CheckCircle size={14} />}
+            {record.is_active ? 'Deactivate' : 'Activate'}
+          </button>
+          <button
+            onClick={() => { onEdit(record); setOpen(false) }}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Pencil size={14} /> Edit
+          </button>
+          <div className="border-t border-gray-100 my-1" />
+          <button
+            onClick={() => { onDelete(record); setOpen(false) }}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={14} /> Delete
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Image preview lightbox ────────────────────────────────────────────────
+function ImageLightbox({ src, name, onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl p-4 max-w-sm w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-gray-900 text-sm truncate">{name}</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <img src={src} alt={name} className="w-full rounded-lg object-contain" />
+      </div>
+    </div>
+  )
+}
+
+// ── Single QR card ─────────────────────────────────────────────────────────
+function QRCard({ r, canWrite, onEdit, onDelete, onToggle }) {
+  const [preview, setPreview] = useState(false)
+  return (
+    <>
+    {preview && <ImageLightbox src={r.qr_image} name={r.qr_name} onClose={() => setPreview(false)} />}
+    <div className="bg-white rounded-xl border border-gray-200 shadow-card flex flex-col overflow-hidden hover:shadow-card-hover transition-shadow duration-200">
+      {/* Image area */}
+      <div className="relative h-44 bg-gray-50 flex items-center justify-center p-4 border-b border-gray-100">
+        {r.qr_image
+          ? <img src={r.qr_image} alt={r.qr_name} className="h-full w-full object-contain" />
+          : <QrIcon size={72} className="text-gray-200" />
+        }
+        {/* Status */}
+        <span className={`absolute top-3 left-3 px-2.5 py-0.5 text-[11px] font-bold rounded-full ${r.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+          {r.is_active ? 'Active' : 'Inactive'}
+        </span>
+        {/* View full image */}
+        {r.qr_image && (
+          <button
+            onClick={() => setPreview(true)}
+            className="absolute top-3 right-3 p-1.5 bg-white rounded-lg border border-gray-200 text-gray-400 hover:text-accent transition-colors shadow-sm">
+            <Maximize2 size={13} />
+          </button>
+        )}
+      </div>
+
+      {/* Card body */}
+      <div className="p-4 flex-1 flex flex-col gap-3">
+        {/* Name + brand + menu */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="font-bold text-gray-900 text-sm leading-tight truncate">{r.qr_name}</h3>
+            <span className="inline-block mt-1.5 bg-accent/10 text-accent text-[11px] font-bold px-2 py-0.5 rounded-md">
+              {r.brand_name}
+            </span>
+          </div>
+          {canWrite && <CardMenu record={r} onEdit={onEdit} onDelete={onDelete} onToggle={onToggle} />}
+        </div>
+
+        {/* Range */}
+        <div>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Range</p>
+          <p className="text-xs text-gray-600 font-medium">
+            ₹{Number(r.range_from).toLocaleString('en-IN')} – ₹{Number(r.range_to).toLocaleString('en-IN')}
+          </p>
+        </div>
+
+        {/* Daily capacity */}
+        <div>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Daily Capacity</p>
+          <CapacityBar capacity={r.capacity} />
+        </div>
+
+        {/* Download button */}
+        {r.qr_image ? (
+          <button
+            onClick={() => downloadQR(r.qr_image, r.qr_name)}
+            className="mt-auto w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:border-accent hover:text-accent hover:bg-accent/5 transition-all duration-150"
+          >
+            <Download size={14} /> Download QR
+          </button>
+        ) : (
+          <div className="mt-auto w-full py-2 rounded-lg border border-dashed border-gray-200 text-xs text-center text-gray-300">
+            No image uploaded
+          </div>
+        )}
+      </div>
+    </div>
+    </>
+  )
+}
+
+// ── Create / Edit form ─────────────────────────────────────────────────────
 function QRForm({ initial, brands, onSubmit, loading }) {
   const [form, setForm] = useState({
-    qr_name:    initial?.qr_name    ?? '',
-    brand:      initial?.brand      ?? '',
-    range_from: initial?.range_from ?? '',
-    range_to:   initial?.range_to   ?? '',
-    qr_image:   null,
+    qr_name:     initial?.qr_name     ?? '',
+    brand:       initial?.brand       ?? '',
+    range_from:  initial?.range_from  ?? '',
+    range_to:    initial?.range_to    ?? '',
+    daily_limit: initial?.daily_limit ?? '',
+    qr_image:    null,
   })
   const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
   const isEdit = !!initial
@@ -45,6 +214,10 @@ function QRForm({ initial, brands, onSubmit, loading }) {
         </div>
       </div>
       <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Daily Limit (₹) <span className="text-gray-400 font-normal">— optional</span></label>
+        <input type="number" className="input" placeholder="e.g. 100000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
+      </div>
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">QR Image {isEdit ? '(leave blank to keep)' : '*'}</label>
         <input type="file" accept="image/*" className="input py-1.5" onChange={(e) => f('qr_image')(e.target.files[0] || null)} required={!isEdit} />
       </div>
@@ -55,13 +228,14 @@ function QRForm({ initial, brands, onSubmit, loading }) {
   )
 }
 
+// ── Main page ──────────────────────────────────────────────────────────────
 export default function QRCodes() {
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const canWrite = ['admin', 'back_office'].includes(user?.role)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [modal, setModal] = useState(null)
+  const [page,      setPage]      = useState(1)
+  const [search,    setSearch]    = useState('')
+  const [modal,     setModal]     = useState(null)
   const [delTarget, setDelTarget] = useState(null)
 
   const { data, isLoading } = useQuery({
@@ -75,88 +249,94 @@ export default function QRCodes() {
   const totalPages = data?.data?.data?.total_pages ?? 1
   const brands     = brandsData?.data?.data?.results ?? []
 
-  const inv    = () => qc.invalidateQueries({ queryKey: ['qr-codes'] })
-  const clean  = (form) => { const d = { ...form }; if (!d.qr_image) delete d.qr_image; return d }
+  const inv   = () => qc.invalidateQueries({ queryKey: ['qr-codes'] })
+  const clean = (form) => { const d = { ...form }; if (!d.qr_image) delete d.qr_image; return d }
 
-  const createM = useMutation({ mutationFn: createQRCode, onSuccess: () => { inv(); setModal(null) } })
-  const updateM = useMutation({ mutationFn: ({ id, d }) => updateQRCode(id, clean(d)), onSuccess: () => { inv(); setModal(null) } })
-  const deleteM = useMutation({ mutationFn: deleteQRCode, onSuccess: () => { inv(); setDelTarget(null) } })
+  const createM = useMutation({ mutationFn: createQRCode,                                    onSuccess: () => { inv(); setModal(null) } })
+  const updateM = useMutation({ mutationFn: ({ id, d }) => updateQRCode(id, clean(d)),       onSuccess: () => { inv(); setModal(null) } })
+  const deleteM = useMutation({ mutationFn: deleteQRCode,                                    onSuccess: () => { inv(); setDelTarget(null) } })
   const toggleM = useMutation({ mutationFn: ({ id, a }) => a ? deactivateQRCode(id) : activateQRCode(id), onSuccess: inv })
 
   if (isLoading) return <PageSpinner />
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">QR Codes</h1>
           <p className="page-subtitle">{total} QR code{total !== 1 ? 's' : ''}</p>
         </div>
-        {canWrite && <button onClick={() => setModal({ mode: 'create' })} className="btn-primary"><Plus size={16} /> Upload QR</button>}
+        {canWrite && (
+          <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
+            <Plus size={16} /> Upload QR
+          </button>
+        )}
       </div>
 
-      <div className="card py-4">
-        <div className="relative max-w-xs">
+      {/* Global Search */}
+      <div className="card py-3">
+        <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input className="input pl-9" placeholder="Search QR codes…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+          <input
+            className="input pl-9"
+            placeholder="Search QR codes by name…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          />
         </div>
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              {['#', 'QR Name', 'Brand', 'Range', 'Image', 'Status', ...(canWrite ? ['Actions'] : [])].map((h) => (
-                <th key={h} className={`px-6 py-3.5 font-semibold text-gray-600 text-xs uppercase tracking-wide ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {records.length === 0 && <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">No QR codes found</td></tr>}
-            {records.map((r, i) => (
-              <tr key={r.id} className="hover:bg-amber-50/40 transition-colors">
-                <td className="px-6 py-4 text-gray-400 text-xs">{(page-1)*20+i+1}</td>
-                <td className="px-6 py-4 font-semibold text-gray-800">{r.qr_name}</td>
-                <td className="px-6 py-4">
-                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.brand_name}</span>
-                </td>
-                <td className="px-6 py-4 text-gray-500 text-xs">₹{r.range_from} – ₹{r.range_to}</td>
-                <td className="px-6 py-4">
-                  {r.qr_image
-                    ? <a href={r.qr_image} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-600 flex items-center gap-1 text-xs"><Image size={13} />View</a>
-                    : <span className="text-gray-300 text-xs">—</span>}
-                </td>
-                <td className="px-6 py-4"><Badge variant={r.is_active ? 'active' : 'inactive'} /></td>
-                {canWrite && (
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} className={`p-1.5 rounded-lg ${r.is_active ? 'text-green-500 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}>
-                        {r.is_active ? <CheckCircle size={16} /> : <XCircle size={16} />}
-                      </button>
-                      <button onClick={() => setModal({ mode: 'edit', data: r })} className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50"><Pencil size={15} /></button>
-                      <button onClick={() => setDelTarget(r)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50"><Trash2 size={15} /></button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="px-6 pb-4"><Pagination current={page} total={totalPages} onPage={setPage} /></div>
-      </div>
+      {/* Cards grid — 4 per row on xl, scales down */}
+      {records.length === 0 ? (
+        <div className="card py-16 text-center text-gray-400">No QR codes found.</div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {records.map((r) => (
+            <QRCard
+              key={r.id}
+              r={r}
+              canWrite={canWrite}
+              onEdit={(rec) => setModal({ mode: 'edit', data: rec })}
+              onDelete={(rec) => setDelTarget(rec)}
+              onToggle={(rec) => toggleM.mutate({ id: rec.id, a: rec.is_active })}
+            />
+          ))}
+        </div>
+      )}
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="card py-3">
+          <Pagination current={page} total={totalPages} onPage={setPage} />
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
       {canWrite && (
         <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Edit QR Code' : 'Upload QR Code'}>
-          <QRForm initial={modal?.data} brands={brands} loading={createM.isPending || updateM.isPending}
-            onSubmit={(vals) => modal?.mode === 'edit' ? updateM.mutate({ id: modal.data.id, d: vals }) : createM.mutate(vals)} />
+          <QRForm
+            initial={modal?.data}
+            brands={brands}
+            loading={createM.isPending || updateM.isPending}
+            onSubmit={(vals) => modal?.mode === 'edit' ? updateM.mutate({ id: modal.data.id, d: vals }) : createM.mutate(vals)}
+          />
           {(createM.isError || updateM.isError) && (
-            <p className="text-red-500 text-sm mt-3">{createM.error?.response?.data?.message || updateM.error?.response?.data?.message || 'Error'}</p>
+            <p className="text-red-500 text-sm mt-3">
+              {createM.error?.response?.data?.message || updateM.error?.response?.data?.message || 'An error occurred.'}
+            </p>
           )}
         </Modal>
       )}
 
-      <ConfirmDialog open={!!delTarget} onClose={() => setDelTarget(null)} onConfirm={() => deleteM.mutate(delTarget.id)}
-        loading={deleteM.isPending} title="Delete QR Code" message={`Delete "${delTarget?.qr_name}"?`} />
+      <ConfirmDialog
+        open={!!delTarget}
+        onClose={() => setDelTarget(null)}
+        onConfirm={() => deleteM.mutate(delTarget.id)}
+        loading={deleteM.isPending}
+        title="Delete QR Code"
+        message={`Delete "${delTarget?.qr_name}"? This cannot be undone.`}
+      />
     </div>
   )
 }

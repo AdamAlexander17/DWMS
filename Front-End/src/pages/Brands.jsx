@@ -80,7 +80,6 @@ export default function Brands() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              <th className="px-6 py-3.5 font-semibold text-gray-600 text-xs uppercase tracking-wide">#</th>
               <th className="px-6 py-3.5 font-semibold text-gray-600 text-xs uppercase tracking-wide">Brand Name</th>
               <th className="px-6 py-3.5 font-semibold text-gray-600 text-xs uppercase tracking-wide">Status</th>
               <th className="px-6 py-3.5 font-semibold text-gray-600 text-xs uppercase tracking-wide">Created</th>
@@ -89,11 +88,10 @@ export default function Brands() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {brands.length === 0 && (
-              <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 text-sm">No brands found</td></tr>
+              <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-400 text-sm">No brands found</td></tr>
             )}
             {brands.map((b, i) => (
               <tr key={b.id} className="hover:bg-amber-50/40 transition-colors">
-                <td className="px-6 py-4 text-gray-400 text-xs">{(page - 1) * 20 + i + 1}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-accent text-sidebar-bg flex items-center justify-center font-bold text-sm shrink-0">
@@ -105,19 +103,19 @@ export default function Brands() {
                 <td className="px-6 py-4"><Badge variant={b.is_active ? 'active' : 'inactive'} /></td>
                 <td className="px-6 py-4 text-gray-500">{new Date(b.created_at).toLocaleDateString()}</td>
                 <td className="px-6 py-4">
-                  <div className="flex items-center gap-1 justify-end">
+                  <div className="flex items-center gap-1.5 justify-end">
                     <button
                       onClick={() => toggleM.mutate({ id: b.id, active: b.is_active })}
                       title={b.is_active ? 'Deactivate' : 'Activate'}
-                      className={`p-1.5 rounded-lg transition-colors ${b.is_active ? 'text-green-500 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                      className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${b.is_active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                     >
-                      {b.is_active ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                      {b.is_active ? <CheckCircle size={15} /> : <XCircle size={15} />}
                     </button>
-                    <button onClick={() => setModal({ mode: 'edit', data: b })} className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50">
-                      <Pencil size={15} />
+                    <button onClick={() => setModal({ mode: 'edit', data: b })} title="Edit" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors">
+                      <Pencil size={14} />
                     </button>
-                    <button onClick={() => setDelTarget(b)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50">
-                      <Trash2 size={15} />
+                    <button onClick={() => setDelTarget(b)} title="Delete" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </td>

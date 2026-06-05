@@ -27,7 +27,8 @@ from .services import BrandService
 )
 class BrandViewSet(ModelViewSet):
     """
-    Full CRUD for brands.  Admin access only.
+    Full CRUD for brands.  Write operations: Admin only.
+    Read operations: all authenticated users (back office and RM need brand lists for dropdowns).
     """
 
     permission_classes = [IsAuthenticated, IsAdmin]
@@ -35,6 +36,11 @@ class BrandViewSet(ModelViewSet):
     filterset_class = BrandFilter
     search_fields = ['name']
     ordering_fields = ['name', 'is_active', 'created_at']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdmin()]
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):

@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'users',
     'brands',
     'payments',
+    'deposits',
     'audit_logs',
     'common',
 ]

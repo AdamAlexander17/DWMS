@@ -35,7 +35,12 @@ class _PaymentSourceMixin:
         user = self.request.user
         role_name = getattr(user.role, 'name', None) if getattr(user, 'role', None) else None
         if role_name == 'rm':
-            qs = qs.filter(brand=user.brand, is_active=True)
+            # RM: only active channels belonging to their assigned brands
+            qs = qs.filter(brand__in=user.brands.all(), is_active=True)
+        elif role_name == 'back_office':
+            # Back office: all channels (active + inactive) for their assigned brands
+            qs = qs.filter(brand__in=user.brands.all())
+        # admin: no brand restriction — sees everything
         return qs
 
     # ------------------------------------------------------------------

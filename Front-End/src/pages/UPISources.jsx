@@ -8,14 +8,16 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Badge from '../components/ui/Badge'
 import Pagination from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
+import CapacityBar from '../components/ui/CapacityBar'
 import { useAuthStore } from '../store/authStore'
 
 function UPIForm({ initial, brands, onSubmit, loading }) {
   const [form, setForm] = useState({
-    upi_id:     initial?.upi_id     ?? '',
-    brand:      initial?.brand      ?? '',
-    range_from: initial?.range_from ?? '',
-    range_to:   initial?.range_to   ?? '',
+    upi_id:      initial?.upi_id      ?? '',
+    brand:       initial?.brand       ?? '',
+    range_from:  initial?.range_from  ?? '',
+    range_to:    initial?.range_to    ?? '',
+    daily_limit: initial?.daily_limit ?? '',
   })
   const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
   return (
@@ -40,6 +42,10 @@ function UPIForm({ initial, brands, onSubmit, loading }) {
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Range To *</label>
           <input type="number" className="input" value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} required step="0.01" />
         </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Daily Limit (₹) <span className="text-gray-400 font-normal">— optional</span></label>
+        <input type="number" className="input" placeholder="e.g. 100000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
       </div>
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center mt-2">
         {loading ? 'Saving…' : initial ? 'Update UPI Source' : 'Create UPI Source'}
@@ -97,30 +103,30 @@ export default function UPISources() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              {['#', 'UPI ID', 'Brand', 'Range', 'Status', ...(canWrite ? ['Actions'] : [])].map((h) => (
+              {['UPI ID', 'Brand', 'Range', 'Daily Capacity', 'Status', ...(canWrite ? ['Actions'] : [])].map((h) => (
                 <th key={h} className={`px-6 py-3.5 font-semibold text-gray-600 text-xs uppercase tracking-wide ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {records.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">No UPI sources found</td></tr>}
+            {records.length === 0 && <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400">No UPI sources found</td></tr>}
             {records.map((r, i) => (
               <tr key={r.id} className="hover:bg-amber-50/40 transition-colors">
-                <td className="px-6 py-4 text-gray-400 text-xs">{(page-1)*20+i+1}</td>
                 <td className="px-6 py-4 font-mono font-semibold text-gray-800">{r.upi_id}</td>
                 <td className="px-6 py-4">
                   <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.brand_name}</span>
                 </td>
                 <td className="px-6 py-4 text-gray-500 text-xs">₹{r.range_from} – ₹{r.range_to}</td>
+                <td className="px-6 py-4"><CapacityBar capacity={r.capacity} /></td>
                 <td className="px-6 py-4"><Badge variant={r.is_active ? 'active' : 'inactive'} /></td>
                 {canWrite && (
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} className={`p-1.5 rounded-lg ${r.is_active ? 'text-green-500 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}>
-                        {r.is_active ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} title={r.is_active ? 'Deactivate' : 'Activate'} className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${r.is_active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
+                        {r.is_active ? <CheckCircle size={15} /> : <XCircle size={15} />}
                       </button>
-                      <button onClick={() => setModal({ mode: 'edit', data: r })} className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50"><Pencil size={15} /></button>
-                      <button onClick={() => setDelTarget(r)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50"><Trash2 size={15} /></button>
+                      <button onClick={() => setModal({ mode: 'edit', data: r })} title="Edit" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors"><Pencil size={14} /></button>
+                      <button onClick={() => setDelTarget(r)} title="Delete" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </td>
                 )}

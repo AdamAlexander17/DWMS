@@ -1,21 +1,19 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import {
-  LayoutDashboard, Users, Tag, QrCode, Wallet,
-  Building2, ScrollText, UserCircle, LogOut, ChevronRight, Shield,
-} from 'lucide-react'
+import { Users, QrCode, Wallet, Building2, ScrollText, LogOut, Shield, ArrowDownCircle, Landmark, LayoutDashboard, Tag } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { logout as apiLogout } from '../../api/auth'
+import NotificationBell from '../ui/NotificationBell'
 
 const allNavItems = [
-  { to: '/',              label: 'Dashboard',     icon: LayoutDashboard, roles: ['admin', 'back_office', 'rm'] },
-  { to: '/users',         label: 'Users',         icon: Users,           roles: ['admin'] },
-  { to: '/roles',         label: 'Roles',         icon: Shield,          roles: ['admin'] },
-  { to: '/brands',        label: 'Brands',        icon: Tag,             roles: ['admin'] },
-  { to: '/qr-codes',      label: 'QR Codes',      icon: QrCode,          roles: ['admin', 'back_office', 'rm'] },
-  { to: '/upi-sources',   label: 'UPI Sources',   icon: Wallet,          roles: ['admin', 'back_office', 'rm'] },
-  { to: '/bank-accounts', label: 'Bank Accounts', icon: Building2,       roles: ['admin', 'back_office', 'rm'] },
-  { to: '/audit-logs',    label: 'Audit Logs',    icon: ScrollText,      roles: ['admin'] },
-  { to: '/profile',       label: 'Profile',       icon: UserCircle,      roles: ['admin', 'back_office', 'rm'] },
+  { to: '/',              label: 'Dashboard',    roles: ['admin', 'back_office', 'rm'] },
+  { to: '/users',         label: 'Users',        roles: ['admin'] },
+  { to: '/roles',         label: 'Roles',        roles: ['admin'] },
+  { to: '/brands',        label: 'Brands',       roles: ['admin'] },
+  { to: '/qr-codes',      label: 'QR Codes',     roles: ['admin', 'back_office', 'rm'] },
+  { to: '/upi-sources',   label: 'UPI Sources',  roles: ['admin', 'back_office', 'rm'] },
+  { to: '/bank-accounts', label: 'Bank Accounts',roles: ['admin', 'back_office', 'rm'] },
+  { to: '/deposits',      label: 'Deposits',     roles: ['admin', 'back_office', 'rm'] },
+  { to: '/audit-logs',    label: 'Audit Logs',   roles: ['admin'] },
 ]
 
 const roleLabel = { admin: 'Administrator', back_office: 'Back Office', rm: 'Relationship Manager' }
@@ -35,63 +33,66 @@ export default function Sidebar() {
   const initials = user?.username?.[0]?.toUpperCase() ?? 'U'
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-64 flex flex-col bg-sidebar-bg z-30 select-none">
-      {/* Brand / Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-        <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center shrink-0">
-          <span className="text-sidebar-bg font-black text-base leading-none">D</span>
-        </div>
-        <div>
-          <p className="text-white font-bold text-base leading-tight tracking-wide">DWMS</p>
-          <p className="text-sidebar-text text-[11px] leading-tight">Deposit Management</p>
-        </div>
-      </div>
+    <nav className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm select-none">
+      <div className="flex items-stretch h-14 px-6">
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-        {navItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
-                isActive
-                  ? 'bg-accent text-sidebar-bg shadow-sm'
-                  : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
-              }`
-            }
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 shrink-0 pr-5 border-r border-gray-200 mr-4">
+          <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
+            <Landmark size={16} className="text-white" strokeWidth={2.5} />
+          </div>
+          <div>
+            <p className="text-gray-900 font-bold text-sm leading-tight">DWMS</p>
+            <p className="text-gray-400 text-[10px] leading-tight">Deposit Management</p>
+          </div>
+        </div>
+
+        {/* Nav Links */}
+        <div className="flex items-stretch flex-1 overflow-x-auto">
+          {navItems.map(({ to, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                `flex items-center px-3 text-sm font-medium border-b-2 whitespace-nowrap transition-all duration-150 ${
+                  isActive
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+                }`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+        </div>
+
+        {/* Right side */}
+        <div className="flex items-center gap-3 shrink-0 pl-4 border-l border-gray-200">
+          <NotificationBell />
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-2.5 group"
+            title="My Profile"
           >
-            {({ isActive }) => (
-              <>
-                <Icon size={17} className="shrink-0" />
-                <span className="flex-1">{label}</span>
-                {isActive && <ChevronRight size={14} className="opacity-60" />}
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* User Footer */}
-      <div className="border-t border-sidebar-border px-4 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-            <span className="text-accent font-bold text-sm">{initials}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-semibold truncate">{user?.username}</p>
-            <p className="text-sidebar-text text-[11px] truncate">{roleLabel[user?.role] || user?.role}</p>
-          </div>
+            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 group-hover:bg-accent/20 transition-colors">
+              <span className="text-accent font-bold text-xs">{initials}</span>
+            </div>
+            <div className="hidden lg:block leading-tight text-left">
+              <p className="text-sm font-semibold text-gray-800">{user?.username}</p>
+              <p className="text-[11px] text-gray-400">{roleLabel[user?.role] ?? user?.role}</p>
+            </div>
+          </button>
           <button
             onClick={handleLogout}
             title="Logout"
-            className="text-sidebar-text hover:text-red-400 transition-colors p-1 rounded"
+            className="text-gray-400 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-gray-50"
           >
             <LogOut size={16} />
           </button>
         </div>
+
       </div>
-    </aside>
+    </nav>
   )
 }

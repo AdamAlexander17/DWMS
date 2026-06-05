@@ -25,14 +25,15 @@ def _validate_range(attrs, instance=None):
 # ---------------------------------------------------------------------------
 
 class QRCodeSerializer(serializers.ModelSerializer):
-    brand_name = serializers.SerializerMethodField()
-    created_by_name = serializers.SerializerMethodField()
+    brand_name       = serializers.SerializerMethodField()
+    created_by_name  = serializers.SerializerMethodField()
+    capacity         = serializers.SerializerMethodField()
 
     class Meta:
         model = QRCode
         fields = [
             'id', 'brand', 'brand_name', 'qr_name', 'qr_image',
-            'range_from', 'range_to', 'is_active',
+            'range_from', 'range_to', 'daily_limit', 'is_active', 'capacity',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
@@ -43,8 +44,21 @@ class QRCodeSerializer(serializers.ModelSerializer):
     def get_created_by_name(self, obj) -> str:
         return obj.created_by.username if obj.created_by else None
 
+    def get_capacity(self, obj) -> dict:
+        from deposits.services import CapacityService
+        return CapacityService.get_capacity_info('qr', obj.pk, obj.daily_limit)
+
     def validate_qr_image(self, value):
         validate_image_file(value)
+        from common.utils import crop_qr_from_image
+        return crop_qr_from_image(value)
+
+    def validate_qr_name(self, value):
+        qs = QRCode.objects.filter(qr_name__iexact=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('A QR code with this name already exists.')
         return value
 
     def validate(self, attrs):
@@ -61,14 +75,15 @@ class QRCodeSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 
 class UPISourceSerializer(serializers.ModelSerializer):
-    brand_name = serializers.SerializerMethodField()
+    brand_name      = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
+    capacity        = serializers.SerializerMethodField()
 
     class Meta:
         model = UPISource
         fields = [
             'id', 'brand', 'brand_name', 'upi_id',
-            'range_from', 'range_to', 'is_active',
+            'range_from', 'range_to', 'daily_limit', 'is_active', 'capacity',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
@@ -78,6 +93,10 @@ class UPISourceSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj) -> str:
         return obj.created_by.username if obj.created_by else None
+
+    def get_capacity(self, obj) -> dict:
+        from deposits.services import CapacityService
+        return CapacityService.get_capacity_info('upi', obj.pk, obj.daily_limit)
 
     def validate(self, attrs):
         _validate_range(attrs, self.instance)
@@ -93,8 +112,9 @@ class UPISourceSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 
 class BankAccountSerializer(serializers.ModelSerializer):
-    brand_name = serializers.SerializerMethodField()
+    brand_name      = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
+    capacity        = serializers.SerializerMethodField()
 
     class Meta:
         model = BankAccount
@@ -102,7 +122,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             'id', 'brand', 'brand_name',
             'bank_name', 'account_holder_name', 'account_number',
             'ifsc_code', 'branch_name',
-            'range_from', 'range_to', 'is_active',
+            'range_from', 'range_to', 'daily_limit', 'is_active', 'capacity',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
@@ -112,6 +132,10 @@ class BankAccountSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj) -> str:
         return obj.created_by.username if obj.created_by else None
+
+    def get_capacity(self, obj) -> dict:
+        from deposits.services import CapacityService
+        return CapacityService.get_capacity_info('bank', obj.pk, obj.daily_limit)
 
     def validate(self, attrs):
         _validate_range(attrs, self.instance)

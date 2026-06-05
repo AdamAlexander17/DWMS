@@ -8,6 +8,7 @@ class Module(models.TextChoices):
     UPI_SOURCES  = 'upi_sources',   'UPI Sources'
     BANK_ACCOUNTS = 'bank_accounts', 'Bank Accounts'
     AUDIT_LOGS   = 'audit_logs',    'Audit Logs'
+    DEPOSITS     = 'deposits',      'Deposits'
 
 
 class Role(models.Model):

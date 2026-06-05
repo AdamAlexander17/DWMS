@@ -52,3 +52,60 @@ def validate_image_file(file) -> None:
             f"File size {file.size / (1024 * 1024):.1f} MB exceeds "
             f"the maximum allowed size of {MAX_IMAGE_SIZE_MB} MB."
         )
+
+
+def crop_qr_from_image(image_file):
+    """
+    Detect a QR code in the uploaded image, crop tightly to its bounding box
+    (+ 15% padding), and return a new InMemoryUploadedFile containing only
+    the QR.  Raises ValidationError if no QR code is detected.
+    """
+    import io
+    from django.core.exceptions import ValidationError
+    from django.core.files.uploadedfile import InMemoryUploadedFile
+    from PIL import Image
+    from pyzbar.pyzbar import decode
+
+    image_file.seek(0)
+    try:
+        img = Image.open(image_file).convert('RGB')
+    except Exception:
+        raise ValidationError('Could not open the uploaded image.')
+
+    decoded = decode(img)
+    if not decoded:
+        raise ValidationError(
+            'No QR code detected in the uploaded image. '
+            'Please upload an image that clearly contains a QR code.'
+        )
+
+    # Pick the largest QR code found
+    qr  = max(decoded, key=lambda d: d.rect.width * d.rect.height)
+    lft = qr.rect.left
+    top = qr.rect.top
+    rgt = qr.rect.left + qr.rect.width
+    bot = qr.rect.top  + qr.rect.height
+
+    # 15% padding on each side
+    px = int(qr.rect.width  * 0.15)
+    py = int(qr.rect.height * 0.15)
+    img_w, img_h = img.size
+    lft = max(0,     lft - px)
+    top = max(0,     top - py)
+    rgt = min(img_w, rgt + px)
+    bot = min(img_h, bot + py)
+
+    cropped = img.crop((lft, top, rgt, bot))
+
+    buf = io.BytesIO()
+    cropped.save(buf, format='PNG')
+    buf.seek(0)
+
+    return InMemoryUploadedFile(
+        file=buf,
+        field_name=getattr(image_file, 'field_name', 'qr_image'),
+        name=f'qr_{uuid.uuid4().hex}.png',
+        content_type='image/png',
+        size=buf.getbuffer().nbytes,
+        charset=None,
+    )
