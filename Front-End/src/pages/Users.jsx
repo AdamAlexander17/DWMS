@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+﻿import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Pencil, Trash2, Search, LockKeyhole, X, Clock, Calendar, ChevronDown, ChevronUp, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getUsers, createUser, updateUser, deleteUser, activateUser, deactivateUser, resetPassword, bulkImportUsers } from '../api/users'
@@ -364,91 +364,91 @@ export default function Users() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80 text-left">
               {['User', 'Brand', 'Roles', 'Status', 'Last Login'].map((h) => (
-                <th key={h} className="px-5 py-3.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">{h}</th>
+                <th key={h} className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider">{h}</th>
               ))}
               <th
-                className="px-5 py-3.5 font-semibold text-gray-500 text-xs uppercase tracking-wide cursor-pointer select-none"
+                className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider cursor-pointer select-none"
                 onClick={() => setSortAsc(p => !p)}
               >
                 <span className="inline-flex items-center gap-1">
-                  Created {sortAsc ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  Created {sortAsc ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                 </span>
               </th>
-              <th className="px-5 py-3.5 font-semibold text-gray-500 text-xs uppercase tracking-wide text-right">Actions</th>
+              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-50">
             {users.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">No users found</td></tr>
+              <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400 text-sm">No users found</td></tr>
             )}
             {users.map((u) => (
-              <tr key={u.id} className="hover:bg-blue-50/30 transition-colors">
+              <tr key={u.id} className="hover:bg-blue-50/20 transition-colors">
 
                 {/* User */}
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full ${avatarColor(u.username)} flex items-center justify-center font-bold text-white text-sm shrink-0`}>
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-full ${avatarColor(u.username)} flex items-center justify-center font-bold text-white text-xs shrink-0`}>
                       {u.username[0].toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-800 leading-tight">{u.username}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">@{u.username}</p>
+                      <p className="font-medium text-gray-800 text-xs leading-tight">{u.username}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">@{u.username}</p>
                     </div>
                   </div>
                 </td>
 
                 {/* Brand */}
-                <td className="px-5 py-3.5 text-gray-600 text-sm">
+                <td className="px-4 py-2.5 text-gray-500 text-xs">
                   {u.brands_detail?.length ? u.brands_detail.map(b => b.name).join(', ') : <span className="text-gray-300">—</span>}
                 </td>
 
                 {/* Roles */}
-                <td className="px-5 py-3.5"><Badge variant={u.role_name} /></td>
+                <td className="px-4 py-2.5"><Badge variant={u.role_name} /></td>
 
                 {/* Status — toggle switch */}
-                <td className="px-5 py-3.5">
+                <td className="px-4 py-2.5">
                   <button
                     onClick={() => toggleM.mutate({ id: u.id, active: u.is_active })}
                     title={u.is_active ? 'Deactivate' : 'Activate'}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${u.is_active ? 'bg-accent' : 'bg-gray-200'}`}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${u.is_active ? 'bg-accent' : 'bg-gray-200'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${u.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${u.is_active ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
                   </button>
                 </td>
 
                 {/* Last Login */}
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-1.5 text-gray-500 text-xs">
-                    <Clock size={13} className="text-gray-400 shrink-0" />
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-1.5 text-gray-400 text-[11px]">
+                    <Clock size={11} className="text-gray-300 shrink-0" />
                     {fmtDateTime(u.last_login)}
                   </div>
                 </td>
 
                 {/* Created */}
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-1.5 text-gray-500 text-xs">
-                    <Calendar size={13} className="text-gray-400 shrink-0" />
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-1.5 text-gray-400 text-[11px]">
+                    <Calendar size={11} className="text-gray-300 shrink-0" />
                     {fmtDate(u.created_at)}
                   </div>
                 </td>
 
                 {/* Actions */}
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-1.5 justify-end">
-                    <button onClick={() => setResetTarget(u)} title="Reset Password" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"><LockKeyhole size={14} /></button>
-                    <button onClick={() => setModal({ mode: 'edit', data: u })} title="Edit" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"><Pencil size={14} /></button>
-                    <button onClick={() => setDelTarget(u)} title="Delete" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"><Trash2 size={14} /></button>
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => setResetTarget(u)} title="Reset Password" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><LockKeyhole size={13} /></button>
+                    <button onClick={() => setModal({ mode: 'edit', data: u })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><Pencil size={13} /></button>
+                    <button onClick={() => setDelTarget(u)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div className="px-6 pb-4">
+        <div className="px-5 py-3 border-t border-gray-50">
           <Pagination current={page} total={totalPages} onPage={setPage} />
         </div>
       </div>

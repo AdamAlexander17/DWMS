@@ -18,7 +18,7 @@ const labels = {
 export default function Badge({ variant = 'default', label }) {
   const cls = variants[variant] || variants.default
   return (
-    <span className={`inline-flex items-center justify-center min-w-[80px] px-2.5 py-0.5 rounded-md text-xs font-semibold border ${cls}`}>
+    <span className={`inline-flex items-center justify-center min-w-[70px] px-2 py-0.5 rounded-md text-[11px] font-semibold border ${cls}`}>
       {label ?? labels[variant] ?? variant}
     </span>
   )
