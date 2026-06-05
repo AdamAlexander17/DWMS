@@ -432,7 +432,7 @@ export default function Deposits() {
                       {canWrite && (
                         <>
                           <button onClick={() => setModal({ mode: 'edit', data: r })}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors">
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
                             <Pencil size={14} />
                           </button>
                           <button onClick={() => setDelTarget(r)}

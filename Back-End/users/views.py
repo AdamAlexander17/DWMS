@@ -8,9 +8,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
 from audit_logs.services import AuditLogService
+from brands.models import Brand
 from common.permissions import IsAdmin
 from common.responses import error_response, success_response
 from common.utils import get_client_ip
+from roles.models import Role
 
 from .serializers import UserCreateSerializer, UserListSerializer, UserUpdateSerializer
 from .services import UserService
@@ -174,3 +176,82 @@ class UserViewSet(ModelViewSet):
             ip_address=get_client_ip(request),
         )
         return success_response('Password reset successfully')
+
+    @action(detail=False, methods=['post'], url_path='bulk-import')
+    def bulk_import(self, request):
+        """Bulk create users from a CSV or Excel file.
+
+        Expected columns: username, role, brands (comma-separated), password (optional)
+        Missing password defaults to 123456 and must_change_password is set to True.
+        """
+        import csv
+        import io
+        import openpyxl
+
+        file = request.FILES.get('file')
+        if not file:
+            return error_response('File is required', status_code=status.HTTP_400_BAD_REQUEST)
+
+        fname = file.name.lower()
+        try:
+            if fname.endswith('.csv'):
+                content = file.read().decode('utf-8-sig')
+                reader = csv.DictReader(io.StringIO(content))
+                rows = [r for r in reader]
+            elif fname.endswith(('.xlsx', '.xls')):
+                wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+                ws = wb.active
+                headers = [str(cell.value).strip() if cell.value is not None else '' for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+                rows = []
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    rows.append(dict(zip(headers, [str(v).strip() if v is not None else '' for v in row])))
+            else:
+                return error_response('Only CSV (.csv) and Excel (.xlsx) files are supported', status_code=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return error_response(f'Failed to parse file: {exc}', status_code=status.HTTP_400_BAD_REQUEST)
+
+        roles_cache  = {r.name.lower(): r for r in Role.objects.filter(is_active=True)}
+        brands_cache = {b.name.lower(): b for b in Brand.objects.all()}
+
+        created, skipped, errors = [], [], []
+
+        for i, row in enumerate(rows, start=2):
+            username = str(row.get('username') or '').strip()
+            if not username:
+                errors.append({'row': i, 'error': 'Username is required'})
+                continue
+
+            if User.objects.filter(username=username).exists():
+                skipped.append(username)
+                continue
+
+            role_key  = str(row.get('role') or '').strip().lower().replace(' ', '_')
+            role_obj  = roles_cache.get(role_key)
+
+            brand_names = [b.strip().lower() for b in str(row.get('brands') or '').split(',') if b.strip()]
+            brand_objs  = [brands_cache[bn] for bn in brand_names if bn in brands_cache]
+
+            password = str(row.get('password') or '').strip() or '123456'
+
+            try:
+                user = User(username=username, role=role_obj, must_change_password=True)
+                user.set_password(password)
+                user.save()
+                if brand_objs:
+                    user.brands.set(brand_objs)
+                created.append(username)
+            except Exception as exc:
+                errors.append({'row': i, 'username': username, 'error': str(exc)})
+
+        AuditLogService.log(
+            user=request.user,
+            action=f'Bulk imported users: {len(created)} created, {len(skipped)} skipped, {len(errors)} errors',
+            module='User',
+            ip_address=get_client_ip(request),
+        )
+        return success_response('Bulk import completed', {
+            'created': created,
+            'skipped': skipped,
+            'errors':  errors,
+            'summary': f'{len(created)} created, {len(skipped)} skipped, {len(errors)} errors',
+        })

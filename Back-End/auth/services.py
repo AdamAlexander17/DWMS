@@ -18,12 +18,13 @@ class AuthService:
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'user': {
-                'id':          user.id,
-                'username':    user.username,
-                'role':        role_name,
-                'role_id':     user.role_id,
-                'permissions': permissions,
-                'brand_ids':   list(user.brands.values_list('id', flat=True)),
+                'id':                   user.id,
+                'username':             user.username,
+                'role':                 role_name,
+                'role_id':              user.role_id,
+                'permissions':          permissions,
+                'brand_ids':            list(user.brands.values_list('id', flat=True)),
+                'must_change_password': user.must_change_password,
             },
         }
 
@@ -42,7 +43,8 @@ class AuthService:
         if not user.check_password(old_password):
             raise ValueError('Old password is incorrect')
         user.set_password(new_password)
-        user.save(update_fields=['password', 'updated_at'])
+        user.must_change_password = False
+        user.save(update_fields=['password', 'must_change_password', 'updated_at'])
 
 
 

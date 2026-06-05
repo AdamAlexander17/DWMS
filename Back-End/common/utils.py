@@ -9,11 +9,16 @@ ALLOWED_IMAGE_CONTENT_TYPES = {
     'image/jpg',
     'image/png',
     'image/webp',
+    'image/gif',
+    'image/bmp',
+    'image/tiff',
+    'image/x-bmp',
+    'image/x-ms-bmp',
 }
-MAX_IMAGE_SIZE_MB = 5
+MAX_IMAGE_SIZE_MB = 10
 MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
 
-ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.tiff', '.tif'}
 
 
 def get_client_ip(request) -> str:
@@ -44,7 +49,7 @@ def validate_image_file(file) -> None:
     if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
         raise ValidationError(
             f"Unsupported file type '{content_type}'. "
-            f"Allowed types: JPEG, PNG, WebP."
+            f"Allowed types: JPEG, PNG, WebP, GIF, BMP, TIFF."
         )
 
     if file.size > MAX_IMAGE_SIZE_BYTES:

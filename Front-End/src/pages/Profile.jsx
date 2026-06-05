@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { User, Lock, Save, Pencil, Settings, Clock } from 'lucide-react'
+import { User, Lock, Save, Pencil, Settings, Clock, AlertTriangle } from 'lucide-react'
 import { getProfile, changePassword } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
 import { PageSpinner } from '../components/ui/Spinner'
@@ -15,11 +16,13 @@ const NAV = [
 ]
 
 export default function Profile() {
-  const { user: storeUser } = useAuthStore()
+  const { user: storeUser, clearMustChangePassword } = useAuthStore()
+  const location = useLocation()
+  const forceChange = !!location.state?.forcePasswordChange || !!storeUser?.must_change_password
   const { data, isLoading } = useQuery({ queryKey: ['profile'], queryFn: getProfile })
   const u = data?.data?.data || storeUser
 
-  const [tab, setTab] = useState('profile')
+  const [tab, setTab] = useState(forceChange ? 'password' : 'profile')
   const [pwForm, setPwForm]   = useState({ old_password: '', new_password: '', confirm_password: '' })
   const [pwMsg, setPwMsg]     = useState(null)
   const [pwLoading, setPwLoading] = useState(false)
@@ -35,6 +38,7 @@ export default function Profile() {
       await changePassword(pwForm)
       setPwMsg({ ok: true, text: 'Password changed successfully' })
       setPwForm({ old_password: '', new_password: '', confirm_password: '' })
+      clearMustChangePassword()
     } catch (err) {
       setPwMsg({ ok: false, text: err.response?.data?.message || 'Failed to change password' })
     } finally {
@@ -51,6 +55,14 @@ export default function Profile() {
   return (
     <div className="space-y-6">
       <h1 className="page-title">Edit Profile</h1>
+
+      {/* Force password change banner */}
+      {forceChange && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+          <AlertTriangle size={18} className="shrink-0 mt-0.5 text-amber-500" />
+          <p className="text-sm font-medium">You are using a temporary password. Please change your password before continuing.</p>
+        </div>
+      )}
 
       <div className="grid gap-6" style={{ gridTemplateColumns: '260px 1fr' }}>
 

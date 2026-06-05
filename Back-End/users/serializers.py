@@ -32,9 +32,10 @@ class UserListSerializer(serializers.ModelSerializer):
             'id', 'username', 'mobile',
             'role', 'role_name', 'role_detail',
             'brands', 'brands_detail', 'is_active',
-            'created_at', 'updated_at',
+            'must_change_password',
+            'last_login', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'must_change_password', 'last_login', 'created_at', 'updated_at']
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -70,6 +71,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         user = User(**validated_data)
         user.set_password(password)
+        user.must_change_password = True
         user.save()
         if brands:
             user.brands.set(brands)

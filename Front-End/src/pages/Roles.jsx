@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Shield, Plus, Edit2, Trash2, CheckCircle, XCircle, Lock, Search } from 'lucide-react';
+import { Shield, Plus, Edit2, Trash2, CheckCircle, XCircle, Lock, Search, X } from 'lucide-react';
 import {
   getRoles, getRole, createRole, updateRole, deleteRole,
   activateRole, deactivateRole, getModules,
@@ -220,15 +220,15 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[92vh]">
 
-        {/* Header — app dark theme */}
-        <div className="flex items-center justify-between px-6 py-4 rounded-t-2xl bg-sidebar-bg">
+        {/* Header — accent blue */}
+        <div className="flex items-center justify-between px-6 py-4 rounded-t-2xl bg-accent">
           <div>
             <h2 className="text-base font-bold text-white">
               {isEdit ? 'Edit Role' : 'Create New Role'}
             </h2>
-            <p className="text-xs text-white/50 mt-0.5">Define role permissions and access levels</p>
+            <p className="text-xs text-white/60 mt-0.5">Define role permissions and access levels</p>
           </div>
-          <button onClick={onClose} className="text-white/50 hover:text-white text-2xl font-bold leading-none">×</button>
+          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors"><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
@@ -481,7 +481,7 @@ export default function Roles() {
                         {role.is_active ? <CheckCircle size={15} /> : <XCircle size={15} />}
                       </button>
                       <button onClick={() => setModal({ mode: 'edit', role })}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors"
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
                         title="Edit role">
                         <Edit2 size={14} />
                       </button>

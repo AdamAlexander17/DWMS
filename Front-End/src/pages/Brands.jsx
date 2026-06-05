@@ -111,7 +111,7 @@ export default function Brands() {
                     >
                       {b.is_active ? <CheckCircle size={15} /> : <XCircle size={15} />}
                     </button>
-                    <button onClick={() => setModal({ mode: 'edit', data: b })} title="Edit" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors">
+                    <button onClick={() => setModal({ mode: 'edit', data: b })} title="Edit" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
                       <Pencil size={14} />
                     </button>
                     <button onClick={() => setDelTarget(b)} title="Delete" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
