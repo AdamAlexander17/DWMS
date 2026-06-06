@@ -11,6 +11,7 @@ import QRCodes      from './pages/QRCodes'
 import UPISources   from './pages/UPISources'
 import BankAccounts from './pages/BankAccounts'
 import Deposits     from './pages/Deposits'
+import Withdrawals  from './pages/Withdrawals'
 import AuditLogs    from './pages/AuditLogs'
 import Profile      from './pages/Profile'
 
@@ -66,6 +67,12 @@ function AppRoutes() {
       <Route path="/deposits" element={
         <ProtectedRoute>
           <Layout><Deposits /></Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/withdrawals" element={
+        <ProtectedRoute>
+          <Layout><Withdrawals /></Layout>
         </ProtectedRoute>
       } />
 

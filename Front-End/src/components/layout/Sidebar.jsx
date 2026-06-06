@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Users, QrCode, Wallet, Building2, ScrollText, LogOut, Shield, ArrowDownCircle, Landmark, LayoutDashboard, Tag } from 'lucide-react'
+import { Users, QrCode, Wallet, Building2, ScrollText, LogOut, Shield, ArrowDownCircle, ArrowUpCircle, Landmark, LayoutDashboard, Tag } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { logout as apiLogout } from '../../api/auth'
 import NotificationBell from '../ui/NotificationBell'
@@ -12,8 +12,9 @@ const allNavItems = [
   { to: '/qr-codes',      label: 'QR Codes',     roles: ['admin', 'back_office', 'rm'] },
   { to: '/upi-sources',   label: 'UPI Sources',  roles: ['admin', 'back_office', 'rm'] },
   { to: '/bank-accounts', label: 'Bank Accounts',roles: ['admin', 'back_office', 'rm'] },
-  { to: '/deposits',      label: 'Deposits',     roles: ['admin', 'back_office', 'rm'] },
-  { to: '/audit-logs',    label: 'Audit Logs',   roles: ['admin'] },
+  { to: '/deposits',      label: 'Deposits',     icon: ArrowDownCircle, roles: ['admin', 'back_office', 'rm'] },
+  { to: '/withdrawals',   label: 'Withdrawals',  icon: ArrowUpCircle,   roles: ['admin', 'back_office', 'rm'] },
+  { to: '/audit-logs',    label: 'Audit Logs',   icon: ScrollText,      roles: ['admin'] },
 ]
 
 const roleLabel = { admin: 'Administrator', back_office: 'Back Office', rm: 'Relationship Manager' }
