@@ -13,8 +13,9 @@ const allNavItems = [
   { to: '/upi-sources',   label: 'UPI Sources',  roles: ['admin', 'back_office', 'rm'] },
   { to: '/bank-accounts', label: 'Bank Accounts',roles: ['admin', 'back_office', 'rm'] },
   { to: '/deposits',      label: 'Deposits',     icon: ArrowDownCircle, roles: ['admin', 'back_office', 'rm'] },
-  { to: '/withdrawals',   label: 'Withdrawals',  icon: ArrowUpCircle,   roles: ['admin', 'back_office', 'rm'] },
-  { to: '/audit-logs',    label: 'Audit Logs',   icon: ScrollText,      roles: ['admin'] },
+  { to: '/withdrawals',         label: 'Withdrawals',         icon: ArrowUpCircle,   roles: ['admin', 'back_office', 'rm'] },
+  { to: '/withdrawal-history',  label: 'Withdrawal History',  roles: ['admin', 'back_office', 'rm'] },
+  { to: '/audit-logs',          label: 'Audit Logs',          icon: ScrollText,      roles: ['admin'] },
 ]
 
 const roleLabel = { admin: 'Administrator', back_office: 'Back Office', rm: 'Relationship Manager' }

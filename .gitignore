@@ -15,6 +15,9 @@ build/
 .env.*
 !.env.example
 
+# Django uploaded media
+Back-End/media/
+
 # Virtual environment
 Back-End/env/
 

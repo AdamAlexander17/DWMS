@@ -12,6 +12,7 @@ import UPISources   from './pages/UPISources'
 import BankAccounts from './pages/BankAccounts'
 import Deposits     from './pages/Deposits'
 import Withdrawals  from './pages/Withdrawals'
+import WithdrawalHistory from './pages/WithdrawalHistory'
 import AuditLogs    from './pages/AuditLogs'
 import Profile      from './pages/Profile'
 
@@ -73,6 +74,12 @@ function AppRoutes() {
       <Route path="/withdrawals" element={
         <ProtectedRoute>
           <Layout><Withdrawals /></Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/withdrawal-history" element={
+        <ProtectedRoute>
+          <Layout><WithdrawalHistory /></Layout>
         </ProtectedRoute>
       } />
 

@@ -11,5 +11,5 @@ export const resetPassword  = (id, new_password) => api.post(`/users/${id}/reset
 export const bulkImportUsers = (file) => {
   const fd = new FormData()
   fd.append('file', file)
-  return api.post('/users/bulk-import/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  return api.post('/users/bulk-import/', fd)
 }
