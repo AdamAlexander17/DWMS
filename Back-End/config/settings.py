@@ -98,7 +98,7 @@ DATABASES = {
         'NAME': 'dwms',
         'USER': 'root',
         'PASSWORD': 'root',
-        'HOST': 'localhost',
+        'HOST': '10.255.254.25',
         'PORT': '3306',
     }
 }
