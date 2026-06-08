@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='depositlog',
             name='status',
-            field=models.CharField(choices=[('pending', 'Pending'), ('for_review', 'For Review'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('approved', 'Approved'), ('rejected', 'Rejected')], db_index=True, default='pending', max_length=20),
+            field=models.CharField(choices=[('pending', 'Pending'),('in_progress', 'In Progress'), ('completed', 'Completed'), ('approved', 'Approved'), ('rejected', 'Rejected')], db_index=True, default='pending', max_length=20),
         ),
     ]

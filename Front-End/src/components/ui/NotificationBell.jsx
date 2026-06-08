@@ -40,9 +40,10 @@ function playChime() {
 
 // Deposit-channel alert level
 const DEPOSIT_CFG = {
-  warning:   { Icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-200', label: 'Warning — 50% reached' },
-  danger:    { Icon: AlertOctagon,  color: 'text-red-500',   bg: 'bg-red-50',   border: 'border-red-200',   label: 'Critical — 80% reached' },
-  exhausted: { Icon: XCircle,       color: 'text-red-600',   bg: 'bg-red-50',   border: 'border-red-200',   label: 'Blocked — 85% reached' },
+  warning:   { Icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50',  border: 'border-amber-200', label: 'Warning — 50% reached'   },
+  danger:    { Icon: AlertOctagon,  color: 'text-red-500',   bg: 'bg-red-50',   border: 'border-red-200',   label: 'Critical — 80% reached'  },
+  exhausted: { Icon: XCircle,       color: 'text-red-600',   bg: 'bg-red-50',   border: 'border-red-200',   label: 'Blocked — 85% reached'   },
+  info:      { Icon: ArrowDownCircle, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200',  label: 'Deposit Update'           },
 }
 
 // Withdrawal-ticket notification type
@@ -99,8 +100,10 @@ export default function NotificationBell() {
 
   const { data: depList } = useQuery({
     queryKey: ['notifications-list'],
-    queryFn:  () => getNotifications({ page_size: 20 }),
+    queryFn:  () => getNotifications({ page_size: 50 }),
     enabled:  open && tab === 'deposits',
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
   const depNotifs = depList?.data?.data?.results ?? []
 
@@ -149,6 +152,15 @@ export default function NotificationBell() {
           // also refresh ticket list / stats so badges update
           qc.invalidateQueries({ queryKey: ['withdrawals'] })
           qc.invalidateQueries({ queryKey: ['withdrawal-stats'] })
+        }
+        if (data?.type === 'deposit_update') {
+          playChime()   // ← deposit create / edit / review push
+          // Force refetch instead of injecting a stub — the server returns full row
+          qc.invalidateQueries({ queryKey: ['notifications-list'] })
+          qc.invalidateQueries({ queryKey: ['notifications-unread'] })
+          // live-refresh deposit tables on both sides
+          qc.invalidateQueries({ queryKey: ['deposits'] })
+          qc.invalidateQueries({ queryKey: ['deposit-history'] })
         }
         if (data?.type === 'unread_count') {
           qc.setQueryData(['wd-notifications-unread'], (prev) => {
@@ -337,21 +349,27 @@ export default function NotificationBell() {
                   <p className="px-4 py-10 text-center text-sm text-gray-400">No channel alerts</p>
                 )}
                 {depNotifs.map((n) => {
-                  const cfg  = DEPOSIT_CFG[n.level] ?? DEPOSIT_CFG.warning
+                  const cfg  = DEPOSIT_CFG[n.level] ?? DEPOSIT_CFG.info
                   const Icon = cfg.Icon
+                  const isStatusUpdate = n.level === 'info'
                   return (
                     <div
                       key={n.id}
                       onClick={() => !n.is_read && depReadM.mutate(n.id)}
-                      className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-amber-50/40' : ''}`}
+                      className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
                     >
                       <div className={`shrink-0 w-8 h-8 rounded-lg ${cfg.bg} border ${cfg.border} flex items-center justify-center`}>
                         <Icon size={15} className={cfg.color} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-800 truncate">{n.channel_label}</p>
-                        <p className="text-[11px] text-gray-500">{cfg.label}</p>
-                        <p className="text-[11px] text-gray-400">{n.percent_used}% used · {timeAgo(n.created_at)}</p>
+                        <p className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</p>
+                        <p className="text-xs text-gray-700 mt-0.5 line-clamp-2">{n.message}</p>
+                        {!isStatusUpdate && n.percent_used != null && (
+                          <p className="text-[11px] text-gray-400">{n.percent_used}% used · {timeAgo(n.created_at)}</p>
+                        )}
+                        {(isStatusUpdate || n.percent_used == null) && (
+                          <p className="text-[11px] text-gray-400">{timeAgo(n.created_at)}</p>
+                        )}
                       </div>
                       {!n.is_read && <div className="shrink-0 w-2 h-2 rounded-full bg-accent self-start mt-2" />}
                     </div>

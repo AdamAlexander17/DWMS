@@ -17,6 +17,7 @@ from common.responses import success_response
 from .filters import DepositLogFilter
 from .models import DepositLog, DepositNotification
 from .serializers import DepositLogSerializer, DepositNotificationSerializer
+from .services import push_deposit_event
 
 
 @extend_schema_view(
@@ -54,6 +55,10 @@ class DepositLogViewSet(
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        # Default list excludes completed deposits (those live in Deposit History).
+        # History page explicitly requests ?status=completed to see them.
+        if 'status' not in request.query_params:
+            queryset = queryset.exclude(status=DepositLog.STATUS_COMPLETED)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -71,6 +76,10 @@ class DepositLogViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
+        try:
+            push_deposit_event(instance, request.user, 'created')
+        except Exception:
+            pass
         return success_response(
             'Deposit logged successfully',
             self.get_serializer(instance).data,
@@ -83,6 +92,10 @@ class DepositLogViewSet(
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
+        try:
+            push_deposit_event(instance, request.user, 'updated')
+        except Exception:
+            pass
         return success_response('Deposit updated successfully', self.get_serializer(instance).data)
 
     def destroy(self, request, *args, **kwargs):
@@ -131,6 +144,11 @@ class DepositLogViewSet(
             update_fields += ['review_slip', 'slip_status']
 
         deposit.save(update_fields=update_fields)
+
+        try:
+            push_deposit_event(deposit, request.user, 'reviewed')
+        except Exception:
+            pass
 
         return success_response(
             f'Deposit marked as {action_val}.',

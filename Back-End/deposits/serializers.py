@@ -40,7 +40,7 @@ class DepositLogSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'submitted_by', 'created_at', 'updated_at',
-            'status', 'review_message', 'reviewed_by', 'reviewed_at',
+            'review_message', 'reviewed_by', 'reviewed_at',
         ]
 
     def get_submitted_by_name(self, obj) -> str | None:

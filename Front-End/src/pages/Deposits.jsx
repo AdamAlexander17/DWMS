@@ -28,23 +28,11 @@ const CHANNEL_BADGE = {
 
 const CHANNEL_LABEL = { qr: 'QR Code', upi: 'UPI', bank: 'Bank Account' }
 
-const SLIP_STATUS_OPTS = [
-  { value: 'added',        label: 'Added'        },
+// RM-side status options (shown in Create / Edit forms)
+const RM_STATUS_OPTS = [
   { value: 'not_received', label: 'Not Received' },
-  { value: 'pending',      label: 'Pending'      },
+  { value: 'completed',    label: 'Completed'    },
 ]
-
-const SLIP_STATUS_BADGE = {
-  added:        'bg-green-100 text-green-700',
-  not_received: 'bg-red-100 text-red-700',
-  pending:      'bg-amber-100 text-amber-700',
-}
-
-const SLIP_STATUS_LABEL = {
-  added:        'Added',
-  not_received: 'Not Received',
-  pending:      'Pending',
-}
 
 // Unified "Ticket Status" derived from both slip_status + review status
 const TICKET_STATUS_CONFIG = {
@@ -68,10 +56,10 @@ function deriveTicketStatus(r) {
   return 'pending'
 }
 
+// Back Office review options — Completed is RM-only
 const REVIEW_DECISION_OPTS = [
-  { value: 'for_review',  label: 'For Review'  },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed',   label: 'Completed'   },
+  { value: 'in_progress', label: 'In Progress', hint: 'Reviewing — no receipt yet'   },
+  { value: 'added',       label: 'Added',       hint: 'Receipt uploaded, confirming' },
 ]
 
 // ── Shared hook: fetches active gateways from master module ─────────────
@@ -160,7 +148,7 @@ function CreateForm({ onSubmit, loading, error }) {
     channel_type: '',
     channel_id:   '',
     slip:         null,
-    slip_status:  'pending',
+    rm_status:    'not_received',
     comment:      '',
   })
   const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
@@ -176,7 +164,12 @@ function CreateForm({ onSubmit, loading, error }) {
                   : 'bank_account'
       fd.append(fkKey, form.channel_id)
     }
-    fd.append('slip_status', form.slip_status)
+    if (form.rm_status === 'completed') {
+      fd.append('slip_status', 'added')
+      fd.append('status',      'completed')
+    } else {
+      fd.append('slip_status', 'not_received')
+    }
     fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
     onSubmit(fd)
@@ -194,12 +187,11 @@ function CreateForm({ onSubmit, loading, error }) {
 
       {/* Gateway Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name</label>
         <select
           className="input"
           value={form.gateway}
           onChange={(e) => f('gateway')(e.target.value)}
-          required
         >
           <option value="">Select gateway…</option>
           {gateways.map((gw) => (
@@ -225,17 +217,17 @@ function CreateForm({ onSubmit, loading, error }) {
         </label>
       </div>
 
-      {/* Slip Status */}
+      {/* Status */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Status *</label>
-        <div className="grid grid-cols-3 gap-2">
-          {SLIP_STATUS_OPTS.map(({ value, label }) => (
+        <div className="grid grid-cols-2 gap-2">
+          {RM_STATUS_OPTS.map(({ value, label }) => (
             <button
               key={value}
               type="button"
-              onClick={() => f('slip_status')(value)}
+              onClick={() => f('rm_status')(value)}
               className={`py-2 rounded-lg border-2 text-xs font-semibold transition-all ${
-                form.slip_status === value
+                form.rm_status === value
                   ? 'border-accent bg-accent/10 text-accent-dark'
                   : 'border-gray-200 text-gray-500 hover:border-gray-300'
               }`}
@@ -261,7 +253,7 @@ function CreateForm({ onSubmit, loading, error }) {
       {error && <p className="text-red-500 text-sm">{error}</p>}
       <button
         type="submit"
-        disabled={loading || !form.gateway || (form.channel_type && !form.channel_id)}
+        disabled={loading || (form.channel_type && !form.channel_id)}
         className="btn-primary w-full justify-center mt-1"
       >
         {loading ? 'Logging…' : 'Log Deposit'}
@@ -272,14 +264,15 @@ function CreateForm({ onSubmit, loading, error }) {
 
 // ── Review Form (back office / admin) ──────────────────────────────────────
 function ReviewForm({ initial, onSubmit, loading, error }) {
-  const [decision,    setDecision]    = useState('for_review')
+  const [decision,    setDecision]    = useState('in_progress')
   const [message,     setMessage]     = useState('')
   const [reviewSlip,  setReviewSlip]  = useState(null)
 
   const handleSubmit = (e) => {
     e.preventDefault()
     const fd = new FormData()
-    fd.append('action',  decision)
+    // 'added' is a display-only state: submit in_progress with a receipt
+    fd.append('action',  'in_progress')
     fd.append('message', message)
     if (reviewSlip) fd.append('review_slip', reviewSlip)
     onSubmit(fd)
@@ -350,10 +343,13 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
           onChange={(e) => setDecision(e.target.value)}
           required
         >
-          {REVIEW_DECISION_OPTS.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
+          {REVIEW_DECISION_OPTS.map(({ value, label, hint }) => (
+            <option key={value} value={value}>{label} — {hint}</option>
           ))}
         </select>
+        {decision === 'added' && !reviewSlip && !initial?.review_slip && (
+          <p className="mt-1 text-[11px] text-amber-600">Please attach a receipt to mark as Added.</p>
+        )}
       </div>
 
       {/* Back-office receipt upload */}
@@ -398,7 +394,7 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
       {error && <p className="text-red-500 text-sm">{error}</p>}
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || (decision === 'added' && !reviewSlip && !initial?.review_slip)}
         className="btn-primary w-full justify-center mt-1"
       >
         {loading ? 'Submitting…' : 'Submit Review'}
@@ -419,9 +415,9 @@ function EditForm({ initial, onSubmit, loading, error }) {
     gateway:      String(initial?.gateway ?? ''),
     channel_type: initial?.channel_type ?? '',
     channel_id:   initChannelId,
-    slip_status:  initial?.slip_status  ?? 'pending',
     comment:      initial?.comment      ?? '',
     slip:         null,
+    rm_status:    initial?.status === 'completed' ? 'completed' : 'not_received',
   })
   const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
 
@@ -436,7 +432,12 @@ function EditForm({ initial, onSubmit, loading, error }) {
                   : 'bank_account'
       fd.append(fkKey, form.channel_id)
     }
-    fd.append('slip_status', form.slip_status)
+    if (form.rm_status === 'completed') {
+      fd.append('slip_status', 'added')
+      fd.append('status',      'completed')
+    } else {
+      fd.append('slip_status', 'not_received')
+    }
     fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
     onSubmit(fd)
@@ -454,12 +455,11 @@ function EditForm({ initial, onSubmit, loading, error }) {
 
       {/* Gateway Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name</label>
         <select
           className="input"
           value={form.gateway}
           onChange={(e) => f('gateway')(e.target.value)}
-          required
         >
           <option value="">Select gateway…</option>
           {gateways.map((gw) => (
@@ -485,17 +485,17 @@ function EditForm({ initial, onSubmit, loading, error }) {
         </label>
       </div>
 
-      {/* Slip Status */}
+      {/* Status */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Status *</label>
-        <div className="grid grid-cols-3 gap-2">
-          {SLIP_STATUS_OPTS.map(({ value, label }) => (
+        <div className="grid grid-cols-2 gap-2">
+          {RM_STATUS_OPTS.map(({ value, label }) => (
             <button
               key={value}
               type="button"
-              onClick={() => f('slip_status')(value)}
+              onClick={() => f('rm_status')(value)}
               className={`py-2 rounded-lg border-2 text-xs font-semibold transition-all ${
-                form.slip_status === value
+                form.rm_status === value
                   ? 'border-accent bg-accent/10 text-accent-dark'
                   : 'border-gray-200 text-gray-500 hover:border-gray-300'
               }`}
@@ -519,7 +519,7 @@ function EditForm({ initial, onSubmit, loading, error }) {
       </div>
 
       {error && <p className="text-red-500 text-sm">{error}</p>}
-      <button type="submit" disabled={loading || !form.gateway} className="btn-primary w-full justify-center mt-1">
+      <button type="submit" disabled={loading} className="btn-primary w-full justify-center mt-1">
         {loading ? 'Saving…' : 'Save Changes'}
       </button>
     </form>
@@ -546,6 +546,7 @@ export default function Deposits() {
   const { data, isLoading } = useQuery({
     queryKey: ['deposits', page, search, gatewayFilter, channelFilter],
     queryFn:  () => getDeposits({ page, search, gateway: gatewayFilter || undefined, channel_type: channelFilter || undefined }),
+    refetchInterval: 15_000,   // fallback poll — WS push is the primary mechanism
   })
 
   const records    = data?.data?.data?.results ?? []
