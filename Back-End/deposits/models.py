@@ -3,14 +3,6 @@ from django.db import models
 
 
 class DepositLog(models.Model):
-    # Gateway choices (dropdown)
-    GATEWAY_PG1 = 'PG1'
-    GATEWAY_PG2 = 'PG2'
-    GATEWAY_CHOICES = [
-        (GATEWAY_PG1, 'PG1'),
-        (GATEWAY_PG2, 'PG2'),
-    ]
-
     # Channel type choices
     CHANNEL_QR   = 'qr'
     CHANNEL_UPI  = 'upi'
@@ -32,19 +24,30 @@ class DepositLog(models.Model):
     ]
 
     # Review status choices
-    STATUS_PENDING  = 'pending'
+    STATUS_PENDING     = 'pending'
+    STATUS_FOR_REVIEW  = 'for_review'
+    STATUS_IN_PROGRESS = 'in_progress'
+    STATUS_COMPLETED   = 'completed'
+    # Legacy — kept so existing rows stay valid
     STATUS_APPROVED = 'approved'
     STATUS_REJECTED = 'rejected'
     STATUS_CHOICES  = [
-        (STATUS_PENDING,  'Pending'),
-        (STATUS_APPROVED, 'Approved'),
-        (STATUS_REJECTED, 'Rejected'),
+        (STATUS_PENDING,     'Pending'),
+        (STATUS_FOR_REVIEW,  'For Review'),
+        (STATUS_IN_PROGRESS, 'In Progress'),
+        (STATUS_COMPLETED,   'Completed'),
+        (STATUS_APPROVED,    'Approved'),
+        (STATUS_REJECTED,    'Rejected'),
     ]
 
-    gateway_name = models.CharField(
-        max_length=10,
-        choices=GATEWAY_CHOICES,
+    # Gateway – driven from master.Gateway table
+    gateway = models.ForeignKey(
+        'master.Gateway',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         db_index=True,
+        related_name='deposit_logs',
     )
 
     # Channel type + polymorphic FKs (at most one is set at a time)
@@ -96,6 +99,7 @@ class DepositLog(models.Model):
 
     status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     review_message = models.TextField(blank=True, default='')
+    review_slip    = models.FileField(upload_to='deposit_review_slips/', null=True, blank=True)
     reviewed_by    = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -111,9 +115,50 @@ class DepositLog(models.Model):
         db_table = 'deposit_logs'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['gateway_name', 'slip_status']),
-            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['slip_status'], name='deposit_log_slip_status_idx'),
+            models.Index(fields=['status', 'created_at'], name='deposit_log_status_55fba1_idx'),
         ]
 
     def __str__(self) -> str:
-        return f'{self.gateway_name} – {self.slip_status} ({self.created_at:%Y-%m-%d})'
+        gw = self.gateway.name if self.gateway_id else '–'
+        return f'{gw} – {self.slip_status} ({self.created_at:%Y-%m-%d})'
+
+
+class DepositNotification(models.Model):
+    """Notification for a deposit log recipient (e.g. review approved/rejected)."""
+
+    LEVEL_WARNING  = 'warning'
+    LEVEL_DANGER   = 'danger'
+    LEVEL_EXHAUSTED = 'exhausted'
+    LEVEL_INFO     = 'info'
+    LEVEL_CHOICES  = [
+        (LEVEL_WARNING,   'Warning'),
+        (LEVEL_DANGER,    'Danger'),
+        (LEVEL_EXHAUSTED, 'Exhausted'),
+        (LEVEL_INFO,      'Info'),
+    ]
+
+    recipient     = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='deposit_notifications',
+    )
+    deposit_log   = models.ForeignKey(
+        DepositLog,
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='notifications',
+    )
+    level         = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_INFO, db_index=True)
+    channel_label = models.CharField(max_length=200, blank=True)
+    message       = models.TextField(blank=True)
+    percent_used  = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    is_read       = models.BooleanField(default=False, db_index=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'deposit_notifications'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f'DepositNotif({self.level}) → {self.recipient}'

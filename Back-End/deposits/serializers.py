@@ -1,14 +1,17 @@
 from rest_framework import serializers
 
-from .models import DepositLog
+from master.serializers import GatewaySerializer
+from .models import DepositLog, DepositNotification
 
 
 class DepositLogSerializer(serializers.ModelSerializer):
     submitted_by_name = serializers.SerializerMethodField()
     reviewed_by_name  = serializers.SerializerMethodField()
 
+    # Nested gateway detail (read)
+    gateway_detail = GatewaySerializer(source='gateway', read_only=True)
+
     # Human-readable labels for choice fields
-    gateway_name_display  = serializers.CharField(source='get_gateway_name_display',  read_only=True)
     channel_type_display  = serializers.CharField(source='get_channel_type_display',  read_only=True)
     slip_status_display   = serializers.CharField(source='get_slip_status_display',   read_only=True)
     status_display        = serializers.CharField(source='get_status_display',        read_only=True)
@@ -20,7 +23,7 @@ class DepositLogSerializer(serializers.ModelSerializer):
         model = DepositLog
         fields = [
             'id',
-            'gateway_name', 'gateway_name_display',
+            'gateway', 'gateway_detail',
             'channel_type', 'channel_type_display',
             'qr_code', 'upi_source', 'bank_account',
             'channel_label',
@@ -30,6 +33,7 @@ class DepositLogSerializer(serializers.ModelSerializer):
             'submitted_by', 'submitted_by_name',
             'status', 'status_display',
             'review_message',
+            'review_slip',
             'reviewed_by', 'reviewed_by_name',
             'reviewed_at',
             'created_at', 'updated_at',
@@ -80,3 +84,13 @@ class DepositLogSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['submitted_by'] = self.context['request'].user
         return DepositLog.objects.create(**validated_data)
+
+
+class DepositNotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DepositNotification
+        fields = [
+            'id', 'level', 'channel_label', 'message',
+            'percent_used', 'is_read', 'created_at',
+        ]
+        read_only_fields = fields

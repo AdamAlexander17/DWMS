@@ -4,7 +4,7 @@ from .models import DepositLog
 
 
 class DepositLogFilter(django_filters.FilterSet):
-    gateway_name = django_filters.ChoiceFilter(choices=DepositLog.GATEWAY_CHOICES)
+    gateway      = django_filters.NumberFilter(field_name='gateway_id')
     channel_type = django_filters.ChoiceFilter(choices=DepositLog.CHANNEL_TYPE_CHOICES)
     slip_status  = django_filters.ChoiceFilter(choices=DepositLog.SLIP_STATUS_CHOICES)
     status       = django_filters.ChoiceFilter(choices=DepositLog.STATUS_CHOICES)
@@ -13,4 +13,4 @@ class DepositLogFilter(django_filters.FilterSet):
 
     class Meta:
         model  = DepositLog
-        fields = ['gateway_name', 'channel_type', 'slip_status', 'status']
+        fields = ['gateway', 'channel_type', 'slip_status', 'status']

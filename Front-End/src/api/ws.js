@@ -22,6 +22,12 @@ export function connectWS(path, token, { onMessage, onOpen, onClose } = {}) {
     ws = new WebSocket(url())
 
     ws.onopen = () => {
+      // React 18 StrictMode cleanup may have fired before the socket opened.
+      // Close cleanly here instead of letting the browser warn about it.
+      if (stopped) {
+        ws.close()
+        return
+      }
       attempt = 0
       onOpen?.()
     }
@@ -53,7 +59,9 @@ export function connectWS(path, token, { onMessage, onOpen, onClose } = {}) {
     close() {
       stopped = true
       if (reconnectTimer) clearTimeout(reconnectTimer)
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      // Only close if already OPEN — CONNECTING sockets are handled in onopen
+      // (closing a CONNECTING socket produces a browser warning in StrictMode)
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.close()
       }
     },

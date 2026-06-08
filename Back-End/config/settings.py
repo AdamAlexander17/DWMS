@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'roles',
     'users',
     'brands',
+    'master',
     'payments',
     'deposits',
     'withdrawals',

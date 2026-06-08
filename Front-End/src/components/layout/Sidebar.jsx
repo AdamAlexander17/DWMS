@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Users, QrCode, Wallet, Building2, ScrollText, LogOut, Shield, ArrowDownCircle, ArrowUpCircle, Landmark, LayoutDashboard, Tag } from 'lucide-react'
+import { Users, QrCode, Wallet, Building2, ScrollText, LogOut, Shield, ArrowDownCircle, ArrowUpCircle, Landmark, LayoutDashboard, Tag, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { logout as apiLogout } from '../../api/auth'
 import NotificationBell from '../ui/NotificationBell'
@@ -15,6 +15,7 @@ const allNavItems = [
   { to: '/deposits',      label: 'Deposits',     icon: ArrowDownCircle, roles: ['admin', 'back_office', 'rm'] },
   { to: '/withdrawals',         label: 'Withdrawals',         icon: ArrowUpCircle,   roles: ['admin', 'back_office', 'rm'] },
   { to: '/withdrawal-history',  label: 'Withdrawal History',  roles: ['admin', 'back_office', 'rm'] },
+  { to: '/gateways',            label: 'Master',              roles: ['admin'] },
   { to: '/audit-logs',          label: 'Audit Logs',          icon: ScrollText,      roles: ['admin'] },
 ]
 

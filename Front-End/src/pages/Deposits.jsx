@@ -1,7 +1,8 @@
 ﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Pencil, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2 } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2 } from 'lucide-react'
 import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit } from '../api/deposits'
+import { getGateways }     from '../api/master'
 import { getQRCodes }      from '../api/payments'
 import { getUPISources }   from '../api/payments'
 import { getBankAccounts } from '../api/payments'
@@ -11,10 +12,7 @@ import Pagination    from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useAuthStore } from '../store/authStore'
 
-const GATEWAY_OPTS = [
-  { value: 'PG1', label: 'PG1' },
-  { value: 'PG2', label: 'PG2' },
-]
+// Gateway options are fetched from master API – see useGateways() hook below
 
 const CHANNEL_OPTS = [
   { value: 'qr',   label: 'QR Code',      Icon: QrCode    },
@@ -48,10 +46,42 @@ const SLIP_STATUS_LABEL = {
   pending:      'Pending',
 }
 
-const STATUS_CONFIG = {
-  pending:  { label: 'Pending',  bg: 'bg-amber-100',  text: 'text-amber-700',  Icon: Clock        },
-  approved: { label: 'Approved', bg: 'bg-green-100',  text: 'text-green-700',  Icon: CheckCircle2 },
-  rejected: { label: 'Rejected', bg: 'bg-red-100',    text: 'text-red-700',    Icon: XCircle      },
+// Unified "Ticket Status" derived from both slip_status + review status
+const TICKET_STATUS_CONFIG = {
+  not_received: { label: 'Not Received', bg: 'bg-red-100',    text: 'text-red-700',    Icon: XCircle     },
+  pending:      { label: 'Pending',      bg: 'bg-amber-100',  text: 'text-amber-700',  Icon: Clock       },
+  in_progress:  { label: 'In Progress',  bg: 'bg-purple-100', text: 'text-purple-700', Icon: Loader2     },
+  added:        { label: 'Added',        bg: 'bg-teal-100',   text: 'text-teal-700',   Icon: FileCheck2  },
+  completed:    { label: 'Completed',    bg: 'bg-green-100',  text: 'text-green-700',  Icon: BadgeCheck  },
+  // legacy
+  approved:     { label: 'Approved',     bg: 'bg-green-100',  text: 'text-green-700',  Icon: CheckCircle2 },
+  rejected:     { label: 'Rejected',     bg: 'bg-red-100',    text: 'text-red-700',    Icon: XCircle     },
+}
+
+function deriveTicketStatus(r) {
+  if (!r) return 'pending'
+  if (r.status === 'completed') return 'completed'
+  if (r.status === 'approved')  return 'approved'
+  if (r.status === 'rejected')  return 'rejected'
+  if (r.status === 'in_progress') return r.review_slip ? 'added' : 'in_progress'
+  if (r.slip_status === 'not_received') return 'not_received'
+  return 'pending'
+}
+
+const REVIEW_DECISION_OPTS = [
+  { value: 'for_review',  label: 'For Review'  },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed',   label: 'Completed'   },
+]
+
+// ── Shared hook: fetches active gateways from master module ─────────────
+function useGateways() {
+  const { data } = useQuery({
+    queryKey: ['master-gateways'],
+    queryFn:  getGateways,
+    staleTime: 5 * 60 * 1000,
+  })
+  return data?.data?.data ?? []
 }
 
 // ── Shared hook: fetches all channel options for a given channel_type ─────
@@ -124,8 +154,9 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
 
 // ── Create / Log Deposit Form ──────────────────────────────────────────────
 function CreateForm({ onSubmit, loading, error }) {
+  const gateways = useGateways()
   const [form, setForm] = useState({
-    gateway_name: '',
+    gateway: '',
     channel_type: '',
     channel_id:   '',
     slip:         null,
@@ -137,7 +168,7 @@ function CreateForm({ onSubmit, loading, error }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     const fd = new FormData()
-    fd.append('gateway_name', form.gateway_name)
+    fd.append('gateway', form.gateway)
     if (form.channel_type) fd.append('channel_type', form.channel_type)
     if (form.channel_id) {
       const fkKey = form.channel_type === 'qr' ? 'qr_code'
@@ -166,13 +197,13 @@ function CreateForm({ onSubmit, loading, error }) {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name *</label>
         <select
           className="input"
-          value={form.gateway_name}
-          onChange={(e) => f('gateway_name')(e.target.value)}
+          value={form.gateway}
+          onChange={(e) => f('gateway')(e.target.value)}
           required
         >
           <option value="">Select gateway…</option>
-          {GATEWAY_OPTS.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
+          {gateways.map((gw) => (
+            <option key={gw.id} value={gw.id}>{gw.name}</option>
           ))}
         </select>
       </div>
@@ -230,7 +261,7 @@ function CreateForm({ onSubmit, loading, error }) {
       {error && <p className="text-red-500 text-sm">{error}</p>}
       <button
         type="submit"
-        disabled={loading || !form.gateway_name || (form.channel_type && !form.channel_id)}
+        disabled={loading || !form.gateway || (form.channel_type && !form.channel_id)}
         className="btn-primary w-full justify-center mt-1"
       >
         {loading ? 'Logging…' : 'Log Deposit'}
@@ -239,18 +270,28 @@ function CreateForm({ onSubmit, loading, error }) {
   )
 }
 
-// ── Review Form (approve / reject by back office or admin) ───────────────────────
+// ── Review Form (back office / admin) ──────────────────────────────────────
 function ReviewForm({ initial, onSubmit, loading, error }) {
-  const [decision, setDecision] = useState('approved')
-  const [message,  setMessage]  = useState('')
+  const [decision,    setDecision]    = useState('for_review')
+  const [message,     setMessage]     = useState('')
+  const [reviewSlip,  setReviewSlip]  = useState(null)
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const fd = new FormData()
+    fd.append('action',  decision)
+    fd.append('message', message)
+    if (reviewSlip) fd.append('review_slip', reviewSlip)
+    onSubmit(fd)
+  }
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ action: decision, message }) }} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Deposit summary */}
       <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-sm space-y-1.5">
         <div className="flex justify-between">
           <span className="text-gray-500">Gateway</span>
-          <span className="font-semibold text-gray-800">{initial?.gateway_name}</span>
+          <span className="font-semibold text-gray-800">{initial?.gateway_detail?.name ?? initial?.gateway}</span>
         </div>
         {initial?.channel_type && (
           <div className="flex justify-between">
@@ -265,12 +306,33 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
             </div>
           </div>
         )}
-        <div className="flex justify-between">
-          <span className="text-gray-500">Slip Status</span>
-          <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${SLIP_STATUS_BADGE[initial?.slip_status] ?? 'bg-gray-100 text-gray-600'}`}>
-            {SLIP_STATUS_LABEL[initial?.slip_status] ?? initial?.slip_status}
-          </span>
-        </div>
+        {(() => {
+          const key  = deriveTicketStatus(initial)
+          const cfg  = TICKET_STATUS_CONFIG[key] ?? TICKET_STATUS_CONFIG.pending
+          const Icon = cfg.Icon
+          return (
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Ticket Status</span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${cfg.bg} ${cfg.text}`}>
+                <Icon size={10} /> {cfg.label}
+              </span>
+            </div>
+          )
+        })()}
+        {/* RM's uploaded receipt */}
+        {initial?.slip && (
+          <div className="flex justify-between items-center pt-1.5 border-t border-gray-200">
+            <span className="text-gray-500">Receipt (by RM)</span>
+            <a
+              href={initial.slip}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-accent font-medium hover:underline"
+            >
+              <ExternalLink size={12} /> View Slip
+            </a>
+          </div>
+        )}
         {initial?.comment && (
           <div className="pt-1.5 border-t border-gray-200">
             <p className="text-gray-400 text-xs mb-0.5">Comment</p>
@@ -279,23 +341,46 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
         )}
       </div>
 
-      {/* Approve / Reject selector */}
+      {/* Decision dropdown */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Decision *</label>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => setDecision('approved')}
-            className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
-              decision === 'approved' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-            }`}>
-            <CheckCircle2 size={16} /> Approve
-          </button>
-          <button type="button" onClick={() => setDecision('rejected')}
-            className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
-              decision === 'rejected' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-            }`}>
-            <XCircle size={16} /> Reject
-          </button>
-        </div>
+        <select
+          className="input"
+          value={decision}
+          onChange={(e) => setDecision(e.target.value)}
+          required
+        >
+          {REVIEW_DECISION_OPTS.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Back-office receipt upload */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Upload Receipt</label>
+        <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded-lg px-4 py-3 hover:border-accent transition-colors">
+          <Paperclip size={15} className="text-gray-400 shrink-0" />
+          <span className="text-sm text-gray-500 truncate">
+            {reviewSlip ? reviewSlip.name : (initial?.review_slip ? 'Replace existing receipt…' : 'Attach receipt (image / PDF)')}
+          </span>
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => setReviewSlip(e.target.files?.[0] ?? null)}
+          />
+        </label>
+        {initial?.review_slip && !reviewSlip && (
+          <a
+            href={initial.review_slip}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:underline"
+          >
+            <ExternalLink size={11} /> View existing receipt
+          </a>
+        )}
       </div>
 
       {/* Message to RM */}
@@ -304,7 +389,7 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
         <textarea
           className="input resize-none"
           rows={3}
-          placeholder={decision === 'approved' ? 'e.g. Payment confirmed in bank statement…' : 'e.g. UTR not found, please recheck…'}
+          placeholder="e.g. Payment confirmed, processing…"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
@@ -314,17 +399,16 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
       <button
         type="submit"
         disabled={loading}
-        className={`w-full py-2 rounded-lg font-semibold text-sm transition-colors ${
-          decision === 'approved' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'
-        }`}
+        className="btn-primary w-full justify-center mt-1"
       >
-        {loading ? 'Submitting…' : decision === 'approved' ? 'Approve Deposit' : 'Reject Deposit'}
+        {loading ? 'Submitting…' : 'Submit Review'}
       </button>
     </form>
   )
 }
 // ── Edit Form ──────────────────────────────────────────────────────────────
 function EditForm({ initial, onSubmit, loading, error }) {
+  const gateways = useGateways()
   // Resolve the initial channel_id from the correct FK field
   const initChannelId = initial?.channel_type === 'qr'   ? String(initial?.qr_code   ?? '')
                       : initial?.channel_type === 'upi'  ? String(initial?.upi_source  ?? '')
@@ -332,7 +416,7 @@ function EditForm({ initial, onSubmit, loading, error }) {
                       : ''
 
   const [form, setForm] = useState({
-    gateway_name: initial?.gateway_name ?? '',
+    gateway:      String(initial?.gateway ?? ''),
     channel_type: initial?.channel_type ?? '',
     channel_id:   initChannelId,
     slip_status:  initial?.slip_status  ?? 'pending',
@@ -344,7 +428,7 @@ function EditForm({ initial, onSubmit, loading, error }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     const fd = new FormData()
-    fd.append('gateway_name', form.gateway_name)
+    fd.append('gateway', form.gateway)
     fd.append('channel_type', form.channel_type ?? '')
     if (form.channel_type && form.channel_id) {
       const fkKey = form.channel_type === 'qr' ? 'qr_code'
@@ -373,13 +457,13 @@ function EditForm({ initial, onSubmit, loading, error }) {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name *</label>
         <select
           className="input"
-          value={form.gateway_name}
-          onChange={(e) => f('gateway_name')(e.target.value)}
+          value={form.gateway}
+          onChange={(e) => f('gateway')(e.target.value)}
           required
         >
           <option value="">Select gateway…</option>
-          {GATEWAY_OPTS.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
+          {gateways.map((gw) => (
+            <option key={gw.id} value={gw.id}>{gw.name}</option>
           ))}
         </select>
       </div>
@@ -435,7 +519,7 @@ function EditForm({ initial, onSubmit, loading, error }) {
       </div>
 
       {error && <p className="text-red-500 text-sm">{error}</p>}
-      <button type="submit" disabled={loading || !form.gateway_name} className="btn-primary w-full justify-center mt-1">
+      <button type="submit" disabled={loading || !form.gateway} className="btn-primary w-full justify-center mt-1">
         {loading ? 'Saving…' : 'Save Changes'}
       </button>
     </form>
@@ -450,17 +534,18 @@ export default function Deposits() {
   const canWrite  = ['admin', 'rm'].includes(user?.role)
   const canReview  = ['admin', 'back_office'].includes(user?.role)
 
+  const gateways = useGateways()
+
   const [page,            setPage]            = useState(1)
   const [search,          setSearch]          = useState('')
   const [gatewayFilter,   setGatewayFilter]   = useState('')
-  const [slipStatusFilter,setSlipStatusFilter]= useState('')
   const [channelFilter,   setChannelFilter]   = useState('')
   const [modal,           setModal]           = useState(null)
   const [delTarget,       setDelTarget]       = useState(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['deposits', page, search, gatewayFilter, slipStatusFilter, channelFilter],
-    queryFn:  () => getDeposits({ page, search, gateway_name: gatewayFilter || undefined, slip_status: slipStatusFilter || undefined, channel_type: channelFilter || undefined }),
+    queryKey: ['deposits', page, search, gatewayFilter, channelFilter],
+    queryFn:  () => getDeposits({ page, search, gateway: gatewayFilter || undefined, channel_type: channelFilter || undefined }),
   })
 
   const records    = data?.data?.data?.results ?? []
@@ -504,15 +589,8 @@ export default function Deposits() {
           <select className="input max-w-[160px]" value={gatewayFilter}
             onChange={(e) => { setGatewayFilter(e.target.value); setPage(1) }}>
             <option value="">All gateways</option>
-            {GATEWAY_OPTS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <select className="input max-w-[160px]" value={slipStatusFilter}
-            onChange={(e) => { setSlipStatusFilter(e.target.value); setPage(1) }}>
-            <option value="">All slip statuses</option>
-            {SLIP_STATUS_OPTS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
+            {gateways.map((gw) => (
+              <option key={gw.id} value={gw.id}>{gw.name}</option>
             ))}
           </select>
           <select className="input max-w-[160px]" value={channelFilter ?? ''}
@@ -530,14 +608,14 @@ export default function Deposits() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              {['Gateway', 'Channel', 'Channel Detail', 'Slip', 'Slip Status', 'Comment', 'Logged By', 'Review Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
+              {['Gateway', 'Channel', 'Channel Detail', 'Slip', 'Comment', 'Logged By', 'Ticket Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
                 <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
-              <tr><td colSpan={canWrite || canReview ? 9 : 8} className="px-4 py-10 text-center text-gray-400 text-sm">
+              <tr><td colSpan={canWrite || canReview ? 8 : 7} className="px-4 py-10 text-center text-gray-400 text-sm">
                 {isRM ? 'No deposits logged yet. Use "Log Deposit" to record a deposit.' : 'No deposit logs found.'}
               </td></tr>
             )}
@@ -545,7 +623,7 @@ export default function Deposits() {
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
                 {/* Gateway */}
                 <td className="px-4 py-2.5">
-                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.gateway_name}</span>
+                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.gateway_detail?.name ?? '—'}</span>
                 </td>
                 {/* Channel Type */}
                 <td className="px-4 py-2.5">
@@ -571,22 +649,17 @@ export default function Deposits() {
                     <span className="text-xs text-gray-400">—</span>
                   )}
                 </td>
-                {/* Slip Status */}
-                <td className="px-4 py-2.5">
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${SLIP_STATUS_BADGE[r.slip_status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {SLIP_STATUS_LABEL[r.slip_status] ?? r.slip_status}
-                  </span>
-                </td>
                 {/* Comment */}
                 <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[200px]">
                   <span className="line-clamp-2">{r.comment || '—'}</span>
                 </td>
                 {/* Logged By */}
                 <td className="px-4 py-2.5 text-xs text-gray-500">{r.submitted_by_name ?? '—'}</td>
-                {/* Review Status */}
+                {/* Ticket Status */}
                 <td className="px-4 py-2.5">
                   {(() => {
-                    const cfg = STATUS_CONFIG[r.status] ?? STATUS_CONFIG.pending
+                    const key  = deriveTicketStatus(r)
+                    const cfg  = TICKET_STATUS_CONFIG[key] ?? TICKET_STATUS_CONFIG.pending
                     const Icon = cfg.Icon
                     return (
                       <div className="flex flex-col gap-1">
@@ -606,7 +679,7 @@ export default function Deposits() {
                 {(canWrite || canReview) && (
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 justify-end">
-                      {canReview && r.status === 'pending' && (
+                      {canReview && r.status !== 'completed' && (
                         <button onClick={() => setModal({ mode: 'review', data: r })}
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-green-50 text-green-500 hover:bg-green-100 transition-colors" title="Review">
                           <CheckCircle2 size={12} />
@@ -673,7 +746,7 @@ export default function Deposits() {
         onConfirm={() => deleteM.mutate(delTarget.id)}
         loading={deleteM.isPending}
         title="Delete Deposit"
-        message={`Delete this ${delTarget?.gateway_name ?? ''} deposit log? This cannot be undone.`}
+        message={`Delete this ${delTarget?.gateway_detail?.name ?? ''} deposit log? This cannot be undone.`}
       />
     </div>
   )

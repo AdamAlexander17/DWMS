@@ -6,6 +6,7 @@ from rest_framework.mixins import (
     CreateModelMixin, DestroyModelMixin,
     ListModelMixin, RetrieveModelMixin, UpdateModelMixin,
 )
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import GenericViewSet
 
@@ -14,8 +15,8 @@ from common.permissions import IsAdminOrBackOffice, IsRM
 from common.responses import success_response
 
 from .filters import DepositLogFilter
-from .models import DepositLog
-from .serializers import DepositLogSerializer
+from .models import DepositLog, DepositNotification
+from .serializers import DepositLogSerializer, DepositNotificationSerializer
 
 
 @extend_schema_view(
@@ -33,7 +34,7 @@ class DepositLogViewSet(
     serializer_class = DepositLogSerializer
     pagination_class = StandardResultsPagination
     filterset_class  = DepositLogFilter
-    ordering_fields  = ['created_at', 'gateway_name', 'slip_status', 'status']
+    ordering_fields  = ['created_at', 'gateway', 'slip_status', 'status']
     search_fields    = ['comment']
 
     def get_permissions(self):
@@ -43,7 +44,7 @@ class DepositLogViewSet(
 
     def get_queryset(self):
         return DepositLog.objects.select_related(
-            'submitted_by', 'reviewed_by',
+            'submitted_by', 'reviewed_by', 'gateway',
             'qr_code', 'upi_source', 'bank_account',
         ).all()
 
@@ -92,8 +93,9 @@ class DepositLogViewSet(
     # Review action — Admin / Back Office only
     # ------------------------------------------------------------------
 
-    @extend_schema(summary='Approve or reject a deposit', tags=['Deposits'])
-    @action(detail=True, methods=['post'], url_path='review')
+    @extend_schema(summary='Review a deposit (for_review / in_progress / completed)', tags=['Deposits'])
+    @action(detail=True, methods=['post'], url_path='review',
+            parser_classes=[MultiPartParser, FormParser, JSONParser])
     def review(self, request, pk=None):
         if not IsAdminOrBackOffice().has_permission(request, self):
             from rest_framework.exceptions import PermissionDenied
@@ -103,17 +105,67 @@ class DepositLogViewSet(
         action_val = request.data.get('action', '')
         message    = request.data.get('message', '').strip()
 
-        if action_val not in (DepositLog.STATUS_APPROVED, DepositLog.STATUS_REJECTED):
+        VALID = (
+            DepositLog.STATUS_FOR_REVIEW,
+            DepositLog.STATUS_IN_PROGRESS,
+            DepositLog.STATUS_COMPLETED,
+            DepositLog.STATUS_APPROVED,
+            DepositLog.STATUS_REJECTED,
+        )
+        if action_val not in VALID:
             from rest_framework.exceptions import ValidationError
-            raise ValidationError({'action': 'Must be "approved" or "rejected".'})
+            raise ValidationError({'action': f'Must be one of: {", ".join(VALID)}.'})
 
         deposit.status         = action_val
         deposit.review_message = message
         deposit.reviewed_by    = request.user
         deposit.reviewed_at    = timezone.now()
-        deposit.save(update_fields=['status', 'review_message', 'reviewed_by', 'reviewed_at'])
+
+        update_fields = ['status', 'review_message', 'reviewed_by', 'reviewed_at', 'updated_at']
+
+        # Handle back-office receipt upload
+        review_slip = request.FILES.get('review_slip')
+        if review_slip:
+            deposit.review_slip = review_slip
+            deposit.slip_status = DepositLog.SLIP_ADDED   # auto-mark slip as added
+            update_fields += ['review_slip', 'slip_status']
+
+        deposit.save(update_fields=update_fields)
 
         return success_response(
-            f'Deposit {action_val} successfully.',
+            f'Deposit marked as {action_val}.',
             self.get_serializer(deposit).data,
         )
+
+
+# ── Deposit Notifications ──────────────────────────────────────────────────
+
+class DepositNotificationViewSet(
+    ListModelMixin, RetrieveModelMixin, GenericViewSet,
+):
+    serializer_class = DepositNotificationSerializer
+    pagination_class = StandardResultsPagination
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return DepositNotification.objects.filter(recipient=self.request.user)
+
+    @extend_schema(summary='Unread deposit notification count', tags=['Deposits'])
+    @action(detail=False, methods=['get'], url_path='unread_count')
+    def unread_count(self, request):
+        count = self.get_queryset().filter(is_read=False).count()
+        return success_response('Unread count fetched', {'count': count})
+
+    @extend_schema(summary='Mark deposit notification as read', tags=['Deposits'])
+    @action(detail=True, methods=['post'], url_path='mark_read')
+    def mark_read(self, request, pk=None):
+        notif = self.get_object()
+        notif.is_read = True
+        notif.save(update_fields=['is_read'])
+        return success_response('Notification marked as read', self.get_serializer(notif).data)
+
+    @extend_schema(summary='Mark all deposit notifications as read', tags=['Deposits'])
+    @action(detail=False, methods=['post'], url_path='mark_all_read')
+    def mark_all_read(self, request):
+        self.get_queryset().filter(is_read=False).update(is_read=True)
+        return success_response('All notifications marked as read')

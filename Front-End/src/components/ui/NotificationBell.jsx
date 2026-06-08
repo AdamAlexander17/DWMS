@@ -16,6 +16,28 @@ import {
 import { connectWS } from '../../api/ws'
 import { useAuthStore } from '../../store/authStore'
 
+// ── Notification chime (Web Audio API — no audio file needed) ─────────────
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const notes = [880, 1100]   // A5 → C#6  (bright two-tone ding)
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      const start = ctx.currentTime + i * 0.15
+      gain.gain.setValueAtTime(0, start)
+      gain.gain.linearRampToValueAtTime(0.25, start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4)
+      osc.start(start)
+      osc.stop(start + 0.4)
+    })
+  } catch { /* browser blocked audio — silently ignore */ }
+}
+
 // Deposit-channel alert level
 const DEPOSIT_CFG = {
   warning:   { Icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-200', label: 'Warning — 50% reached' },
@@ -45,10 +67,12 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [tab,  setTab]  = useState('withdrawals')   // 'withdrawals' | 'deposits'
   const [wsLive, setWsLive] = useState(false)
-  const ref      = useRef(null)
-  const navigate = useNavigate()
-  const qc       = useQueryClient()
+  const ref         = useRef(null)
+  const navigate     = useNavigate()
+  const qc           = useQueryClient()
   const { accessToken } = useAuthStore()
+  const prevDepUnread = useRef(0)
+  const prevWdUnread  = useRef(0)
 
   useEffect(() => {
     const handler = (e) => {
@@ -62,10 +86,16 @@ export default function NotificationBell() {
   const { data: depCount } = useQuery({
     queryKey: ['notifications-unread'],
     queryFn:  getUnreadCount,
-    refetchInterval: 60_000,             // deposits still polled (no WS yet)
+    refetchInterval: 30_000,
     refetchOnWindowFocus: true,
   })
   const depUnread = depCount?.data?.data?.count ?? 0
+
+  // Chime when deposit unread count goes up
+  useEffect(() => {
+    if (depUnread > prevDepUnread.current) playChime()
+    prevDepUnread.current = depUnread
+  }, [depUnread])
 
   const { data: depList } = useQuery({
     queryKey: ['notifications-list'],
@@ -78,10 +108,16 @@ export default function NotificationBell() {
   const { data: wdCount } = useQuery({
     queryKey: ['wd-notifications-unread'],
     queryFn:  getWdUnreadCount,
-    refetchInterval: 30_000,             // WS handles real-time; this is a safety-net
+    refetchInterval: 30_000,
     refetchOnWindowFocus: true,
   })
   const wdUnread = wdCount?.data?.data?.count ?? 0
+
+  // Chime when WD unread count goes up (safety-net for polling path)
+  useEffect(() => {
+    if (wdUnread > prevWdUnread.current) playChime()
+    prevWdUnread.current = wdUnread
+  }, [wdUnread])
 
   const { data: wdList } = useQuery({
     queryKey: ['wd-notifications-list'],
@@ -98,6 +134,7 @@ export default function NotificationBell() {
       onClose: () => setWsLive(false),
       onMessage: (data) => {
         if (data?.type === 'notification' && data.notification) {
+          playChime()   // ← real-time WS push
           // prepend new notification to cached list
           qc.setQueryData(['wd-notifications-list'], (prev) => {
             if (!prev) return prev
