@@ -1,160 +1,136 @@
 ﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, QrCode, Wallet, Building2, Calendar, IndianRupee, Pencil, Trash2, Ban, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, CheckCircle2, XCircle, Clock, Paperclip } from 'lucide-react'
 import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit } from '../api/deposits'
-import { getQRCodes }      from '../api/payments'
-import { getUPISources }   from '../api/payments'
-import { getBankAccounts } from '../api/payments'
 import Modal         from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Pagination    from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useAuthStore } from '../store/authStore'
 
-const CHANNEL_OPTS = [
-  { value: 'qr',   label: 'QR Code',      Icon: QrCode    },
-  { value: 'upi',  label: 'UPI Source',   Icon: Wallet    },
-  { value: 'bank', label: 'Bank Account', Icon: Building2 },
+const GATEWAY_OPTS = [
+  { value: 'PG1', label: 'PG1' },
+  { value: 'PG2', label: 'PG2' },
 ]
 
-const CHANNEL_TYPE_LABEL = { qr: 'QR Code', upi: 'UPI', bank: 'Bank' }
+const SLIP_STATUS_OPTS = [
+  { value: 'added',        label: 'Added'        },
+  { value: 'not_received', label: 'Not Received' },
+  { value: 'pending',      label: 'Pending'      },
+]
 
-const CHANNEL_BADGE = {
-  qr:   'bg-purple-100 text-purple-700',
-  upi:  'bg-blue-100 text-blue-700',
-  bank: 'bg-teal-100 text-teal-700',
+const SLIP_STATUS_BADGE = {
+  added:        'bg-green-100 text-green-700',
+  not_received: 'bg-red-100 text-red-700',
+  pending:      'bg-amber-100 text-amber-700',
+}
+
+const SLIP_STATUS_LABEL = {
+  added:        'Added',
+  not_received: 'Not Received',
+  pending:      'Pending',
 }
 
 const STATUS_CONFIG = {
-  pending:  { label: 'Pending',  bg: 'bg-amber-100',  text: 'text-amber-700',  Icon: Clock          },
-  approved: { label: 'Approved', bg: 'bg-green-100',  text: 'text-green-700',  Icon: CheckCircle2   },
-  rejected: { label: 'Rejected', bg: 'bg-red-100',    text: 'text-red-700',    Icon: XCircle        },
+  pending:  { label: 'Pending',  bg: 'bg-amber-100',  text: 'text-amber-700',  Icon: Clock        },
+  approved: { label: 'Approved', bg: 'bg-green-100',  text: 'text-green-700',  Icon: CheckCircle2 },
+  rejected: { label: 'Rejected', bg: 'bg-red-100',    text: 'text-red-700',    Icon: XCircle      },
 }
 
-function nowLocal() {
-  const now = new Date()
-  now.setSeconds(0, 0)
-  return now.toISOString().slice(0, 16)
-}
-
-// ── Create Form (full form with channel selector) ──────────────────────────
+// ── Create / Log Deposit Form ──────────────────────────────────────────────
 function CreateForm({ onSubmit, loading, error }) {
   const [form, setForm] = useState({
-    channel_type: '',
-    channel_id:   '',
-    client_name:  '',
-    amount:       '',
-    utr_number:   '',
-    deposit_at:   nowLocal(),
-    remarks:      '',
+    gateway_name: '',
+    slip:         null,
+    slip_status:  'pending',
+    comment:      '',
   })
   const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
 
-  const { data: qrData }   = useQuery({ queryKey: ['qr-active'],   queryFn: () => getQRCodes({ is_active: true, page_size: 100 }),   enabled: form.channel_type === 'qr'   })
-  const { data: upiData }  = useQuery({ queryKey: ['upi-active'],  queryFn: () => getUPISources({ is_active: true, page_size: 100 }),  enabled: form.channel_type === 'upi'  })
-  const { data: bankData } = useQuery({ queryKey: ['bank-active'], queryFn: () => getBankAccounts({ is_active: true, page_size: 100 }), enabled: form.channel_type === 'bank' })
-
-  const channels = {
-    qr:   (qrData?.data?.data?.results   ?? []).map((c) => ({ id: c.id, label: `${c.qr_name}  (₹${c.range_from}–₹${c.range_to})`,             isBlocked: c.capacity?.capacity_status === 'exhausted', pct: c.capacity?.percent_used ?? 0, rangeFrom: Number(c.range_from), rangeTo: Number(c.range_to) })),
-    upi:  (upiData?.data?.data?.results  ?? []).map((c) => ({ id: c.id, label: `${c.upi_id}  (₹${c.range_from}–₹${c.range_to})`,                   isBlocked: c.capacity?.capacity_status === 'exhausted', pct: c.capacity?.percent_used ?? 0, rangeFrom: Number(c.range_from), rangeTo: Number(c.range_to) })),
-    bank: (bankData?.data?.data?.results ?? []).map((c) => ({ id: c.id, label: `${c.bank_name} – ${c.account_number}  (₹${c.range_from}–₹${c.range_to})`, isBlocked: c.capacity?.capacity_status === 'exhausted', pct: c.capacity?.percent_used ?? 0, rangeFrom: Number(c.range_from), rangeTo: Number(c.range_to) })),
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const fd = new FormData()
+    fd.append('gateway_name', form.gateway_name)
+    fd.append('slip_status',  form.slip_status)
+    fd.append('comment',      form.comment)
+    if (form.slip) fd.append('slip', form.slip)
+    onSubmit(fd)
   }
 
-  const selectedChannel = form.channel_id
-    ? (channels[form.channel_type] ?? []).find((c) => c.id === Number(form.channel_id))
-    : null
-
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, channel_id: Number(form.channel_id) }) }} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Gateway Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Channel Type *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name *</label>
+        <select
+          className="input"
+          value={form.gateway_name}
+          onChange={(e) => f('gateway_name')(e.target.value)}
+          required
+        >
+          <option value="">Select gateway…</option>
+          {GATEWAY_OPTS.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Slip upload */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
+        <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded-lg px-4 py-3 hover:border-accent transition-colors">
+          <Paperclip size={15} className="text-gray-400 shrink-0" />
+          <span className="text-sm text-gray-500 truncate">
+            {form.slip ? form.slip.name : 'Click to attach slip (image / PDF)'}
+          </span>
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      </div>
+
+      {/* Slip Status */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Status *</label>
         <div className="grid grid-cols-3 gap-2">
-          {CHANNEL_OPTS.map(({ value, label, Icon }) => (
-            <button key={value} type="button"
-              onClick={() => setForm((p) => ({ ...p, channel_type: value, channel_id: '' }))}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-semibold transition-all ${form.channel_type === value ? 'border-accent bg-accent/10 text-accent-dark' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
-            ><Icon size={18} />{label}</button>
+          {SLIP_STATUS_OPTS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => f('slip_status')(value)}
+              className={`py-2 rounded-lg border-2 text-xs font-semibold transition-all ${
+                form.slip_status === value
+                  ? 'border-accent bg-accent/10 text-accent-dark'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {label}
+            </button>
           ))}
         </div>
       </div>
-      {form.channel_type && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Channel *</label>
-          <select className="input" value={form.channel_id} onChange={(e) => f('channel_id')(e.target.value)} required>
-            <option value="">Choose {CHANNEL_TYPE_LABEL[form.channel_type]}…</option>
-            {(channels[form.channel_type] ?? []).map((c) => (
-              <option key={c.id} value={c.id} disabled={c.isBlocked}>
-                {c.isBlocked ? `🚫 BLOCKED (${c.pct}% used) – ` : ''}{c.label}
-              </option>
-            ))}
-          </select>
-          {selectedChannel?.isBlocked && (
-            <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-              <Ban size={15} className="mt-0.5 shrink-0 text-red-500" />
-              <div>
-                <p className="text-sm font-semibold text-red-700">Channel Blocked</p>
-                <p className="mt-0.5 text-xs text-red-500">
-                  This channel has reached {selectedChannel.pct}% of its daily limit and cannot accept new deposits today.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Client Name *</label>
-          <input className="input" placeholder="e.g. Rahul Sharma" value={form.client_name} onChange={(e) => f('client_name')(e.target.value)} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (₹) *</label>
-          <input
-            type="number"
-            className="input"
-            placeholder="0.00"
-            value={form.amount}
-            onChange={(e) => f('amount')(e.target.value)}
-            step="0.01"
-            min={selectedChannel?.rangeFrom ?? '0.01'}
-            max={selectedChannel?.rangeTo ?? undefined}
-            required
-          />
-          {selectedChannel && (
-            <p className="mt-1 text-[11px] text-gray-400">
-              Allowed: ₹{selectedChannel.rangeFrom.toLocaleString('en-IN')} – ₹{selectedChannel.rangeTo.toLocaleString('en-IN')}
-            </p>
-          )}
-          {selectedChannel && form.amount && (
-            Number(form.amount) < selectedChannel.rangeFrom
-              ? <p className="mt-0.5 text-[11px] text-red-500">Amount is below the minimum of ₹{selectedChannel.rangeFrom.toLocaleString('en-IN')}.</p>
-              : Number(form.amount) > selectedChannel.rangeTo
-                ? <p className="mt-0.5 text-[11px] text-red-500">Amount exceeds the maximum of ₹{selectedChannel.rangeTo.toLocaleString('en-IN')}.</p>
-                : null
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">UTR / Ref. No. *</label>
-          <input className="input font-mono" placeholder="Transaction reference" value={form.utr_number} onChange={(e) => f('utr_number')(e.target.value)} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Deposit Date & Time *</label>
-          <input type="datetime-local" className="input" value={form.deposit_at} onChange={(e) => f('deposit_at')(e.target.value)} required />
-        </div>
-      </div>
+
+      {/* Comment */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Remarks</label>
-        <textarea className="input resize-none" rows={2} placeholder="Optional note…" value={form.remarks} onChange={(e) => f('remarks')(e.target.value)} />
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Comment</label>
+        <textarea
+          className="input resize-none"
+          rows={3}
+          placeholder="Optional comment…"
+          value={form.comment}
+          onChange={(e) => f('comment')(e.target.value)}
+        />
       </div>
+
       {error && <p className="text-red-500 text-sm">{error}</p>}
-      <button type="submit" disabled={
-        loading ||
-        !form.channel_type ||
-        !form.channel_id ||
-        !!selectedChannel?.isBlocked ||
-        (selectedChannel && form.amount && (Number(form.amount) < selectedChannel.rangeFrom || Number(form.amount) > selectedChannel.rangeTo))
-      } className="btn-primary w-full justify-center mt-1">
+      <button
+        type="submit"
+        disabled={loading || !form.gateway_name}
+        className="btn-primary w-full justify-center mt-1"
+      >
         {loading ? 'Logging…' : 'Log Deposit'}
       </button>
     </form>
@@ -171,21 +147,19 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
       {/* Deposit summary */}
       <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-sm space-y-1.5">
         <div className="flex justify-between">
-          <span className="text-gray-500">Client</span>
-          <span className="font-semibold text-gray-800">{initial?.client_name}</span>
+          <span className="text-gray-500">Gateway</span>
+          <span className="font-semibold text-gray-800">{initial?.gateway_name}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Amount</span>
-          <span className="font-bold text-gray-800">₹{Number(initial?.amount).toLocaleString('en-IN')}</span>
+          <span className="text-gray-500">Slip Status</span>
+          <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${SLIP_STATUS_BADGE[initial?.slip_status] ?? 'bg-gray-100 text-gray-600'}`}>
+            {SLIP_STATUS_LABEL[initial?.slip_status] ?? initial?.slip_status}
+          </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">UTR / Ref</span>
-          <span className="font-mono text-gray-600">{initial?.utr_number}</span>
-        </div>
-        {initial?.remarks && (
+        {initial?.comment && (
           <div className="pt-1.5 border-t border-gray-200">
-            <p className="text-gray-400 text-xs mb-0.5">RM Remarks</p>
-            <p className="text-gray-700">{initial.remarks}</p>
+            <p className="text-gray-400 text-xs mb-0.5">Comment</p>
+            <p className="text-gray-700">{initial.comment}</p>
           </div>
         )}
       </div>
@@ -234,51 +208,96 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
     </form>
   )
 }
+// ── Edit Form ──────────────────────────────────────────────────────────────
 function EditForm({ initial, onSubmit, loading, error }) {
   const [form, setForm] = useState({
-    client_name: initial?.client_name ?? '',
-    amount:      initial?.amount      ?? '',
-    utr_number:  initial?.utr_number  ?? '',
-    deposit_at:  initial?.deposit_at ? new Date(initial.deposit_at).toISOString().slice(0, 16) : nowLocal(),
-    remarks:     initial?.remarks     ?? '',
+    gateway_name: initial?.gateway_name ?? '',
+    slip_status:  initial?.slip_status  ?? 'pending',
+    comment:      initial?.comment      ?? '',
+    slip:         null,
   })
   const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
 
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const fd = new FormData()
+    fd.append('gateway_name', form.gateway_name)
+    fd.append('slip_status',  form.slip_status)
+    fd.append('comment',      form.comment)
+    if (form.slip) fd.append('slip', form.slip)
+    onSubmit(fd)
+  }
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="space-y-4">
-      {/* Channel info – read-only */}
-      <div className="bg-gray-50 rounded-lg px-4 py-3 flex items-center gap-3">
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${CHANNEL_BADGE[initial?.channel_type] ?? 'bg-gray-100 text-gray-600'}`}>
-          {CHANNEL_TYPE_LABEL[initial?.channel_type]}
-        </span>
-        <span className="text-sm text-gray-600">{initial?.channel_label}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Client Name *</label>
-          <input className="input" value={form.client_name} onChange={(e) => f('client_name')(e.target.value)} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (₹) *</label>
-          <input type="number" className="input" value={form.amount} onChange={(e) => f('amount')(e.target.value)} step="0.01" min="0.01" required />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">UTR / Ref. No. *</label>
-          <input className="input font-mono" value={form.utr_number} onChange={(e) => f('utr_number')(e.target.value)} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Deposit Date & Time *</label>
-          <input type="datetime-local" className="input" value={form.deposit_at} onChange={(e) => f('deposit_at')(e.target.value)} required />
-        </div>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Gateway Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Remarks</label>
-        <textarea className="input resize-none" rows={2} value={form.remarks} onChange={(e) => f('remarks')(e.target.value)} />
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name *</label>
+        <select
+          className="input"
+          value={form.gateway_name}
+          onChange={(e) => f('gateway_name')(e.target.value)}
+          required
+        >
+          <option value="">Select gateway…</option>
+          {GATEWAY_OPTS.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
       </div>
+
+      {/* Slip upload */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
+        <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded-lg px-4 py-3 hover:border-accent transition-colors">
+          <Paperclip size={15} className="text-gray-400 shrink-0" />
+          <span className="text-sm text-gray-500 truncate">
+            {form.slip ? form.slip.name : (initial?.slip ? 'Replace existing slip…' : 'Click to attach slip (image / PDF)')}
+          </span>
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      </div>
+
+      {/* Slip Status */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Status *</label>
+        <div className="grid grid-cols-3 gap-2">
+          {SLIP_STATUS_OPTS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => f('slip_status')(value)}
+              className={`py-2 rounded-lg border-2 text-xs font-semibold transition-all ${
+                form.slip_status === value
+                  ? 'border-accent bg-accent/10 text-accent-dark'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Comment */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Comment</label>
+        <textarea
+          className="input resize-none"
+          rows={3}
+          placeholder="Optional comment…"
+          value={form.comment}
+          onChange={(e) => f('comment')(e.target.value)}
+        />
+      </div>
+
       {error && <p className="text-red-500 text-sm">{error}</p>}
-      <button type="submit" disabled={loading} className="btn-primary w-full justify-center mt-1">
+      <button type="submit" disabled={loading || !form.gateway_name} className="btn-primary w-full justify-center mt-1">
         {loading ? 'Saving…' : 'Save Changes'}
       </button>
     </form>
@@ -293,15 +312,16 @@ export default function Deposits() {
   const canWrite  = ['admin', 'rm'].includes(user?.role)
   const canReview  = ['admin', 'back_office'].includes(user?.role)
 
-  const [page,       setPage]       = useState(1)
-  const [search,     setSearch]     = useState('')
-  const [typeFilter, setTypeFilter] = useState('')
-  const [modal,      setModal]      = useState(null)   // null | { mode: 'create' } | { mode: 'edit', data: record }
-  const [delTarget,  setDelTarget]  = useState(null)
+  const [page,            setPage]            = useState(1)
+  const [search,          setSearch]          = useState('')
+  const [gatewayFilter,   setGatewayFilter]   = useState('')
+  const [slipStatusFilter,setSlipStatusFilter]= useState('')
+  const [modal,           setModal]           = useState(null)
+  const [delTarget,       setDelTarget]       = useState(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['deposits', page, search, typeFilter],
-    queryFn:  () => getDeposits({ page, search, channel_type: typeFilter || undefined }),
+    queryKey: ['deposits', page, search, gatewayFilter, slipStatusFilter],
+    queryFn:  () => getDeposits({ page, search, gateway_name: gatewayFilter || undefined, slip_status: slipStatusFilter || undefined }),
   })
 
   const records    = data?.data?.data?.results ?? []
@@ -310,10 +330,6 @@ export default function Deposits() {
 
   const inv = () => {
     qc.invalidateQueries({ queryKey: ['deposits'] })
-    qc.invalidateQueries({ queryKey: ['notifications-unread'] })
-    qc.invalidateQueries({ queryKey: ['qr-codes'] })
-    qc.invalidateQueries({ queryKey: ['upi-sources'] })
-    qc.invalidateQueries({ queryKey: ['bank-accounts'] })
   }
 
   const createM = useMutation({ mutationFn: createDeposit,                                  onSuccess: () => { inv(); setModal(null) } })
@@ -343,15 +359,22 @@ export default function Deposits() {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 max-w-xs">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input className="input pl-9" placeholder="Search client, UTR…" value={search}
+            <input className="input pl-9" placeholder="Search comment…" value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
           </div>
-          <select className="input max-w-[180px]" value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}>
-            <option value="">All channel types</option>
-            <option value="qr">QR Code</option>
-            <option value="upi">UPI</option>
-            <option value="bank">Bank</option>
+          <select className="input max-w-[160px]" value={gatewayFilter}
+            onChange={(e) => { setGatewayFilter(e.target.value); setPage(1) }}>
+            <option value="">All gateways</option>
+            {GATEWAY_OPTS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <select className="input max-w-[180px]" value={slipStatusFilter}
+            onChange={(e) => { setSlipStatusFilter(e.target.value); setPage(1) }}>
+            <option value="">All slip statuses</option>
+            {SLIP_STATUS_OPTS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -361,46 +384,47 @@ export default function Deposits() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              {['Client', 'Channel', 'Amount', 'UTR / Ref', 'Deposit Time', 'Logged By', 'Brand', 'Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
+              {['Gateway', 'Slip', 'Slip Status', 'Comment', 'Logged By', 'Review Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
                 <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
-              <tr><td colSpan={canWrite || canReview ? 10 : 9} className="px-4 py-10 text-center text-gray-400 text-sm">
-                {isRM ? 'No deposits logged yet. Use "Log Deposit" to record a client deposit.' : 'No deposit logs found.'}
+              <tr><td colSpan={canWrite || canReview ? 7 : 6} className="px-4 py-10 text-center text-gray-400 text-sm">
+                {isRM ? 'No deposits logged yet. Use "Log Deposit" to record a deposit.' : 'No deposit logs found.'}
               </td></tr>
             )}
-            {records.map((r, i) => (
+            {records.map((r) => (
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
-                <td className="px-4 py-2.5 font-medium text-gray-800 text-xs">{r.client_name}</td>
+                {/* Gateway */}
                 <td className="px-4 py-2.5">
-                  <div className="flex flex-col gap-0.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold w-fit ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {CHANNEL_TYPE_LABEL[r.channel_type]}
-                    </span>
-                    <span className="text-xs text-gray-500 truncate max-w-[140px]">{r.channel_label}</span>
-                  </div>
+                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.gateway_name}</span>
                 </td>
+                {/* Slip */}
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-1 font-bold text-gray-800">
-                    <IndianRupee size={13} className="text-gray-400" />
-                    {Number(r.amount).toLocaleString('en-IN')}
-                  </div>
+                  {r.slip ? (
+                    <a href={r.slip} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
+                      <Paperclip size={11} /> View
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
                 </td>
-                <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{r.utr_number}</td>
-                <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar size={12} className="text-gray-300" />
-                    {new Date(r.deposit_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                  </div>
+                {/* Slip Status */}
+                <td className="px-4 py-2.5">
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${SLIP_STATUS_BADGE[r.slip_status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {SLIP_STATUS_LABEL[r.slip_status] ?? r.slip_status}
+                  </span>
                 </td>
+                {/* Comment */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[200px]">
+                  <span className="line-clamp-2">{r.comment || '—'}</span>
+                </td>
+                {/* Logged By */}
                 <td className="px-4 py-2.5 text-xs text-gray-500">{r.submitted_by_name ?? '—'}</td>
-                <td className="px-4 py-2.5">
-                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.brand_name}</span>
-                </td>
-                {/* Status */}
+                {/* Review Status */}
                 <td className="px-4 py-2.5">
                   {(() => {
                     const cfg = STATUS_CONFIG[r.status] ?? STATUS_CONFIG.pending
@@ -490,7 +514,7 @@ export default function Deposits() {
         onConfirm={() => deleteM.mutate(delTarget.id)}
         loading={deleteM.isPending}
         title="Delete Deposit"
-        message={`Delete deposit of ₹${delTarget ? Number(delTarget.amount).toLocaleString('en-IN') : ''} by "${delTarget?.client_name}"? This cannot be undone.`}
+        message={`Delete this ${delTarget?.gateway_name ?? ''} deposit log? This cannot be undone.`}
       />
     </div>
   )
