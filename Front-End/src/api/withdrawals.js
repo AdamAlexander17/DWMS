@@ -20,6 +20,8 @@ export const getWdNotifications  = () => api.get('/withdrawals/notifications/')
 export const getWdUnreadCount    = () => api.get('/withdrawals/notifications-count/')
 export const markWdAllRead       = () => api.post('/withdrawals/notifications-read-all/')
 export const markWdNotifRead     = (id) => api.post(`/withdrawals/${id}/notifications-read/`)
+export const deleteWdNotif       = (id) => api.delete(`/withdrawals/${id}/notifications-delete/`)
+export const clearAllWdNotifs    = () => api.post('/withdrawals/notifications-clear-all/')
 
 // Conversation / messages
 export const getMessages         = (id) => api.get(`/withdrawals/${id}/messages/`)

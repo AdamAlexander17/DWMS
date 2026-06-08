@@ -5,11 +5,15 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 from audit_logs.services import AuditLogService
 from common.pagination import StandardResultsPagination
 from common.responses import error_response, success_response
 from common.utils import get_client_ip
 
+from .consumers import ticket_group, user_notif_group
 from .models import Withdrawal, WithdrawalMessage, WithdrawalNotification
 from .serializers import (
     EmailSentSerializer, ManualCloseSerializer, NotReceivedSerializer,
@@ -25,17 +29,50 @@ def _role(user) -> str:
     return (getattr(user.role, 'name', None) or '').lower()
 
 
+def _push(group: str, type_: str, payload: dict):
+    """Broadcast to a channels group; silently no-op if layer is missing."""
+    layer = get_channel_layer()
+    if not layer:
+        return
+    async_to_sync(layer.group_send)(group, {'type': type_, **payload})
+
+
+def _push_notif(user_id: int, notif_dict: dict, unread_count: int):
+    _push(user_notif_group(user_id), 'notify', {'payload': {
+        'type':         'notification',
+        'notification': notif_dict,
+        'unread_count': unread_count,
+    }})
+
+
+def _push_unread_count(user_id: int, unread_count: int):
+    _push(user_notif_group(user_id), 'notify', {'payload': {
+        'type':         'unread_count',
+        'unread_count': unread_count,
+    }})
+
+
+def _push_ticket_update(withdrawal, request=None):
+    _push(ticket_group(withdrawal.pk), 'ticket_updated', {
+        'withdrawal': WithdrawalSerializer(withdrawal, context={'request': request}).data,
+    })
+
+
 def _notify(withdrawal, notif_type, message, recipients):
     recipients = [r for r in (recipients or []) if r is not None]
     if not recipients:
         return
-    WithdrawalNotification.objects.bulk_create([
+    notifs = WithdrawalNotification.objects.bulk_create([
         WithdrawalNotification(
             withdrawal=withdrawal, recipient=r,
             notif_type=notif_type, message=message,
         )
         for r in recipients
     ])
+    # broadcast each new notification to its recipient over WS
+    for n in notifs:
+        unread = WithdrawalNotification.objects.filter(recipient_id=n.recipient_id, is_read=False).count()
+        _push_notif(n.recipient_id, WithdrawalNotificationSerializer(n).data, unread)
 
 
 class WithdrawalViewSet(ModelViewSet):
@@ -174,6 +211,7 @@ class WithdrawalViewSet(ModelViewSet):
             'slip', 'slip_note', 'slip_uploaded_at', 'slip_uploaded_by',
             'status', 'updated_at',
         ])
+        _push_ticket_update(instance, request)
 
         _notify(
             instance, 'slip_uploaded',
@@ -203,6 +241,7 @@ class WithdrawalViewSet(ModelViewSet):
 
         instance.status = 'closed'
         instance.save(update_fields=['status', 'updated_at'])
+        _push_ticket_update(instance, request)
 
         _notify(
             instance, 'closed',
@@ -236,6 +275,7 @@ class WithdrawalViewSet(ModelViewSet):
         instance.followup_remarks = s.validated_data['followup_remarks']
         instance.status           = 'bank_followup_required'
         instance.save(update_fields=['followup_remarks', 'status', 'updated_at'])
+        _push_ticket_update(instance, request)
 
         recipients = list(User.objects.filter(role__name='admin'))
         if instance.brand_id:
@@ -275,6 +315,7 @@ class WithdrawalViewSet(ModelViewSet):
         instance.email_sent_at      = timezone.now()
         instance.status             = 'email_sent_to_bank'
         instance.save(update_fields=['bank_followup_note', 'email_sent_at', 'status', 'updated_at'])
+        _push_ticket_update(instance, request)
 
         _notify(
             instance, 'email_sent_to_bank',
@@ -346,6 +387,9 @@ class WithdrawalViewSet(ModelViewSet):
             password_hint  = s.validated_data.get('password_hint', '') if attachment else '',
         )
 
+        msg_data = WithdrawalMessageSerializer(msg, context={'request': request}).data
+        _push(ticket_group(instance.pk), 'message_created', {'message': msg_data})
+
         preview = msg.message[:80] if msg.message else f'sent an attachment ({msg.attachment_name})'
         _notify(
             instance, 'new_message',
@@ -360,7 +404,7 @@ class WithdrawalViewSet(ModelViewSet):
         )
         return success_response(
             'Message sent',
-            WithdrawalMessageSerializer(msg, context={'request': request}).data,
+            msg_data,
             status_code=status.HTTP_201_CREATED,
         )
 
@@ -381,12 +425,16 @@ class WithdrawalViewSet(ModelViewSet):
         instance.save(update_fields=['status', 'updated_at'])
 
         if note:
-            WithdrawalMessage.objects.create(
+            msg = WithdrawalMessage.objects.create(
                 withdrawal  = instance,
                 sender      = request.user,
                 sender_role = _role(request.user),
                 message     = f'✅ Ticket closed by Back Office.\n{note}',
             )
+            _push(ticket_group(instance.pk), 'message_created', {
+                'message': WithdrawalMessageSerializer(msg, context={'request': request}).data,
+            })
+        _push_ticket_update(instance, request)
 
         _notify(
             instance, 'manual_closed',
@@ -430,6 +478,7 @@ class WithdrawalViewSet(ModelViewSet):
         WithdrawalNotification.objects.filter(
             recipient=request.user, is_read=False
         ).update(is_read=True)
+        _push_unread_count(request.user.pk, 0)
         return success_response('All notifications marked as read')
 
     @action(detail=True, methods=['post'], url_path='notifications-read')
@@ -437,7 +486,24 @@ class WithdrawalViewSet(ModelViewSet):
         WithdrawalNotification.objects.filter(
             pk=pk, recipient=request.user
         ).update(is_read=True)
+        unread = WithdrawalNotification.objects.filter(recipient=request.user, is_read=False).count()
+        _push_unread_count(request.user.pk, unread)
         return success_response('Notification marked as read')
+
+    @action(detail=True, methods=['delete'], url_path='notifications-delete')
+    def notification_delete(self, request, pk=None):
+        WithdrawalNotification.objects.filter(
+            pk=pk, recipient=request.user
+        ).delete()
+        unread = WithdrawalNotification.objects.filter(recipient=request.user, is_read=False).count()
+        _push_unread_count(request.user.pk, unread)
+        return success_response('Notification dismissed')
+
+    @action(detail=False, methods=['post'], url_path='notifications-clear-all')
+    def notifications_clear_all(self, request):
+        WithdrawalNotification.objects.filter(recipient=request.user).delete()
+        _push_unread_count(request.user.pk, 0)
+        return success_response('All notifications cleared')
 
     # ── Stats (counts + monthly trend) ───────────────────────────────────
     @action(detail=False, methods=['get'], url_path='stats')

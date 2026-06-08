@@ -14,6 +14,7 @@ import {
   uploadSlip, confirmReceived, notReceived, markEmailSent,
   getMessages, postMessage, manualClose,
 } from '../api/withdrawals'
+import { connectWS } from '../api/ws'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Pagination from '../components/ui/Pagination'
@@ -329,15 +330,40 @@ function MessageThread({ withdrawalId, currentUserId }) {
   const [file, setFile]         = useState(null)
   const [isProt, setIsProt]     = useState(false)
   const [hint, setHint]         = useState('')
+  const [wsLive, setWsLive]     = useState(false)
   const fileInputRef            = useRef(null)
   const scrollerRef             = useRef(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['wd-messages', withdrawalId],
     queryFn:  () => getMessages(withdrawalId),
-    refetchInterval: 15_000,
   })
   const messages = data?.data?.data ?? []
+
+  // ── Live WebSocket subscription ────────────────────────────────────────
+  useEffect(() => {
+    const { accessToken } = useAuthStore.getState()
+    if (!accessToken || !withdrawalId) return
+    const conn = connectWS(`/ws/withdrawals/${withdrawalId}/`, accessToken, {
+      onOpen: () => setWsLive(true),
+      onClose: () => setWsLive(false),
+      onMessage: (data) => {
+        if (data?.type === 'message_created' && data.message) {
+          qc.setQueryData(['wd-messages', withdrawalId], (prev) => {
+            if (!prev) return prev
+            const list = prev.data?.data ?? []
+            if (list.some(m => m.id === data.message.id)) return prev
+            return { ...prev, data: { ...prev.data, data: [...list, data.message] } }
+          })
+        }
+        if (data?.type === 'ticket_updated' && data.withdrawal) {
+          qc.invalidateQueries({ queryKey: ['withdrawals'] })
+          qc.invalidateQueries({ queryKey: ['withdrawal-stats'] })
+        }
+      },
+    })
+    return () => conn.close()
+  }, [withdrawalId, qc])
 
   useEffect(() => {
     if (scrollerRef.current) scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight
@@ -531,8 +557,9 @@ function MessageThread({ withdrawalId, currentUserId }) {
           </button>
         </div>
 
-        <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1">
-          <Info size={9} /> Conversation auto-refreshes every 15 seconds.
+        <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1.5">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${wsLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+          {wsLive ? 'Live — connected' : 'Reconnecting…'}
         </p>
       </div>
     </div>
@@ -740,6 +767,8 @@ export default function Withdrawals() {
   const { data, isLoading } = useQuery({
     queryKey: ['withdrawals', page, search, statusFilter],
     queryFn:  () => getWithdrawals({ page, search: search || undefined, status: statusFilter || undefined, history: 'false' }),
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   })
 
   const records    = data?.data?.data?.results ?? []
