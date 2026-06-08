@@ -42,7 +42,10 @@ class DepositLogViewSet(
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        return DepositLog.objects.select_related('submitted_by', 'reviewed_by').all()
+        return DepositLog.objects.select_related(
+            'submitted_by', 'reviewed_by',
+            'qr_code', 'upi_source', 'bank_account',
+        ).all()
 
     # ------------------------------------------------------------------
     # Standard actions

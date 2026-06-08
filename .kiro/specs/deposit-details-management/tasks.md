@@ -58,7 +58,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 2: Create Data Models and Migrations
 
-- [-] 2.1 Create User model and UserManager (accounts/models.py)
+- [ ] 2.1 Create User model and UserManager (accounts/models.py)
   - Define `UserManager` class with `create_user()` and `create_superuser()` methods
   - Define `User` model extending `AbstractBaseUser` with fields: full_name, username (unique), email (unique), mobile, role (choices: admin, back_office, rm), brand (FK, nullable), is_active, created_at, updated_at
   - Implement `clean()` method validating brand requirement for RM role
@@ -67,25 +67,25 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Set `AUTH_USER_MODEL = 'accounts.User'` in `config/settings.py`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [-] 2.2 Create Brand model (brands/models.py)
+- [ ] 2.2 Create Brand model (brands/models.py)
   - Define `Brand` model with fields: id, name (unique, max 100 chars), status (boolean, default True), created_at, updated_at
   - Set `Meta.ordering` to ['name']
   - _Requirements: 5.1_
 
-- [-] 2.3 Create QRCode model (payments/models.py)
+- [ ] 2.3 Create QRCode model (payments/models.py)
   - Define `QRCode` model with fields: id, qr_name (max 200), qr_image (FileField, upload_to='qr_codes/'), brand (FK), range_from, range_to (DecimalField, max_digits=12, decimal_places=2), status (boolean, default True), created_by (FK to User, nullable), created_at, updated_at
   - Implement `clean()` method validating range_from < range_to
   - Set `Meta.ordering` to ['-created_at']
   - _Requirements: 7.1_
 
-- [-] 2.4 Create UPI model (payments/models.py)
+- [ ] 2.4 Create UPI model (payments/models.py)
   - Define `UPI` model with fields: id, upi_id (unique, max 100, with regex validator), brand (FK), range_from, range_to (DecimalField), status (boolean, default True), created_by (FK to User, nullable), created_at, updated_at
   - Add regex validator on upi_id: `^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$`
   - Implement `clean()` method validating range_from < range_to
   - Set `Meta.ordering` to ['-created_at']
   - _Requirements: 8.1_
 
-- [-] 2.5 Create BankDetail model with encryption (payments/models.py)
+- [ ] 2.5 Create BankDetail model with encryption (payments/models.py)
   - Define `BankDetail` model with fields: id, bank_name (max 200), account_holder_name (max 200), account_number (CharField, max 255, encrypted), ifsc_code (max 11, with regex validator), branch_name (max 200), brand (FK), range_from, range_to (DecimalField), status (boolean, default True), created_by (FK to User, nullable), created_at, updated_at
   - Add regex validator on ifsc_code: `^[A-Z]{4}0[A-Z0-9]{6}$`
   - Implement `clean()` method validating range_from < range_to
@@ -96,7 +96,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Set `ENCRYPTION_KEY` in `config/settings.py` (generate via Fernet.generate_key())
   - _Requirements: 9.1, 9.5, 9.6, 9.7_
 
-- [-] 2.6 Create AuditLog model (audit_logs/models.py)
+- [ ] 2.6 Create AuditLog model (audit_logs/models.py)
   - Define `AuditLog` model with fields: id, user (FK to User, nullable), action (choices: created, updated, deleted, activated, deactivated), module (choices: brand, user, qr, upi, bank), object_id (BigIntegerField), old_data (JSONField, nullable), new_data (JSONField, nullable), ip_address (max 45 chars), timestamp (auto_now_add)
   - Set `Meta.ordering` to ['-timestamp']
   - Add database indexes on timestamp, (module, timestamp), (user, timestamp)
@@ -105,7 +105,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Set all fields to `editable=False`
   - _Requirements: 11.1, 11.9_
 
-- [~] 2.7 Create initial migrations for all models
+- [ ] 2.7 Create initial migrations for all models
   - Run `python manage.py makemigrations` for accounts, brands, payments, audit_logs, common
   - Run `python manage.py migrate` to apply migrations
   - Verify no migration conflicts or circular dependencies
@@ -113,13 +113,13 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 3: Create Serializers
 
-- [~] 3.1 Create Brand serializers (brands/serializers.py)
+- [ ] 3.1 Create Brand serializers (brands/serializers.py)
   - Create `BrandCreateUpdateSerializer` with fields: id, name, status; include unique name validation
   - Create `BrandListSerializer` with fields: id, name, status, created_at, updated_at
   - Create `BrandDetailSerializer` with fields: id, name, status, created_at, updated_at
   - _Requirements: 5.2, 5.3, 5.4, 5.5_
 
-- [~] 3.2 Create User serializers (accounts/serializers.py)
+- [ ] 3.2 Create User serializers (accounts/serializers.py)
   - Create `UserCreateSerializer` with fields: id, full_name, username, email, mobile, role, brand, password (write_only); implement brand validation for RM role
   - Create `UserUpdateSerializer` with fields: id, full_name, username, email, mobile, role, brand, is_active; implement brand validation for RM role
   - Create `UserListSerializer` with fields: id, full_name, username, email, mobile, role, brand, is_active, created_at, updated_at (exclude password)
@@ -128,7 +128,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Create `ResetPasswordSerializer` with field: new_password (write_only)
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [~] 3.3 Create QRCode serializers (payments/serializers.py)
+- [ ] 3.3 Create QRCode serializers (payments/serializers.py)
   - Create `QRCodeCreateUpdateSerializer` with fields: id, qr_name, qr_image, brand, range_from, range_to, status
   - Implement file type validation (jpg, jpeg, png, gif, webp only)
   - Implement file size validation (max 5 MB)
@@ -137,28 +137,28 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Create `QRCodeDetailSerializer` with fields: id, qr_name, qr_image, brand, range_from, range_to, status, created_by, created_at, updated_at
   - _Requirements: 7.3, 7.5, 7.6, 7.7, 7.8_
 
-- [~] 3.4 Create UPI serializers (payments/serializers.py)
+- [ ] 3.4 Create UPI serializers (payments/serializers.py)
   - Create `UPICreateUpdateSerializer` with fields: id, upi_id, brand, range_from, range_to, status
   - Implement range validation (range_from < range_to)
   - Create `UPIListSerializer` with fields: id, upi_id, brand, range_from, range_to, status, created_at
   - Create `UPIDetailSerializer` with fields: id, upi_id, brand, range_from, range_to, status, created_by, created_at, updated_at
   - _Requirements: 8.3, 8.7_
 
-- [~] 3.5 Create BankDetail serializers (payments/serializers.py)
+- [ ] 3.5 Create BankDetail serializers (payments/serializers.py)
   - Create `BankDetailCreateUpdateSerializer` with fields: id, bank_name, account_holder_name, account_number, ifsc_code, branch_name, brand, range_from, range_to, status
   - Implement range validation (range_from < range_to)
   - Create `BankDetailListSerializer` displaying masked account number using `get_masked_account_number()`
   - Create `BankDetailDetailSerializer` with masked account number in all responses; never expose plaintext or encrypted account_number
   - _Requirements: 9.3, 9.5, 9.8, 9.11_
 
-- [~] 3.6 Create AuditLog serializer (audit_logs/serializers.py)
+- [ ] 3.6 Create AuditLog serializer (audit_logs/serializers.py)
   - Create `AuditLogListSerializer` with fields: id, user, action, module, object_id, old_data, new_data, ip_address, timestamp
   - Create `AuditLogDetailSerializer` with same fields
   - _Requirements: 11.6_
 
 ## Phase 4: Create Service Layer
 
-- [~] 4.1 Create AuthService (accounts/services.py)
+- [ ] 4.1 Create AuthService (accounts/services.py)
   - Implement `authenticate_user(username, password)` method: validate credentials, check is_active status, return user object or raise error
   - Implement `generate_tokens(user)` method: generate access and refresh JWT tokens using rest_framework_simplejwt
   - Implement `validate_refresh_token(refresh_token)` method: validate token and check blacklist status
@@ -166,7 +166,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Implement `change_password(user, old_password, new_password)` method: validate old password, run Django password validators, update password
   - _Requirements: 3.6, 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.14, 3.15_
 
-- [~] 4.2 Create BrandService (brands/services.py)
+- [ ] 4.2 Create BrandService (brands/services.py)
   - Implement `get_all_brands(user, filters, search, ordering, page)` method: return paginated queryset, apply filters
   - Implement `create_brand(user, data, ip_address)` method: verify user is Admin, create brand, trigger audit log, return created brand
   - Implement `get_brand_detail(user, brand_id)` method: return brand detail or raise 404
@@ -176,7 +176,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Implement `deactivate_brand(user, brand_id, ip_address)` method: set status=False, trigger audit log
   - _Requirements: 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.10_
 
-- [~] 4.3 Create UserService (accounts/services.py)
+- [ ] 4.3 Create UserService (accounts/services.py)
   - Implement `get_all_users(user, filters, search, ordering, page)` method: return paginated queryset excluding password fields, apply filters
   - Implement `create_user(user, data, ip_address)` method: verify Admin, validate brand requirement for RM, create user, hash password, trigger audit log
   - Implement `get_user_detail(user, user_id)` method: return user detail excluding password or raise 404
@@ -187,7 +187,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Implement `deactivate_user(user, user_id, ip_address)` method: set is_active=False, trigger audit log
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.10, 6.11_
 
-- [~] 4.4 Create QRCodeService (payments/services.py)
+- [ ] 4.4 Create QRCodeService (payments/services.py)
   - Implement `get_filtered_queryset(user, filters)` method: apply brand filtering for RM (only active, own brand), return queryset
   - Implement `get_all_qr(user, filters, search, ordering, page)` method: call get_filtered_queryset, return paginated results
   - Implement `create_qr(user, data, ip_address)` method: verify Admin/BackOffice, validate file (type, size), validate range, generate UUID filename for image, save record, trigger audit log
@@ -198,7 +198,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Implement `deactivate_qr(user, qr_id, ip_address)` method: set status=False, trigger audit log
   - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.7, 7.9, 7.10, 7.11, 7.12, 10.2_
 
-- [~] 4.5 Create UPIService (payments/services.py)
+- [ ] 4.5 Create UPIService (payments/services.py)
   - Implement `get_filtered_queryset(user, filters)` method: apply brand filtering for RM (only active, own brand), return queryset
   - Implement `get_all_upi(user, filters, search, ordering, page)` method: call get_filtered_queryset, return paginated results
   - Implement `create_upi(user, data, ip_address)` method: verify Admin/BackOffice, validate UPI ID format, validate range, create record, trigger audit log
@@ -209,7 +209,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Implement `deactivate_upi(user, upi_id, ip_address)` method: set status=False, trigger audit log
   - _Requirements: 8.2, 8.3, 8.5, 8.6, 8.7, 8.9, 8.10_
 
-- [~] 4.6 Create BankDetailService (payments/services.py)
+- [ ] 4.6 Create BankDetailService (payments/services.py)
   - Implement `get_filtered_queryset(user, filters)` method: apply brand filtering for RM (only active, own brand), return queryset
   - Implement `get_all_bank(user, filters, search, ordering, page)` method: call get_filtered_queryset, return paginated results
   - Implement `create_bank(user, data, ip_address)` method: verify Admin/BackOffice, validate IFSC code, validate range, encrypt account_number, create record, trigger audit log
@@ -220,7 +220,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Implement `deactivate_bank(user, bank_id, ip_address)` method: set status=False, trigger audit log
   - _Requirements: 9.2, 9.3, 9.4, 9.5, 9.8, 9.10, 9.11, 10.3, 10.4_
 
-- [~] 4.7 Create AuditService (audit_logs/services.py)
+- [ ] 4.7 Create AuditService (audit_logs/services.py)
   - Implement `log_action(user, action, module, object_id, old_data, new_data, ip_address)` method: create AuditLog record
   - Implement `get_audit_logs(user, filters, ordering, page)` method: verify Admin/BackOffice (deny RM access), return paginated audit logs
   - Implement `serialize_model_instance(instance)` method: convert model instance to JSON-serializable dict (mask account_number for BankDetail)
@@ -228,7 +228,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 5: Create Permission Classes
 
-- [~] 5.1 Create permission classes (accounts/permissions.py)
+- [ ] 5.1 Create permission classes (accounts/permissions.py)
   - Create `IsAdmin` permission class: allow access only to authenticated users with role='admin'
   - Create `IsBackOffice` permission class: allow access only to authenticated users with role='back_office'
   - Create `IsAdminOrBackOffice` permission class: allow access to users with role='admin' or 'back_office'
@@ -238,7 +238,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 6: Create Authentication Views (accounts/views.py)
 
-- [~] 6.1 Implement login view (POST /api/auth/login/)
+- [ ] 6.1 Implement login view (POST /api/auth/login/)
   - Use FBV with `@api_view(['POST'])`
   - Accept request body: `{"username": "string", "password": "string"}`
   - Call `AuthService.authenticate_user()` to validate credentials
@@ -249,7 +249,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 3.6, 3.7, 3.8_
 
-- [~] 6.2 Implement refresh token view (POST /api/auth/refresh/)
+- [ ] 6.2 Implement refresh token view (POST /api/auth/refresh/)
   - Use FBV with `@api_view(['POST'])`
   - Accept request body: `{"refresh": "jwt_token"}`
   - Validate refresh token and check blacklist
@@ -258,7 +258,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 3.9, 3.11_
 
-- [~] 6.3 Implement logout view (POST /api/auth/logout/)
+- [ ] 6.3 Implement logout view (POST /api/auth/logout/)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAuthenticated])`
   - Accept request body: `{"refresh": "jwt_token"}`
   - Call `AuthService.logout_user()` to blacklist refresh token
@@ -266,7 +266,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 3.10_
 
-- [~] 6.4 Implement change-password view (POST /api/auth/change-password/)
+- [ ] 6.4 Implement change-password view (POST /api/auth/change-password/)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAuthenticated])`
   - Accept request body: `{"old_password": "string", "new_password": "string", "confirm_new_password": "string"}`
   - Call `AuthService.change_password()` to validate and update password
@@ -277,7 +277,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 7: Create Brand Views (brands/views.py)
 
-- [~] 7.1 Implement GET /api/brands/ (list brands)
+- [ ] 7.1 Implement GET /api/brands/ (list brands)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdmin])`
   - Call `BrandService.get_all_brands()` passing user, filters, search, ordering, page
   - Return 200 success response with paginated brand list
@@ -287,7 +287,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 5.2, 5.8_
 
-- [~] 7.2 Implement POST /api/brands/ (create brand)
+- [ ] 7.2 Implement POST /api/brands/ (create brand)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdmin])`
   - Accept serializer: `BrandCreateUpdateSerializer`
   - Call `BrandService.create_brand()` with request data and IP address
@@ -296,14 +296,14 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 5.3, 5.7, 5.10_
 
-- [~] 7.3 Implement GET /api/brands/{id}/ (brand detail)
+- [ ] 7.3 Implement GET /api/brands/{id}/ (brand detail)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdmin])`
   - Call `BrandService.get_brand_detail()` with brand_id
   - Return 200 success response with brand detail or 404 error
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 5.4_
 
-- [~] 7.4 Implement PUT/PATCH /api/brands/{id}/ (update brand)
+- [ ] 7.4 Implement PUT/PATCH /api/brands/{id}/ (update brand)
   - Use FBV with `@api_view(['PUT', 'PATCH'])` and `@permission_classes([IsAdmin])`
   - Accept serializer: `BrandCreateUpdateSerializer`
   - Call `BrandService.update_brand()` with brand_id, data, IP address
@@ -311,21 +311,21 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 5.5, 5.10_
 
-- [~] 7.5 Implement DELETE /api/brands/{id}/ (delete brand)
+- [ ] 7.5 Implement DELETE /api/brands/{id}/ (delete brand)
   - Use FBV with `@api_view(['DELETE'])` and `@permission_classes([IsAdmin])`
   - Call `BrandService.delete_brand()` with brand_id and IP address (soft delete via deactivate)
   - Return 200 success response with message or 404 error
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 5.6, 5.10_
 
-- [~] 7.6 Implement POST /api/brands/{id}/activate/ (activate brand)
+- [ ] 7.6 Implement POST /api/brands/{id}/activate/ (activate brand)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdmin])`
   - Call `BrandService.activate_brand()` with brand_id and IP address
   - Return 200 success response with updated brand or 404 error
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 10.6_
 
-- [~] 7.7 Implement POST /api/brands/{id}/deactivate/ (deactivate brand)
+- [ ] 7.7 Implement POST /api/brands/{id}/deactivate/ (deactivate brand)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdmin])`
   - Call `BrandService.deactivate_brand()` with brand_id and IP address
   - Return 200 success response with updated brand or 404 error
@@ -334,7 +334,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 8: Create User Views (accounts/views.py)
 
-- [~] 8.1 Implement GET /api/users/ (list users)
+- [ ] 8.1 Implement GET /api/users/ (list users)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdmin])`
   - Call `UserService.get_all_users()` passing user, filters, search, ordering, page
   - Return 200 success response with paginated user list (exclude password)
@@ -344,7 +344,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 6.1, 6.9_
 
-- [~] 8.2 Implement POST /api/users/ (create user)
+- [ ] 8.2 Implement POST /api/users/ (create user)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdmin])`
   - Accept serializer: `UserCreateSerializer`
   - Call `UserService.create_user()` with request data and IP address
@@ -354,14 +354,14 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 6.2, 6.7, 6.8, 6.11_
 
-- [~] 8.3 Implement GET /api/users/{id}/ (user detail)
+- [ ] 8.3 Implement GET /api/users/{id}/ (user detail)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdmin])`
   - Call `UserService.get_user_detail()` with user_id
   - Return 200 success response with user detail (exclude password) or 404 error
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 6.3_
 
-- [~] 8.4 Implement PUT/PATCH /api/users/{id}/ (update user)
+- [ ] 8.4 Implement PUT/PATCH /api/users/{id}/ (update user)
   - Use FBV with `@api_view(['PUT', 'PATCH'])` and `@permission_classes([IsAdmin])`
   - Accept serializer: `UserUpdateSerializer`
   - Call `UserService.update_user()` with user_id, data, IP address
@@ -369,14 +369,14 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 6.4, 6.11_
 
-- [~] 8.5 Implement DELETE /api/users/{id}/ (delete/deactivate user)
+- [ ] 8.5 Implement DELETE /api/users/{id}/ (delete/deactivate user)
   - Use FBV with `@api_view(['DELETE'])` and `@permission_classes([IsAdmin])`
   - Call `UserService.delete_user()` with user_id and IP address (deactivate via is_active=False)
   - Return 200 success response with message or 404 error
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 6.5, 6.11_
 
-- [~] 8.6 Implement POST /api/users/{id}/reset-password/ (reset password)
+- [ ] 8.6 Implement POST /api/users/{id}/reset-password/ (reset password)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdmin])`
   - Accept serializer: `ResetPasswordSerializer` with new_password
   - Call `UserService.reset_password()` with user_id, new_password, IP address
@@ -384,14 +384,14 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 6.6, 6.11_
 
-- [~] 8.7 Implement POST /api/users/{id}/activate/ (activate user)
+- [ ] 8.7 Implement POST /api/users/{id}/activate/ (activate user)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdmin])`
   - Call `UserService.activate_user()` with user_id and IP address
   - Return 200 success response with updated user or 404 error
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 10.7_
 
-- [~] 8.8 Implement POST /api/users/{id}/deactivate/ (deactivate user)
+- [ ] 8.8 Implement POST /api/users/{id}/deactivate/ (deactivate user)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdmin])`
   - Call `UserService.deactivate_user()` with user_id and IP address
   - Return 200 success response with updated user or 404 error
@@ -400,7 +400,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 9: Create QR Code Views (payments/views.py)
 
-- [~] 9.1 Implement GET /api/payments/qr/ (list QR codes)
+- [ ] 9.1 Implement GET /api/payments/qr/ (list QR codes)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdminOrBackOfficeOrRM])`
   - Call `QRCodeService.get_all_qr()` passing user, filters, search, ordering, page
   - For Admin/BackOffice: return all QR records; for RM: auto-filter to active records of their brand
@@ -411,7 +411,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 7.2, 7.9, 7.10_
 
-- [~] 9.2 Implement POST /api/payments/qr/ (create QR code)
+- [ ] 9.2 Implement POST /api/payments/qr/ (create QR code)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Accept multipart form data with `QRCodeCreateUpdateSerializer`
   - Call `QRCodeService.create_qr()` with request data and IP address
@@ -422,7 +422,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 7.3, 7.5, 7.6, 7.7, 7.11_
 
-- [~] 9.3 Implement GET /api/payments/qr/{id}/ (QR code detail)
+- [ ] 9.3 Implement GET /api/payments/qr/{id}/ (QR code detail)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdminOrBackOfficeOrRM])`
   - Call `QRCodeService.get_qr_detail()` with qr_id and user
   - For RM: check brand match and active status; return 404 if not accessible
@@ -430,7 +430,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 7.4, 12.4_
 
-- [~] 9.4 Implement PUT/PATCH /api/payments/qr/{id}/ (update QR code)
+- [ ] 9.4 Implement PUT/PATCH /api/payments/qr/{id}/ (update QR code)
   - Use FBV with `@api_view(['PUT', 'PATCH'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Accept multipart form data with `QRCodeCreateUpdateSerializer`
   - Call `QRCodeService.update_qr()` with qr_id, data, IP address
@@ -441,7 +441,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 7.4, 7.11, 12.5_
 
-- [~] 9.5 Implement DELETE /api/payments/qr/{id}/ (delete QR code)
+- [ ] 9.5 Implement DELETE /api/payments/qr/{id}/ (delete QR code)
   - Use FBV with `@api_view(['DELETE'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `QRCodeService.delete_qr()` with qr_id and IP address
   - Delete associated image file from storage before deleting record
@@ -450,7 +450,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 7.4, 7.12, 10.2_
 
-- [~] 9.6 Implement POST /api/payments/qr/{id}/activate/ (activate QR code)
+- [ ] 9.6 Implement POST /api/payments/qr/{id}/activate/ (activate QR code)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `QRCodeService.activate_qr()` with qr_id and IP address
   - Trigger audit log
@@ -458,7 +458,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 10.1, 10.2_
 
-- [~] 9.7 Implement POST /api/payments/qr/{id}/deactivate/ (deactivate QR code)
+- [ ] 9.7 Implement POST /api/payments/qr/{id}/deactivate/ (deactivate QR code)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `QRCodeService.deactivate_qr()` with qr_id and IP address
   - Trigger audit log
@@ -468,7 +468,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 10: Create UPI Views (payments/views.py)
 
-- [~] 10.1 Implement GET /api/payments/upi/ (list UPI records)
+- [ ] 10.1 Implement GET /api/payments/upi/ (list UPI records)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdminOrBackOfficeOrRM])`
   - Call `UPIService.get_all_upi()` passing user, filters, search, ordering, page
   - For Admin/BackOffice: return all UPI records; for RM: auto-filter to active records of their brand
@@ -479,7 +479,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 8.2, 8.8, 8.9_
 
-- [~] 10.2 Implement POST /api/payments/upi/ (create UPI record)
+- [ ] 10.2 Implement POST /api/payments/upi/ (create UPI record)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Accept serializer: `UPICreateUpdateSerializer`
   - Call `UPIService.create_upi()` with request data and IP address
@@ -490,7 +490,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 8.3, 8.5, 8.6, 8.10_
 
-- [~] 10.3 Implement GET /api/payments/upi/{id}/ (UPI detail)
+- [ ] 10.3 Implement GET /api/payments/upi/{id}/ (UPI detail)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdminOrBackOfficeOrRM])`
   - Call `UPIService.get_upi_detail()` with upi_id and user
   - For RM: check brand match and active status; return 404 if not accessible
@@ -498,7 +498,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 8.4, 12.4_
 
-- [~] 10.4 Implement PUT/PATCH /api/payments/upi/{id}/ (update UPI record)
+- [ ] 10.4 Implement PUT/PATCH /api/payments/upi/{id}/ (update UPI record)
   - Use FBV with `@api_view(['PUT', 'PATCH'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Accept serializer: `UPICreateUpdateSerializer`
   - Call `UPIService.update_upi()` with upi_id, data, IP address
@@ -508,7 +508,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 8.4, 8.10_
 
-- [~] 10.5 Implement DELETE /api/payments/upi/{id}/ (delete UPI record)
+- [ ] 10.5 Implement DELETE /api/payments/upi/{id}/ (delete UPI record)
   - Use FBV with `@api_view(['DELETE'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `UPIService.delete_upi()` with upi_id and IP address
   - Trigger audit log
@@ -516,7 +516,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 8.4, 8.10_
 
-- [~] 10.6 Implement POST /api/payments/upi/{id}/activate/ (activate UPI record)
+- [ ] 10.6 Implement POST /api/payments/upi/{id}/activate/ (activate UPI record)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `UPIService.activate_upi()` with upi_id and IP address
   - Trigger audit log
@@ -524,7 +524,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 10.3_
 
-- [~] 10.7 Implement POST /api/payments/upi/{id}/deactivate/ (deactivate UPI record)
+- [ ] 10.7 Implement POST /api/payments/upi/{id}/deactivate/ (deactivate UPI record)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `UPIService.deactivate_upi()` with upi_id and IP address
   - Trigger audit log
@@ -534,7 +534,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 11: Create Bank Detail Views (payments/views.py)
 
-- [~] 11.1 Implement GET /api/payments/bank/ (list bank details)
+- [ ] 11.1 Implement GET /api/payments/bank/ (list bank details)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdminOrBackOfficeOrRM])`
   - Call `BankDetailService.get_all_bank()` passing user, filters, search, ordering, page
   - For Admin/BackOffice: return all bank records; for RM: auto-filter to active records of their brand
@@ -545,7 +545,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 9.2, 9.9, 9.10_
 
-- [~] 11.2 Implement POST /api/payments/bank/ (create bank detail)
+- [ ] 11.2 Implement POST /api/payments/bank/ (create bank detail)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Accept serializer: `BankDetailCreateUpdateSerializer`
   - Call `BankDetailService.create_bank()` with request data and IP address
@@ -556,7 +556,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 9.3, 9.5, 9.7, 9.11_
 
-- [~] 11.3 Implement GET /api/payments/bank/{id}/ (bank detail)
+- [ ] 11.3 Implement GET /api/payments/bank/{id}/ (bank detail)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdminOrBackOfficeOrRM])`
   - Call `BankDetailService.get_bank_detail()` with bank_id and user
   - For RM: check brand match and active status; return 404 if not accessible
@@ -564,7 +564,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, parameters
   - _Requirements: 9.4, 9.6, 12.4_
 
-- [~] 11.4 Implement PUT/PATCH /api/payments/bank/{id}/ (update bank detail)
+- [ ] 11.4 Implement PUT/PATCH /api/payments/bank/{id}/ (update bank detail)
   - Use FBV with `@api_view(['PUT', 'PATCH'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Accept serializer: `BankDetailCreateUpdateSerializer`
   - Call `BankDetailService.update_bank()` with bank_id, data, IP address
@@ -575,7 +575,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary, request/response examples
   - _Requirements: 9.4, 9.11_
 
-- [~] 11.5 Implement DELETE /api/payments/bank/{id}/ (delete bank detail)
+- [ ] 11.5 Implement DELETE /api/payments/bank/{id}/ (delete bank detail)
   - Use FBV with `@api_view(['DELETE'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `BankDetailService.delete_bank()` with bank_id and IP address
   - Trigger audit log
@@ -583,7 +583,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 9.4_
 
-- [~] 11.6 Implement POST /api/payments/bank/{id}/activate/ (activate bank detail)
+- [ ] 11.6 Implement POST /api/payments/bank/{id}/activate/ (activate bank detail)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `BankDetailService.activate_bank()` with bank_id and IP address
   - Trigger audit log
@@ -591,7 +591,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Add `@extend_schema` with operation_id, summary
   - _Requirements: 10.4_
 
-- [~] 11.7 Implement POST /api/payments/bank/{id}/deactivate/ (deactivate bank detail)
+- [ ] 11.7 Implement POST /api/payments/bank/{id}/deactivate/ (deactivate bank detail)
   - Use FBV with `@api_view(['POST'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Call `BankDetailService.deactivate_bank()` with bank_id and IP address
   - Trigger audit log
@@ -601,7 +601,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 12: Create Audit Log Views (audit_logs/views.py)
 
-- [~] 12.1 Implement GET /api/audit-logs/ (list audit logs)
+- [ ] 12.1 Implement GET /api/audit-logs/ (list audit logs)
   - Use FBV with `@api_view(['GET'])` and `@permission_classes([IsAdminOrBackOffice])`
   - Deny RM access with 403 error
   - Call `AuditService.get_audit_logs()` passing user, filters, ordering, page
@@ -613,7 +613,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 13: Configure URL Routing
 
-- [~] 13.1 Create auth URL configuration (accounts/auth_urls.py)
+- [ ] 13.1 Create auth URL configuration (accounts/auth_urls.py)
   - Create URL patterns for:
     - `POST /api/auth/login/` → login view
     - `POST /api/auth/refresh/` → refresh view
@@ -622,7 +622,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Use path() function from django.urls
   - _Requirements: 3.6, 3.9, 3.10, 3.12_
 
-- [~] 13.2 Create user URL configuration (accounts/user_urls.py)
+- [ ] 13.2 Create user URL configuration (accounts/user_urls.py)
   - Create URL patterns for:
     - `GET/POST /api/users/` → list/create users
     - `GET/PUT/PATCH/DELETE /api/users/{id}/` → user detail/update/delete
@@ -632,7 +632,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Use path() and re_path() functions
   - _Requirements: 6.1-6.6_
 
-- [~] 13.3 Create brand URL configuration (brands/urls.py)
+- [ ] 13.3 Create brand URL configuration (brands/urls.py)
   - Create URL patterns for:
     - `GET/POST /api/brands/` → list/create brands
     - `GET/PUT/PATCH/DELETE /api/brands/{id}/` → brand detail/update/delete
@@ -641,7 +641,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Use path() and re_path() functions
   - _Requirements: 5.2-5.6, 10.6_
 
-- [~] 13.4 Create payment URLs configuration (payments/urls.py)
+- [ ] 13.4 Create payment URLs configuration (payments/urls.py)
   - Create URL patterns for QR codes:
     - `GET/POST /api/payments/qr/` → list/create QR
     - `GET/PUT/PATCH/DELETE /api/payments/qr/{id}/` → QR detail/update/delete
@@ -659,12 +659,12 @@ This task list breaks down the DWMS backend API implementation into granular, ac
     - `POST /api/payments/bank/{id}/deactivate/` → deactivate bank
   - _Requirements: 7.2-7.4, 8.2-8.4, 9.2-9.4_
 
-- [~] 13.5 Create audit log URL configuration (audit_logs/urls.py)
+- [ ] 13.5 Create audit log URL configuration (audit_logs/urls.py)
   - Create URL patterns for:
     - `GET /api/audit-logs/` → list audit logs
   - _Requirements: 11.6_
 
-- [~] 13.6 Update main URL configuration (config/urls.py)
+- [ ] 13.6 Update main URL configuration (config/urls.py)
   - Include auth URLs at `/api/auth/`
   - Include user URLs at `/api/users/`
   - Include brand URLs at `/api/brands/`
@@ -678,7 +678,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 14: Testing
 
-- [~] 14.1 Write unit tests for User model and validators (accounts/tests.py)
+- [ ] 14.1 Write unit tests for User model and validators (accounts/tests.py)
   - Test User creation with different roles (admin, back_office, rm)
   - Test brand requirement validation for RM role
   - Test password hashing
@@ -686,7 +686,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test is_active flag functionality
   - _Requirements: 3.1-3.5_
 
-- [~] 14.2 Write unit tests for AuthService (accounts/tests.py)
+- [ ] 14.2 Write unit tests for AuthService (accounts/tests.py)
   - Test authenticate_user() with valid credentials
   - Test authenticate_user() with invalid credentials (401)
   - Test authenticate_user() with inactive user (401)
@@ -699,7 +699,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test change_password() with mismatched new passwords (400)
   - _Requirements: 3.6-3.15_
 
-- [~] 14.3 Write unit tests for BrandService (brands/tests.py)
+- [ ] 14.3 Write unit tests for BrandService (brands/tests.py)
   - Test create_brand() by Admin
   - Test create_brand() with duplicate name (409)
   - Test create_brand() by non-Admin (403 should be enforced at permission level)
@@ -709,7 +709,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test activate_brand() and deactivate_brand()
   - _Requirements: 5.2-5.10_
 
-- [~] 14.4 Write unit tests for UserService (accounts/tests.py)
+- [ ] 14.4 Write unit tests for UserService (accounts/tests.py)
   - Test create_user() with all roles
   - Test create_user() with RM but no brand (400)
   - Test create_user() with duplicate username/email (409)
@@ -720,7 +720,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test activate_user() and deactivate_user()
   - _Requirements: 6.1-6.11_
 
-- [~] 14.5 Write unit tests for QRCodeService (payments/tests.py)
+- [ ] 14.5 Write unit tests for QRCodeService (payments/tests.py)
   - Test create_qr() with valid image file
   - Test create_qr() with invalid file type (400)
   - Test create_qr() with oversized file (400)
@@ -733,7 +733,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test activate_qr() and deactivate_qr()
   - _Requirements: 7.2-7.12_
 
-- [~] 14.6 Write unit tests for UPIService (payments/tests.py)
+- [ ] 14.6 Write unit tests for UPIService (payments/tests.py)
   - Test create_upi() with valid UPI ID format
   - Test create_upi() with invalid UPI ID format (400)
   - Test create_upi() with duplicate upi_id (409)
@@ -744,7 +744,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test activate_upi() and deactivate_upi()
   - _Requirements: 8.2-8.10_
 
-- [~] 14.7 Write unit tests for BankDetailService (payments/tests.py)
+- [ ] 14.7 Write unit tests for BankDetailService (payments/tests.py)
   - Test create_bank() with valid IFSC code
   - Test create_bank() with invalid IFSC code (400)
   - Test account_number encryption/decryption
@@ -757,7 +757,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test activate_bank() and deactivate_bank()
   - _Requirements: 9.2-9.11_
 
-- [~] 14.8 Write unit tests for AuditService (audit_logs/tests.py)
+- [ ] 14.8 Write unit tests for AuditService (audit_logs/tests.py)
   - Test log_action() creates AuditLog record with correct fields
   - Test audit log captures user, action, module, object_id, old_data, new_data, ip_address, timestamp
   - Test serialize_model_instance() returns JSON-serializable dict
@@ -767,7 +767,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test get_audit_logs() denies RM access (403)
   - _Requirements: 11.1-11.8_
 
-- [~] 14.9 Write integration tests for authentication endpoints
+- [ ] 14.9 Write integration tests for authentication endpoints
   - Test POST /api/auth/login/ with valid credentials
   - Test POST /api/auth/login/ with invalid credentials (401)
   - Test POST /api/auth/login/ with inactive user (401)
@@ -778,7 +778,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test permission enforcement on authenticated endpoints
   - _Requirements: 3.6-3.15_
 
-- [~] 14.10 Write integration tests for brand CRUD endpoints
+- [ ] 14.10 Write integration tests for brand CRUD endpoints
   - Test GET /api/brands/ returns paginated list (Admin only)
   - Test POST /api/brands/ creates brand (Admin only)
   - Test GET /api/brands/{id}/ returns brand detail (Admin only)
@@ -789,7 +789,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test filtering, searching, ordering on list endpoint
   - _Requirements: 5.2-5.10_
 
-- [~] 14.11 Write integration tests for user CRUD endpoints
+- [ ] 14.11 Write integration tests for user CRUD endpoints
   - Test GET /api/users/ returns paginated list (Admin only)
   - Test POST /api/users/ creates user (Admin only)
   - Test GET /api/users/{id}/ returns user detail (Admin only)
@@ -801,7 +801,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test filtering, searching, ordering on list endpoint
   - _Requirements: 6.1-6.11_
 
-- [~] 14.12 Write integration tests for QR code endpoints
+- [ ] 14.12 Write integration tests for QR code endpoints
   - Test GET /api/payments/qr/ filters by role (Admin: all, BackOffice: all, RM: active own brand only)
   - Test POST /api/payments/qr/ creates QR with multipart form data (Admin/BackOffice only)
   - Test GET /api/payments/qr/{id}/ with access control (RM: own active only)
@@ -812,7 +812,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test filtering, searching, ordering on list endpoint
   - _Requirements: 7.2-7.12, 12.2, 12.5_
 
-- [~] 14.13 Write integration tests for UPI endpoints
+- [ ] 14.13 Write integration tests for UPI endpoints
   - Test GET /api/payments/upi/ filters by role (Admin: all, BackOffice: all, RM: active own brand only)
   - Test POST /api/payments/upi/ creates UPI (Admin/BackOffice only)
   - Test GET /api/payments/upi/{id}/ with access control (RM: own active only)
@@ -823,7 +823,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test filtering, searching, ordering on list endpoint
   - _Requirements: 8.2-8.10_
 
-- [~] 14.14 Write integration tests for bank detail endpoints
+- [ ] 14.14 Write integration tests for bank detail endpoints
   - Test GET /api/payments/bank/ filters by role; account_number always masked
   - Test POST /api/payments/bank/ creates bank with encrypted account_number (Admin/BackOffice only)
   - Test GET /api/payments/bank/{id}/ returns masked account_number (RM: own active only)
@@ -835,7 +835,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test filtering, searching, ordering on list endpoint
   - _Requirements: 9.2-9.11_
 
-- [~] 14.15 Write integration tests for audit log endpoints
+- [ ] 14.15 Write integration tests for audit log endpoints
   - Test GET /api/audit-logs/ returns paginated list (Admin/BackOffice only)
   - Test RM cannot access /api/audit-logs/ (403)
   - Test filtering by user, action, module
@@ -846,27 +846,27 @@ This task list breaks down the DWMS backend API implementation into granular, ac
 
 ## Phase 15: Documentation & Final Integration
 
-- [~] 15.1 Verify OpenAPI schema generation
+- [ ] 15.1 Verify OpenAPI schema generation
   - Run `python manage.py runserver` and verify `/api/schema/` returns valid OpenAPI 3 JSON
   - Verify all endpoints are documented with proper tags, summaries, descriptions
   - Verify all request/response schemas are correctly defined
   - Verify all parameters (filters, search, ordering, pagination) are documented
   - _Requirements: 13.1-13.4_
 
-- [~] 15.2 Test Swagger UI at /api/docs/
+- [ ] 15.2 Test Swagger UI at /api/docs/
   - Navigate to `/api/docs/` in browser
   - Verify all endpoints are visible and interactive
   - Verify authentication dropdown shows JWT token input
   - Verify request/response examples are displayed
   - _Requirements: 13.3, 13.4_
 
-- [~] 15.3 Test ReDoc UI at /api/redoc/
+- [ ] 15.3 Test ReDoc UI at /api/redoc/
   - Navigate to `/api/redoc/` in browser
   - Verify all endpoints are visible in interactive documentation
   - Verify schemas and models are properly displayed
   - _Requirements: 13.3, 13.4_
 
-- [~] 15.4 Create README.md with setup and usage instructions
+- [ ] 15.4 Create README.md with setup and usage instructions
   - Document Django project setup and Python version requirement (Django 6+)
   - Document environment variables and `.env` file setup
   - Document database migration instructions
@@ -878,7 +878,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Include troubleshooting section for common issues
   - _Requirements: General documentation_
 
-- [~] 15.5 Create .env.example with required environment variables
+- [ ] 15.5 Create .env.example with required environment variables
   - Include `SECRET_KEY`
   - Include `DEBUG` flag
   - Include `ALLOWED_HOSTS`
@@ -888,7 +888,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Include JWT settings if configurable
   - _Requirements: General infrastructure_
 
-- [~] 15.6 Verify all permission classes enforce access control
+- [ ] 15.6 Verify all permission classes enforce access control
   - Test IsAdmin blocks non-Admin users (403)
   - Test IsBackOffice blocks non-BackOffice users (403)
   - Test IsAdminOrBackOffice blocks RM users (403)
@@ -897,7 +897,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Test unauthenticated requests get 401 (IsAuthenticated enforced globally)
   - _Requirements: 4.1-4.6_
 
-- [~] 15.7 Verify audit logging on all data-modifying operations
+- [ ] 15.7 Verify audit logging on all data-modifying operations
   - Create a Brand and verify AuditLog entry with action='created'
   - Update a Brand and verify AuditLog entry with action='updated', old_data, new_data
   - Activate/Deactivate a Brand and verify AuditLog entries with correct actions
@@ -907,7 +907,7 @@ This task list breaks down the DWMS backend API implementation into granular, ac
   - Verify ip_address is captured correctly
   - _Requirements: 11.1-11.8_
 
-- [~] 15.8 Checkpoint - Ensure all tests pass
+- [ ] 15.8 Checkpoint - Ensure all tests pass
   - Run full test suite: `python manage.py test`
   - Verify all unit tests pass (accounts, brands, payments, audit_logs)
   - Verify all integration tests pass

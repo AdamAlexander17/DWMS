@@ -1,7 +1,10 @@
 ﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Pencil, Trash2, CheckCircle2, XCircle, Clock, Paperclip } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2 } from 'lucide-react'
 import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit } from '../api/deposits'
+import { getQRCodes }      from '../api/payments'
+import { getUPISources }   from '../api/payments'
+import { getBankAccounts } from '../api/payments'
 import Modal         from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Pagination    from '../components/ui/Pagination'
@@ -12,6 +15,20 @@ const GATEWAY_OPTS = [
   { value: 'PG1', label: 'PG1' },
   { value: 'PG2', label: 'PG2' },
 ]
+
+const CHANNEL_OPTS = [
+  { value: 'qr',   label: 'QR Code',      Icon: QrCode    },
+  { value: 'upi',  label: 'UPI',          Icon: Wallet    },
+  { value: 'bank', label: 'Bank Account', Icon: Building2 },
+]
+
+const CHANNEL_BADGE = {
+  qr:   'bg-purple-100 text-purple-700',
+  upi:  'bg-blue-100 text-blue-700',
+  bank: 'bg-teal-100 text-teal-700',
+}
+
+const CHANNEL_LABEL = { qr: 'QR Code', upi: 'UPI', bank: 'Bank Account' }
 
 const SLIP_STATUS_OPTS = [
   { value: 'added',        label: 'Added'        },
@@ -37,10 +54,80 @@ const STATUS_CONFIG = {
   rejected: { label: 'Rejected', bg: 'bg-red-100',    text: 'text-red-700',    Icon: XCircle      },
 }
 
+// ── Shared hook: fetches all channel options for a given channel_type ─────
+function useChannelOptions(channelType) {
+  const { data: qrData }   = useQuery({ queryKey: ['qr-all'],   queryFn: () => getQRCodes({ page_size: 200 }),   enabled: channelType === 'qr'   })
+  const { data: upiData }  = useQuery({ queryKey: ['upi-all'],  queryFn: () => getUPISources({ page_size: 200 }),  enabled: channelType === 'upi'  })
+  const { data: bankData } = useQuery({ queryKey: ['bank-all'], queryFn: () => getBankAccounts({ page_size: 200 }), enabled: channelType === 'bank' })
+
+  if (channelType === 'qr')
+    return (qrData?.data?.data?.results ?? []).map((c) => ({ id: c.id, label: c.qr_name }))
+  if (channelType === 'upi')
+    return (upiData?.data?.data?.results ?? []).map((c) => ({ id: c.id, label: c.upi_id }))
+  if (channelType === 'bank')
+    return (bankData?.data?.data?.results ?? []).map((c) => ({ id: c.id, label: `${c.bank_name} – ${c.account_number}` }))
+  return []
+}
+
+// ── Channel Type + Channel selector (shared between Create & Edit) ─────────
+function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
+  const options = useChannelOptions(channelType)
+
+  return (
+    <>
+      {/* Channel Type */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Channel *</label>
+        <div className="grid grid-cols-3 gap-2">
+          {CHANNEL_OPTS.map(({ value, label, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onTypeChange(value)}
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-semibold transition-all ${
+                channelType === value
+                  ? 'border-accent bg-accent/10 text-accent-dark'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              <Icon size={17} />{label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Channel Item */}
+      {channelType && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Select {CHANNEL_LABEL[channelType]} *
+          </label>
+          <select
+            className="input"
+            value={channelId}
+            onChange={(e) => onIdChange(e.target.value)}
+            required
+          >
+            <option value="">Choose {CHANNEL_LABEL[channelType]}…</option>
+            {options.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+          {options.length === 0 && (
+            <p className="mt-1 text-[11px] text-gray-400">No {CHANNEL_LABEL[channelType]} records found.</p>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
 // ── Create / Log Deposit Form ──────────────────────────────────────────────
 function CreateForm({ onSubmit, loading, error }) {
   const [form, setForm] = useState({
     gateway_name: '',
+    channel_type: '',
+    channel_id:   '',
     slip:         null,
     slip_status:  'pending',
     comment:      '',
@@ -51,14 +138,29 @@ function CreateForm({ onSubmit, loading, error }) {
     e.preventDefault()
     const fd = new FormData()
     fd.append('gateway_name', form.gateway_name)
-    fd.append('slip_status',  form.slip_status)
-    fd.append('comment',      form.comment)
+    if (form.channel_type) fd.append('channel_type', form.channel_type)
+    if (form.channel_id) {
+      const fkKey = form.channel_type === 'qr' ? 'qr_code'
+                  : form.channel_type === 'upi' ? 'upi_source'
+                  : 'bank_account'
+      fd.append(fkKey, form.channel_id)
+    }
+    fd.append('slip_status', form.slip_status)
+    fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
     onSubmit(fd)
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Channel Type + Channel Item */}
+      <ChannelSelector
+        channelType={form.channel_type}
+        channelId={form.channel_id}
+        onTypeChange={(v) => setForm((p) => ({ ...p, channel_type: v, channel_id: '' }))}
+        onIdChange={f('channel_id')}
+      />
+
       {/* Gateway Name */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name *</label>
@@ -128,7 +230,7 @@ function CreateForm({ onSubmit, loading, error }) {
       {error && <p className="text-red-500 text-sm">{error}</p>}
       <button
         type="submit"
-        disabled={loading || !form.gateway_name}
+        disabled={loading || !form.gateway_name || (form.channel_type && !form.channel_id)}
         className="btn-primary w-full justify-center mt-1"
       >
         {loading ? 'Logging…' : 'Log Deposit'}
@@ -150,6 +252,19 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
           <span className="text-gray-500">Gateway</span>
           <span className="font-semibold text-gray-800">{initial?.gateway_name}</span>
         </div>
+        {initial?.channel_type && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Channel</span>
+            <div className="flex items-center gap-1.5">
+              <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${CHANNEL_BADGE[initial.channel_type] ?? 'bg-gray-100 text-gray-600'}`}>
+                {CHANNEL_LABEL[initial.channel_type]}
+              </span>
+              {initial?.channel_label && (
+                <span className="text-xs text-gray-600">{initial.channel_label}</span>
+              )}
+            </div>
+          </div>
+        )}
         <div className="flex justify-between">
           <span className="text-gray-500">Slip Status</span>
           <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${SLIP_STATUS_BADGE[initial?.slip_status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -210,8 +325,16 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
 }
 // ── Edit Form ──────────────────────────────────────────────────────────────
 function EditForm({ initial, onSubmit, loading, error }) {
+  // Resolve the initial channel_id from the correct FK field
+  const initChannelId = initial?.channel_type === 'qr'   ? String(initial?.qr_code   ?? '')
+                      : initial?.channel_type === 'upi'  ? String(initial?.upi_source  ?? '')
+                      : initial?.channel_type === 'bank' ? String(initial?.bank_account ?? '')
+                      : ''
+
   const [form, setForm] = useState({
     gateway_name: initial?.gateway_name ?? '',
+    channel_type: initial?.channel_type ?? '',
+    channel_id:   initChannelId,
     slip_status:  initial?.slip_status  ?? 'pending',
     comment:      initial?.comment      ?? '',
     slip:         null,
@@ -222,14 +345,29 @@ function EditForm({ initial, onSubmit, loading, error }) {
     e.preventDefault()
     const fd = new FormData()
     fd.append('gateway_name', form.gateway_name)
-    fd.append('slip_status',  form.slip_status)
-    fd.append('comment',      form.comment)
+    fd.append('channel_type', form.channel_type ?? '')
+    if (form.channel_type && form.channel_id) {
+      const fkKey = form.channel_type === 'qr' ? 'qr_code'
+                  : form.channel_type === 'upi' ? 'upi_source'
+                  : 'bank_account'
+      fd.append(fkKey, form.channel_id)
+    }
+    fd.append('slip_status', form.slip_status)
+    fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
     onSubmit(fd)
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Channel Type + Channel Item */}
+      <ChannelSelector
+        channelType={form.channel_type}
+        channelId={form.channel_id}
+        onTypeChange={(v) => setForm((p) => ({ ...p, channel_type: v, channel_id: '' }))}
+        onIdChange={f('channel_id')}
+      />
+
       {/* Gateway Name */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name *</label>
@@ -316,12 +454,13 @@ export default function Deposits() {
   const [search,          setSearch]          = useState('')
   const [gatewayFilter,   setGatewayFilter]   = useState('')
   const [slipStatusFilter,setSlipStatusFilter]= useState('')
+  const [channelFilter,   setChannelFilter]   = useState('')
   const [modal,           setModal]           = useState(null)
   const [delTarget,       setDelTarget]       = useState(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['deposits', page, search, gatewayFilter, slipStatusFilter],
-    queryFn:  () => getDeposits({ page, search, gateway_name: gatewayFilter || undefined, slip_status: slipStatusFilter || undefined }),
+    queryKey: ['deposits', page, search, gatewayFilter, slipStatusFilter, channelFilter],
+    queryFn:  () => getDeposits({ page, search, gateway_name: gatewayFilter || undefined, slip_status: slipStatusFilter || undefined, channel_type: channelFilter || undefined }),
   })
 
   const records    = data?.data?.data?.results ?? []
@@ -369,10 +508,17 @@ export default function Deposits() {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
-          <select className="input max-w-[180px]" value={slipStatusFilter}
+          <select className="input max-w-[160px]" value={slipStatusFilter}
             onChange={(e) => { setSlipStatusFilter(e.target.value); setPage(1) }}>
             <option value="">All slip statuses</option>
             {SLIP_STATUS_OPTS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <select className="input max-w-[160px]" value={channelFilter ?? ''}
+            onChange={(e) => { setChannelFilter(e.target.value); setPage(1) }}>
+            <option value="">All channels</option>
+            {CHANNEL_OPTS.map(({ value, label }) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
@@ -384,14 +530,14 @@ export default function Deposits() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              {['Gateway', 'Slip', 'Slip Status', 'Comment', 'Logged By', 'Review Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
+              {['Gateway', 'Channel', 'Channel Detail', 'Slip', 'Slip Status', 'Comment', 'Logged By', 'Review Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
                 <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
-              <tr><td colSpan={canWrite || canReview ? 7 : 6} className="px-4 py-10 text-center text-gray-400 text-sm">
+              <tr><td colSpan={canWrite || canReview ? 9 : 8} className="px-4 py-10 text-center text-gray-400 text-sm">
                 {isRM ? 'No deposits logged yet. Use "Log Deposit" to record a deposit.' : 'No deposit logs found.'}
               </td></tr>
             )}
@@ -401,7 +547,20 @@ export default function Deposits() {
                 <td className="px-4 py-2.5">
                   <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.gateway_name}</span>
                 </td>
-                {/* Slip */}
+                {/* Channel Type */}
+                <td className="px-4 py-2.5">
+                  {r.channel_type ? (
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {CHANNEL_LABEL[r.channel_type]}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
+                </td>
+                {/* Channel Detail */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[160px]">
+                  <span className="truncate block">{r.channel_label ?? '—'}</span>
+                </td>
                 <td className="px-4 py-2.5">
                   {r.slip ? (
                     <a href={r.slip} target="_blank" rel="noopener noreferrer"

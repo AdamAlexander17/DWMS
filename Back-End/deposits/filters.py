@@ -5,6 +5,7 @@ from .models import DepositLog
 
 class DepositLogFilter(django_filters.FilterSet):
     gateway_name = django_filters.ChoiceFilter(choices=DepositLog.GATEWAY_CHOICES)
+    channel_type = django_filters.ChoiceFilter(choices=DepositLog.CHANNEL_TYPE_CHOICES)
     slip_status  = django_filters.ChoiceFilter(choices=DepositLog.SLIP_STATUS_CHOICES)
     status       = django_filters.ChoiceFilter(choices=DepositLog.STATUS_CHOICES)
     created_from = django_filters.DateFilter(field_name='created_at', lookup_expr='date__gte')
@@ -12,4 +13,4 @@ class DepositLogFilter(django_filters.FilterSet):
 
     class Meta:
         model  = DepositLog
-        fields = ['gateway_name', 'slip_status', 'status']
+        fields = ['gateway_name', 'channel_type', 'slip_status', 'status']

@@ -11,6 +11,16 @@ class DepositLog(models.Model):
         (GATEWAY_PG2, 'PG2'),
     ]
 
+    # Channel type choices
+    CHANNEL_QR   = 'qr'
+    CHANNEL_UPI  = 'upi'
+    CHANNEL_BANK = 'bank'
+    CHANNEL_TYPE_CHOICES = [
+        (CHANNEL_QR,   'QR Code'),
+        (CHANNEL_UPI,  'UPI'),
+        (CHANNEL_BANK, 'Bank Account'),
+    ]
+
     # Slip status choices
     SLIP_ADDED        = 'added'
     SLIP_NOT_RECEIVED = 'not_received'
@@ -36,6 +46,34 @@ class DepositLog(models.Model):
         choices=GATEWAY_CHOICES,
         db_index=True,
     )
+
+    # Channel type + polymorphic FKs (at most one is set at a time)
+    channel_type = models.CharField(
+        max_length=10,
+        choices=CHANNEL_TYPE_CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    qr_code = models.ForeignKey(
+        'payments.QRCode',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='deposit_logs',
+    )
+    upi_source = models.ForeignKey(
+        'payments.UPISource',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='deposit_logs',
+    )
+    bank_account = models.ForeignKey(
+        'payments.BankAccount',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='deposit_logs',
+    )
+
     slip = models.FileField(
         upload_to='deposit_slips/',
         null=True,
