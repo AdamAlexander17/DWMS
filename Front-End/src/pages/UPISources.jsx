@@ -113,10 +113,14 @@ export default function UPISources() {
   const records    = data?.data?.data?.results ?? []
   const total      = data?.data?.data?.count   ?? 0
   const totalPages = data?.data?.data?.total_pages ?? 1
-  const brands     = brandsData?.data?.data?.results ?? []
+  const allBrands  = brandsData?.data?.data?.results ?? []
+  const brands     = user?.role === 'admin'
+    ? allBrands
+    : allBrands.filter(b => (user?.brand_ids ?? []).includes(b.id))
 
-  const inv    = () => qc.invalidateQueries({ queryKey: ['upi-sources'] })
-  const createM = useMutation({ mutationFn: createUPISource,              onSuccess: () => { inv(); setModal(null) } })
+  const inv      = () => qc.invalidateQueries({ queryKey: ['upi-sources'] })
+  const resetView = () => { setSearch(''); setPage(1) }
+  const createM = useMutation({ mutationFn: createUPISource,              onSuccess: () => { resetView(); inv(); setModal(null) } })
   const updateM = useMutation({ mutationFn: ({ id, d }) => updateUPISource(id, d), onSuccess: () => { inv(); setModal(null) } })
   const deleteM = useMutation({ mutationFn: deleteUPISource,              onSuccess: () => { inv(); setDelTarget(null) } })
   const toggleM = useMutation({ mutationFn: ({ id, a }) => a ? deactivateUPISource(id) : activateUPISource(id), onSuccess: inv })

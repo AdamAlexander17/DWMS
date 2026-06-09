@@ -54,11 +54,23 @@ class DepositLogViewSet(
     # ------------------------------------------------------------------
 
     def list(self, request, *args, **kwargs):
+        from django.db.models import Q
         queryset = self.filter_queryset(self.get_queryset())
+        is_history = request.query_params.get('status') == DepositLog.STATUS_COMPLETED
+
         # Default list excludes completed deposits (those live in Deposit History).
         # History page explicitly requests ?status=completed to see them.
         if 'status' not in request.query_params:
             queryset = queryset.exclude(status=DepositLog.STATUS_COMPLETED)
+
+        # History view: scope to records the user is personally tied to (admin keeps full visibility).
+        user      = request.user
+        role_name = (getattr(user.role, 'name', None) or '').lower() if getattr(user, 'role', None) else ''
+        if is_history and role_name == 'rm':
+            queryset = queryset.filter(submitted_by=user)
+        elif is_history and role_name == 'back_office':
+            queryset = queryset.filter(Q(submitted_by=user) | Q(reviewed_by=user))
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

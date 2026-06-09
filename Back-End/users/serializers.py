@@ -67,8 +67,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return v
 
     def validate_password(self, value):
-        validate_password_strength(value)
-        dj_validate_password(value)
+        if not value or len(value) < 4:
+            raise serializers.ValidationError('Password must be at least 4 characters long.')
+        if ' ' in value:
+            raise serializers.ValidationError('Password must not contain spaces.')
         return value
 
     def validate(self, attrs):

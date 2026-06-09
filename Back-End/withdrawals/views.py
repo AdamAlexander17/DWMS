@@ -105,8 +105,10 @@ class WithdrawalViewSet(ModelViewSet):
         search        = request.query_params.get('search')
         history       = request.query_params.get('history')
 
+        is_history_view = False
         if history in ('1', 'true', 'True'):
             qs = qs.filter(status__in=['closed', 'approved', 'rejected'])
+            is_history_view = True
         elif history in ('0', 'false', 'False'):
             qs = qs.exclude(status__in=['closed', 'approved', 'rejected'])
 
@@ -114,10 +116,21 @@ class WithdrawalViewSet(ModelViewSet):
             # support comma-separated values: ?status=closed,approved
             statuses = [s.strip() for s in status_filter.split(',') if s.strip()]
             qs = qs.filter(status__in=statuses) if len(statuses) > 1 else qs.filter(status=statuses[0])
+            if all(s in ('closed', 'approved', 'rejected') for s in statuses):
+                is_history_view = True
         if search:
             from django.db.models import Q
             qs = qs.filter(
                 Q(client_name__icontains=search) | Q(client_arc_id__icontains=search)
+            )
+
+        # History view: BO sees only tickets they personally touched (admin keeps full visibility, RM is already submitted_by-scoped).
+        if is_history_view and _role(request.user) == 'back_office':
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(submitted_by=request.user)
+                | Q(reviewed_by=request.user)
+                | Q(slip_uploaded_by=request.user)
             )
         page = self.paginate_queryset(qs)
         if page is not None:

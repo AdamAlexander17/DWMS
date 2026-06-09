@@ -163,10 +163,14 @@ export default function BankAccounts() {
   const records    = data?.data?.data?.results ?? []
   const total      = data?.data?.data?.count   ?? 0
   const totalPages = data?.data?.data?.total_pages ?? 1
-  const brands     = brandsData?.data?.data?.results ?? []
+  const allBrands  = brandsData?.data?.data?.results ?? []
+  const brands     = user?.role === 'admin'
+    ? allBrands
+    : allBrands.filter(b => (user?.brand_ids ?? []).includes(b.id))
 
-  const inv    = () => qc.invalidateQueries({ queryKey: ['bank-accounts'] })
-  const createM = useMutation({ mutationFn: createBankAccount,                  onSuccess: () => { inv(); setModal(null) } })
+  const inv      = () => qc.invalidateQueries({ queryKey: ['bank-accounts'] })
+  const resetView = () => { setSearch(''); setPage(1) }
+  const createM = useMutation({ mutationFn: createBankAccount,                  onSuccess: () => { resetView(); inv(); setModal(null) } })
   const updateM = useMutation({ mutationFn: ({ id, d }) => updateBankAccount(id, d), onSuccess: () => { inv(); setModal(null) } })
   const deleteM = useMutation({ mutationFn: deleteBankAccount,                  onSuccess: () => { inv(); setDelTarget(null) } })
   const toggleM = useMutation({ mutationFn: ({ id, a }) => a ? deactivateBankAccount(id) : activateBankAccount(id), onSuccess: inv })

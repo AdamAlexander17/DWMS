@@ -21,7 +21,7 @@ const C = {
   blue:      '#1D4ED8',   // dark blue
   blueDk:    '#1E3A8A',   // deeper blue
   green:     '#15803D',   // dark green
-  red:       '#991B1B',   // dark red
+  red:       '#EF4444',   // bright red
   amber:     '#F59E0B',
   purple:    '#8B5CF6',
   slate:     '#64748B',
@@ -30,7 +30,7 @@ const C = {
 
 const STATUS_COLOR = {
   // deposit
-  pending:     C.amber,
+  pending:     C.red,
   for_review:  C.purple,
   in_progress: C.blue,
   completed:   C.green,

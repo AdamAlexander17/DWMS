@@ -294,12 +294,16 @@ export default function QRCodes() {
   const records    = data?.data?.data?.results ?? []
   const total      = data?.data?.data?.count   ?? 0
   const totalPages = data?.data?.data?.total_pages ?? 1
-  const brands     = brandsData?.data?.data?.results ?? []
+  const allBrands  = brandsData?.data?.data?.results ?? []
+  const brands     = user?.role === 'admin'
+    ? allBrands
+    : allBrands.filter(b => (user?.brand_ids ?? []).includes(b.id))
 
-  const inv   = () => qc.invalidateQueries({ queryKey: ['qr-codes'] })
-  const clean = (form) => { const d = { ...form }; if (!d.qr_image) delete d.qr_image; return d }
+  const inv     = () => qc.invalidateQueries({ queryKey: ['qr-codes'] })
+  const resetView = () => { setSearch(''); setPage(1) }
+  const clean   = (form) => { const d = { ...form }; if (!d.qr_image) delete d.qr_image; return d }
 
-  const createM = useMutation({ mutationFn: createQRCode,                                    onSuccess: () => { inv(); setModal(null) } })
+  const createM = useMutation({ mutationFn: createQRCode,                                    onSuccess: () => { resetView(); inv(); setModal(null) } })
   const updateM = useMutation({ mutationFn: ({ id, d }) => updateQRCode(id, clean(d)),       onSuccess: () => { inv(); setModal(null) } })
   const deleteM = useMutation({ mutationFn: deleteQRCode,                                    onSuccess: () => { inv(); setDelTarget(null) } })
   const toggleM = useMutation({ mutationFn: ({ id, a }) => a ? deactivateQRCode(id) : activateQRCode(id), onSuccess: inv })

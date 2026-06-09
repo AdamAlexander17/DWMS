@@ -67,7 +67,7 @@ function timeAgo(dateStr) {
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
-  const [tab,  setTab]  = useState('withdrawals')   // 'withdrawals' | 'deposits'
+  const [tab,  setTab]  = useState('deposits')   // 'deposits' | 'withdrawals' | 'messages'
   const [wsLive, setWsLive] = useState(false)
   const ref         = useRef(null)
   const navigate     = useNavigate()
@@ -126,9 +126,13 @@ export default function NotificationBell() {
   const { data: wdList } = useQuery({
     queryKey: ['wd-notifications-list'],
     queryFn:  getWdNotifications,
-    enabled:  open && tab === 'withdrawals',
+    enabled:  open && (tab === 'withdrawals' || tab === 'messages'),
   })
-  const wdNotifs = wdList?.data?.data ?? []
+  const wdAll     = wdList?.data?.data ?? []
+  const wdNotifs  = wdAll.filter(n => n.notif_type !== 'new_message')
+  const msgNotifs = wdAll.filter(n => n.notif_type === 'new_message')
+  const wdUnreadShown  = wdNotifs.filter(n => !n.is_read).length
+  const msgUnreadShown = msgNotifs.filter(n => !n.is_read).length
 
   // Live WS push for withdrawal notifications
   useEffect(() => {
@@ -234,12 +238,27 @@ export default function NotificationBell() {
   const handleWdClick = (n) => {
     if (!n.is_read) wdReadM.mutate(n.id)
     setOpen(false)
-    // Deep-link directly to this ticket's chat tab
+    if (n.withdrawal_id) {
+      navigate(`/withdrawals?ticket=${n.withdrawal_id}`)
+    } else {
+      navigate('/withdrawals')
+    }
+  }
+
+  const handleMsgClick = (n) => {
+    if (!n.is_read) wdReadM.mutate(n.id)
+    setOpen(false)
     if (n.withdrawal_id) {
       navigate(`/withdrawals?ticket=${n.withdrawal_id}&chat=1`)
     } else {
       navigate('/withdrawals')
     }
+  }
+
+  const handleDepClick = (n) => {
+    if (!n.is_read) depReadM.mutate(n.id)
+    setOpen(false)
+    navigate('/deposits')
   }
 
   return (
@@ -276,7 +295,7 @@ export default function NotificationBell() {
             </div>
             <div className="flex items-center gap-1">
               {((tab === 'deposits'    && depUnread > 0) ||
-                (tab === 'withdrawals' && wdUnread  > 0)) && (
+                ((tab === 'withdrawals' || tab === 'messages') && wdUnread  > 0)) && (
                 <button
                   onClick={() => tab === 'deposits' ? depReadAllM.mutate() : wdReadAllM.mutate()}
                   title="Mark all as read"
@@ -285,7 +304,7 @@ export default function NotificationBell() {
                   <CheckCheck size={13} /> Read all
                 </button>
               )}
-              {tab === 'withdrawals' && wdNotifs.length > 0 && (
+              {(tab === 'withdrawals' || tab === 'messages') && wdAll.length > 0 && (
                 <button
                   onClick={() => {
                     if (confirm('Clear all withdrawal notifications? This cannot be undone.')) {
@@ -301,7 +320,7 @@ export default function NotificationBell() {
               {tab === 'deposits' && depNotifs.length > 0 && (
                 <button
                   onClick={() => {
-                    if (confirm('Clear all channel notifications? This cannot be undone.')) {
+                    if (confirm('Clear all deposit notifications? This cannot be undone.')) {
                       depClearAllM.mutate()
                     }
                   }}
@@ -317,25 +336,36 @@ export default function NotificationBell() {
           {/* Tabs */}
           <div className="flex border-b border-gray-100">
             <button
+              onClick={() => setTab('deposits')}
+              className={`flex-1 px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                tab === 'deposits' ? 'text-accent border-b-2 border-accent bg-accent/5' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <ArrowDownCircle size={13} /> Deposits
+              {depUnread > 0 && (
+                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">{depUnread}</span>
+              )}
+            </button>
+            <button
               onClick={() => setTab('withdrawals')}
-              className={`flex-1 px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+              className={`flex-1 px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
                 tab === 'withdrawals' ? 'text-accent border-b-2 border-accent bg-accent/5' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               <ArrowUpCircle size={13} /> Withdrawals
-              {wdUnread > 0 && (
-                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">{wdUnread}</span>
+              {wdUnreadShown > 0 && (
+                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">{wdUnreadShown}</span>
               )}
             </button>
             <button
-              onClick={() => setTab('deposits')}
-              className={`flex-1 px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
-                tab === 'deposits' ? 'text-accent border-b-2 border-accent bg-accent/5' : 'text-gray-500 hover:text-gray-700'
+              onClick={() => setTab('messages')}
+              className={`flex-1 px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                tab === 'messages' ? 'text-accent border-b-2 border-accent bg-accent/5' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <ArrowDownCircle size={13} /> Channels
-              {depUnread > 0 && (
-                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">{depUnread}</span>
+              <MessageCircle size={13} /> Messages
+              {msgUnreadShown > 0 && (
+                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">{msgUnreadShown}</span>
               )}
             </button>
           </div>
@@ -343,7 +373,7 @@ export default function NotificationBell() {
           {/* List */}
           <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-50">
 
-            {/* Withdrawal notifications */}
+            {/* Withdrawal notifications (status events, no chat messages) */}
             {tab === 'withdrawals' && (
               <>
                 {wdNotifs.length === 0 && (
@@ -356,6 +386,45 @@ export default function NotificationBell() {
                     <div
                       key={n.id}
                       onClick={() => handleWdClick(n)}
+                      className={`group relative flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                    >
+                      <div className={`shrink-0 w-8 h-8 rounded-lg ${cfg.bg} border ${cfg.border} flex items-center justify-center`}>
+                        <Icon size={15} className={cfg.color} />
+                      </div>
+                      <div className="flex-1 min-w-0 pr-6">
+                        <p className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</p>
+                        <p className="text-xs text-gray-700 mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {n.withdrawal_client} · {timeAgo(n.created_at)}
+                        </p>
+                      </div>
+                      {!n.is_read && <div className="shrink-0 w-2 h-2 rounded-full bg-accent self-start mt-2" />}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); wdDelM.mutate(n.id) }}
+                        title="Dismiss"
+                        className="absolute top-2 right-2 w-5 h-5 rounded-full text-gray-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </>
+            )}
+
+            {/* Messages tab — chat messages from withdrawal tickets */}
+            {tab === 'messages' && (
+              <>
+                {msgNotifs.length === 0 && (
+                  <p className="px-4 py-10 text-center text-sm text-gray-400">No new messages</p>
+                )}
+                {msgNotifs.map((n) => {
+                  const cfg  = WD_CFG.new_message
+                  const Icon = cfg.Icon
+                  return (
+                    <div
+                      key={n.id}
+                      onClick={() => handleMsgClick(n)}
                       className={`group relative flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
                     >
                       <div className={`shrink-0 w-8 h-8 rounded-lg ${cfg.bg} border ${cfg.border} flex items-center justify-center`}>
@@ -395,7 +464,7 @@ export default function NotificationBell() {
                   return (
                     <div
                       key={n.id}
-                      onClick={() => !n.is_read && depReadM.mutate(n.id)}
+                      onClick={() => handleDepClick(n)}
                       className={`group relative flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
                     >
                       <div className={`shrink-0 w-8 h-8 rounded-lg ${cfg.bg} border ${cfg.border} flex items-center justify-center`}>

@@ -38,6 +38,21 @@ def _validate_daily_limit(attrs, instance=None):
         )
 
 
+def _validate_brand_scope(brand, request):
+    """Non-admin users may only create/update records for brands they are assigned to."""
+    if brand is None or request is None:
+        return
+    user = getattr(request, 'user', None)
+    role_name = getattr(user.role, 'name', None) if getattr(user, 'role', None) else None
+    if role_name == 'admin':
+        return
+    allowed_ids = set(user.brands.values_list('id', flat=True))
+    if brand.id not in allowed_ids:
+        raise serializers.ValidationError(
+            {'brand': 'You are not assigned to this brand.'}
+        )
+
+
 # ---------------------------------------------------------------------------
 # QR Code
 # ---------------------------------------------------------------------------
@@ -90,6 +105,7 @@ class QRCodeSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         _validate_range(attrs, self.instance)
         _validate_daily_limit(attrs, self.instance)
+        _validate_brand_scope(attrs.get('brand', getattr(self.instance, 'brand', None)), self.context.get('request'))
         return attrs
 
     def create(self, validated_data):
@@ -143,6 +159,7 @@ class UPISourceSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         _validate_range(attrs, self.instance)
         _validate_daily_limit(attrs, self.instance)
+        _validate_brand_scope(attrs.get('brand', getattr(self.instance, 'brand', None)), self.context.get('request'))
         return attrs
 
     def create(self, validated_data):
@@ -210,6 +227,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         _validate_range(attrs, self.instance)
         _validate_daily_limit(attrs, self.instance)
+        _validate_brand_scope(attrs.get('brand', getattr(self.instance, 'brand', None)), self.context.get('request'))
         return attrs
 
     def create(self, validated_data):

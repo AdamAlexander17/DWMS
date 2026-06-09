@@ -128,5 +128,6 @@ class DepositNotificationSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'level', 'channel_label', 'message',
             'percent_used', 'is_read', 'created_at',
+            'deposit_log',
         ]
         read_only_fields = fields
