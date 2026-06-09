@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Trash2, Search, X, CheckCircle2, XCircle, Clock,
@@ -10,7 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import {
-  getWithdrawals, getWithdrawalStats, createWithdrawal, updateWithdrawal, deleteWithdrawal,
+  getWithdrawals, getWithdrawal, getWithdrawalStats, createWithdrawal, updateWithdrawal, deleteWithdrawal,
   uploadSlip, confirmReceived, notReceived, markEmailSent,
   getMessages, postMessage, manualClose,
 } from '../api/withdrawals'
@@ -763,6 +764,30 @@ export default function Withdrawals() {
   const [emailTarget, setEmail]   = useState(null)
   const [confirmTarget, setCfm]   = useState(null)
   const [closeTarget, setClose]   = useState(null)
+
+  // Deep-link from notification click: ?ticket=<id>&chat=1
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const tid  = searchParams.get('ticket')
+    const chat = searchParams.get('chat') === '1'
+    if (!tid) return
+    let cancelled = false
+    getWithdrawal(tid)
+      .then((res) => {
+        if (cancelled) return
+        const wd = res?.data?.data ?? res?.data
+        if (wd) setView({ ...wd, __openChat: chat })
+      })
+      .catch(() => { /* silently ignore — ticket may have been deleted */ })
+      .finally(() => {
+        // strip the query params so refresh / re-open behaves cleanly
+        const next = new URLSearchParams(searchParams)
+        next.delete('ticket'); next.delete('chat')
+        setSearchParams(next, { replace: true })
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { data, isLoading } = useQuery({
     queryKey: ['withdrawals', page, search, statusFilter],

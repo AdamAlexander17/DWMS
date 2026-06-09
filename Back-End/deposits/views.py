@@ -187,3 +187,16 @@ class DepositNotificationViewSet(
     def mark_all_read(self, request):
         self.get_queryset().filter(is_read=False).update(is_read=True)
         return success_response('All notifications marked as read')
+
+    @extend_schema(summary='Delete a single deposit notification', tags=['Deposits'])
+    @action(detail=True, methods=['delete'], url_path='delete')
+    def delete_notif(self, request, pk=None):
+        notif = self.get_object()
+        notif.delete()
+        return success_response('Notification deleted')
+
+    @extend_schema(summary='Clear all deposit notifications', tags=['Deposits'])
+    @action(detail=False, methods=['post'], url_path='clear_all')
+    def clear_all(self, request):
+        self.get_queryset().delete()
+        return success_response('All notifications cleared')

@@ -13,3 +13,5 @@ export const getNotifications     = (params) => api.get('/deposits/notifications
 export const getUnreadCount       = ()  => api.get('/deposits/notifications/unread_count/')
 export const markNotificationRead = (id) => api.post(`/deposits/notifications/${id}/mark_read/`)
 export const markAllRead          = ()  => api.post('/deposits/notifications/mark_all_read/')
+export const deleteNotification   = (id) => api.delete(`/deposits/notifications/${id}/delete/`)
+export const clearAllNotifications = ()  => api.post('/deposits/notifications/clear_all/')

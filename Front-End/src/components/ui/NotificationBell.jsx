@@ -8,6 +8,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getNotifications, getUnreadCount, markAllRead, markNotificationRead,
+  deleteNotification, clearAllNotifications,
 } from '../../api/deposits'
 import {
   getWdNotifications, getWdUnreadCount, markWdAllRead, markWdNotifRead,
@@ -208,11 +209,37 @@ export default function NotificationBell() {
     },
     onSuccess: inv,
   })
+  const depDelM = useMutation({
+    mutationFn: deleteNotification,
+    onMutate: async (id) => {
+      qc.setQueryData(['notifications-list'], (prev) => {
+        if (!prev) return prev
+        const list = (prev.data?.data?.results ?? []).filter(n => n.id !== id)
+        return { ...prev, data: { ...prev.data, data: { ...prev.data.data, results: list } } }
+      })
+    },
+    onSuccess: inv,
+  })
+  const depClearAllM = useMutation({
+    mutationFn: clearAllNotifications,
+    onMutate: () => {
+      qc.setQueryData(['notifications-list'], (prev) => {
+        if (!prev) return prev
+        return { ...prev, data: { ...prev.data, data: { ...prev.data.data, results: [], count: 0 } } }
+      })
+    },
+    onSuccess: inv,
+  })
 
   const handleWdClick = (n) => {
     if (!n.is_read) wdReadM.mutate(n.id)
     setOpen(false)
-    navigate('/withdrawals')
+    // Deep-link directly to this ticket's chat tab
+    if (n.withdrawal_id) {
+      navigate(`/withdrawals?ticket=${n.withdrawal_id}&chat=1`)
+    } else {
+      navigate('/withdrawals')
+    }
   }
 
   return (
@@ -263,6 +290,19 @@ export default function NotificationBell() {
                   onClick={() => {
                     if (confirm('Clear all withdrawal notifications? This cannot be undone.')) {
                       wdClearAllM.mutate()
+                    }
+                  }}
+                  title="Clear all notifications"
+                  className="flex items-center gap-1 text-[11px] text-red-500 hover:text-red-700 font-medium transition-colors px-1.5 py-0.5 rounded hover:bg-red-50"
+                >
+                  <Trash2 size={12} /> Clear
+                </button>
+              )}
+              {tab === 'deposits' && depNotifs.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (confirm('Clear all channel notifications? This cannot be undone.')) {
+                      depClearAllM.mutate()
                     }
                   }}
                   title="Clear all notifications"
@@ -356,12 +396,12 @@ export default function NotificationBell() {
                     <div
                       key={n.id}
                       onClick={() => !n.is_read && depReadM.mutate(n.id)}
-                      className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                      className={`group relative flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
                     >
                       <div className={`shrink-0 w-8 h-8 rounded-lg ${cfg.bg} border ${cfg.border} flex items-center justify-center`}>
                         <Icon size={15} className={cfg.color} />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 pr-6">
                         <p className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</p>
                         <p className="text-xs text-gray-700 mt-0.5 line-clamp-2">{n.message}</p>
                         {!isStatusUpdate && n.percent_used != null && (
@@ -372,6 +412,13 @@ export default function NotificationBell() {
                         )}
                       </div>
                       {!n.is_read && <div className="shrink-0 w-2 h-2 rounded-full bg-accent self-start mt-2" />}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); depDelM.mutate(n.id) }}
+                        title="Dismiss"
+                        className="absolute top-2 right-2 w-5 h-5 rounded-full text-gray-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                      >
+                        <X size={12} />
+                      </button>
                     </div>
                   )
                 })}
@@ -380,7 +427,9 @@ export default function NotificationBell() {
           </div>
 
           <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
-            <p className="text-[10px] text-gray-400 text-center">Live — refreshes every 10 seconds</p>
+            <p className="text-[10px] text-gray-400 text-center">
+              {wsLive ? 'Live — instant updates over WebSocket' : 'Reconnecting…'}
+            </p>
           </div>
         </div>
       )}
