@@ -2,13 +2,16 @@ from django.db import models
 
 
 class Module(models.TextChoices):
-    USERS        = 'users',         'Users'
-    BRANDS       = 'brands',        'Brands'
-    QR_CODES     = 'qr_codes',      'QR Codes'
-    UPI_SOURCES  = 'upi_sources',   'UPI Sources'
+    ROLES         = 'roles',         'Roles'
+    USERS         = 'users',         'Users'
+    BRANDS        = 'brands',        'Brands'
+    GATEWAYS      = 'gateways',      'Gateways'
+    QR_CODES      = 'qr_codes',      'QR Codes'
+    UPI_SOURCES   = 'upi_sources',   'UPI Sources'
     BANK_ACCOUNTS = 'bank_accounts', 'Bank Accounts'
-    AUDIT_LOGS   = 'audit_logs',    'Audit Logs'
-    DEPOSITS     = 'deposits',      'Deposits'
+    DEPOSITS      = 'deposits',      'Deposits'
+    WITHDRAWALS   = 'withdrawals',   'Withdrawals'
+    AUDIT_LOGS    = 'audit_logs',    'Audit Logs'
 
 
 class Role(models.Model):

@@ -9,9 +9,9 @@ import { PageSpinner } from '../components/ui/Spinner'
 import { useAuthStore } from '../store/authStore'
 
 const CHANNEL_BADGE = {
-  qr:   'bg-purple-100 text-purple-700',
-  upi:  'bg-blue-100 text-blue-700',
-  bank: 'bg-teal-100 text-teal-700',
+  qr:   'bg-purple-50 text-purple-700 border-purple-200',
+  upi:  'bg-blue-50 text-blue-700 border-blue-200',
+  bank: 'bg-teal-50 text-teal-700 border-teal-200',
 }
 const CHANNEL_LABEL = { qr: 'QR Code', upi: 'UPI', bank: 'Bank Account' }
 
@@ -117,7 +117,7 @@ export default function DepositHistory() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
               {cols.map((h) => (
@@ -139,7 +139,7 @@ export default function DepositHistory() {
               <tr key={r.id} className="hover:bg-green-50/20 transition-colors">
                 {/* Gateway */}
                 <td className="px-4 py-2.5">
-                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">
                     {r.gateway_detail?.name ?? '—'}
                   </span>
                 </td>
@@ -147,7 +147,7 @@ export default function DepositHistory() {
                 {/* Channel Type */}
                 <td className="px-4 py-2.5">
                   {r.channel_type ? (
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                       {CHANNEL_LABEL[r.channel_type]}
                     </span>
                   ) : (

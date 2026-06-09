@@ -111,6 +111,8 @@ class UserViewSet(ModelViewSet):
     # ------------------------------------------------------------------
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        if request.user.pk == instance.pk:
+            return error_response('You cannot delete your own account.')
         AuditLogService.log(
             user=request.user,
             action='Deleted user',
@@ -142,6 +144,8 @@ class UserViewSet(ModelViewSet):
     @action(detail=True, methods=['post'], url_path='deactivate')
     def deactivate(self, request, pk=None):
         user = self.get_object()
+        if request.user.pk == user.pk:
+            return error_response('You cannot deactivate your own account.')
         if not user.is_active:
             return error_response('User is already inactive')
         UserService.deactivate(user)
@@ -156,16 +160,24 @@ class UserViewSet(ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='reset-password')
     def reset_password(self, request, pk=None):
+        from common.validators import validate_password_strength
+        from rest_framework.exceptions import ValidationError as DRFValidationError
         user = self.get_object()
         new_password = request.data.get('new_password', '').strip()
         if not new_password:
             return error_response('new_password is required')
         try:
-            dj_validate_password(new_password)
+            validate_password_strength(new_password)
+            dj_validate_password(new_password, user=user)
+        except DRFValidationError as exc:
+            return error_response(
+                'Password validation failed',
+                errors={'new_password': exc.detail if hasattr(exc, 'detail') else [str(exc)]},
+            )
         except Exception as exc:
             return error_response(
                 'Password validation failed',
-                errors={'new_password': list(exc.messages)},
+                errors={'new_password': list(getattr(exc, 'messages', [str(exc)]))},
             )
         UserService.reset_password(user, new_password)
         AuditLogService.log(

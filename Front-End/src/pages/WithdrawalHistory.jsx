@@ -15,16 +15,16 @@ import { useAuthStore } from '../store/authStore'
 
 // Reuse status config style
 const STATUS = {
-  closed:   { label: 'Closed',   bg: 'bg-green-100', text: 'text-green-700', Icon: CheckCircle2 },
-  approved: { label: 'Approved', bg: 'bg-green-100', text: 'text-green-700', Icon: CheckCircle2 },
-  rejected: { label: 'Rejected', bg: 'bg-red-100',   text: 'text-red-700',   Icon: XCircle },
+  closed:   { label: 'Closed',   bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', Icon: CheckCircle2 },
+  approved: { label: 'Approved', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', Icon: CheckCircle2 },
+  rejected: { label: 'Rejected', bg: 'bg-red-50',   text: 'text-red-700',   border: 'border-red-200',   Icon: XCircle },
 }
 
 function StatusChip({ status }) {
   const cfg = STATUS[status] ?? STATUS.closed
   const Icon = cfg.Icon
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.bg} ${cfg.text}`}>
+    <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${cfg.bg} ${cfg.text} ${cfg.border}`}>
       <Icon size={10} /> {cfg.label}
     </span>
   )
@@ -170,37 +170,6 @@ export default function WithdrawalHistory() {
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="card flex items-center gap-3 py-3.5 px-4 border bg-gray-50 border-gray-200">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-100">
-            <HistoryIcon size={18} className="text-gray-600" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Total Records</p>
-            <p className="text-2xl font-bold text-gray-700">{total}</p>
-          </div>
-        </div>
-        <div className="card flex items-center gap-3 py-3.5 px-4 border bg-green-50 border-green-200">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-green-100">
-            <CheckCircle2 size={18} className="text-green-600" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">On This Page</p>
-            <p className="text-2xl font-bold text-green-600">{records.length}</p>
-          </div>
-        </div>
-        <div className="card flex items-center gap-3 py-3.5 px-4 border bg-blue-50 border-blue-200">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-100">
-            <IndianRupee size={18} className="text-blue-600" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Amount (Page)</p>
-            <p className="text-2xl font-bold text-blue-600">₹{Number(totalAmount).toLocaleString('en-IN')}</p>
-          </div>
-        </div>
-      </div>
-
       {/* Filters */}
       <div className="card py-4 flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
@@ -218,7 +187,7 @@ export default function WithdrawalHistory() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <table className="w-full">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80 text-left">
               {COLS.map((h) => (

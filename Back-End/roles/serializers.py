@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from common.validators import validate_role_name, validate_text
+
 from .models import Module, Role, RolePermission
 
 
@@ -21,12 +23,43 @@ class RoleSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'is_system', 'created_at', 'updated_at']
 
     def validate_name(self, value):
+        value = validate_role_name(value)
         qs = Role.objects.filter(name__iexact=value)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError('A role with this name already exists.')
+        # Prevent renaming reserved/system role names
+        if self.instance and self.instance.is_system and value.lower() != self.instance.name.lower():
+            raise serializers.ValidationError('System roles cannot be renamed.')
         return value
+
+    def validate_description(self, value):
+        return validate_text(value, field='Description', max_length=500, allow_blank=True)
+
+    def validate_permissions(self, value):
+        # Reject duplicate modules in a single payload
+        seen = set()
+        for perm in value or []:
+            mod = perm.get('module')
+            if mod is None:
+                continue
+            key = getattr(mod, 'pk', mod)
+            if key in seen:
+                raise serializers.ValidationError(
+                    f'Duplicate permission entry for module id {key}.'
+                )
+            seen.add(key)
+        return value
+
+    def validate(self, attrs):
+        # System roles cannot be deactivated
+        is_active = attrs.get('is_active', getattr(self.instance, 'is_active', True))
+        if self.instance and self.instance.is_system and is_active is False:
+            raise serializers.ValidationError(
+                {'is_active': 'System roles cannot be deactivated.'}
+            )
+        return attrs
 
     def create(self, validated_data):
         permissions_data = validated_data.pop('permissions', [])

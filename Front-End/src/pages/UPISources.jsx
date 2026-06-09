@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Search } from 'lucide-react'
+import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
 import { getUPISources, createUPISource, updateUPISource, deleteUPISource, activateUPISource, deactivateUPISource } from '../api/payments'
 import { getBrands } from '../api/brands'
 import Modal from '../components/ui/Modal'
@@ -10,8 +10,9 @@ import Pagination from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
 import CapacityBar from '../components/ui/CapacityBar'
 import { useAuthStore } from '../store/authStore'
+import { upi as vUpi, positiveAmount as vAmt, rangeOrder, extractApiErrors } from '../utils/validators'
 
-function UPIForm({ initial, brands, onSubmit, loading }) {
+function UPIForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
   const [form, setForm] = useState({
     upi_id:      initial?.upi_id      ?? '',
     brand:       initial?.brand       ?? '',
@@ -19,34 +20,74 @@ function UPIForm({ initial, brands, onSubmit, loading }) {
     range_to:    initial?.range_to    ?? '',
     daily_limit: initial?.daily_limit ?? '',
   })
-  const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
+  const [local, setLocal] = useState({})
+  const errors = { ...apiErrors, ...local }
+  const f = (k) => (v) => { setForm((p) => ({ ...p, [k]: v })); if (local[k]) setLocal(p => ({ ...p, [k]: undefined })) }
+  const E = (k) => errors[k] && <p className="mt-1 text-xs text-red-600">{errors[k]}</p>
+  const cls = (k) => `input ${errors[k] ? 'border-red-300' : ''}`
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const errs = {}
+    const u  = vUpi(form.upi_id);                                    if (u)  errs.upi_id = u
+    if (!form.brand) errs.brand = 'Please select a brand.'
+    const rf = vAmt(form.range_from, { label: 'Range From' });       if (rf) errs.range_from = rf
+    const rt = vAmt(form.range_to,   { label: 'Range To' });         if (rt) errs.range_to   = rt
+    const rorder = rangeOrder(form.range_from, form.range_to, 'Range To'); if (rorder) errs.range_to = rorder
+    if (form.daily_limit !== '' && form.daily_limit !== null) {
+      const dl = vAmt(form.daily_limit, { label: 'Daily Limit' });
+      if (dl) errs.daily_limit = dl
+      else if (form.range_to && Number(form.daily_limit) < Number(form.range_to)) {
+        errs.daily_limit = 'Daily limit must be ≥ Range To.'
+      }
+    }
+    setLocal(errs)
+    if (Object.keys(errs).length === 0) {
+      onSubmit({ ...form, upi_id: form.upi_id.toLowerCase().trim() })
+    }
+  }
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">UPI ID *</label>
-        <input className="input" value={form.upi_id} onChange={(e) => f('upi_id')(e.target.value)} placeholder="e.g. merchant@upi" required />
+        <input
+          className={cls('upi_id')}
+          value={form.upi_id}
+          onChange={(e) => f('upi_id')(e.target.value.toLowerCase())}
+          placeholder="e.g. merchant@upi"
+          maxLength={100}
+        />
+        {E('upi_id')}
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
-        <select className="input" value={form.brand} onChange={(e) => f('brand')(e.target.value)} required>
+        <select className={cls('brand')} value={form.brand} onChange={(e) => f('brand')(e.target.value)}>
           <option value="">Select brand</option>
           {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        {E('brand')}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Range From *</label>
-          <input type="number" className="input" value={form.range_from} onChange={(e) => f('range_from')(e.target.value)} required step="0.01" />
+          <input type="number" className={cls('range_from')} value={form.range_from} onChange={(e) => f('range_from')(e.target.value)} step="0.01" min="0" />
+          {E('range_from')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Range To *</label>
-          <input type="number" className="input" value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} required step="0.01" />
+          <input type="number" className={cls('range_to')} value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} step="0.01" min="0" />
+          {E('range_to')}
         </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Daily Limit (₹) <span className="text-gray-400 font-normal">— optional</span></label>
-        <input type="number" className="input" placeholder="e.g. 100000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
+        <input type="number" className={cls('daily_limit')} placeholder="e.g. 100000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
+        {E('daily_limit')}
       </div>
+      {errors.non_field && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{errors.non_field}</div>
+      )}
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center mt-2">
         {loading ? 'Saving…' : initial ? 'Update UPI Source' : 'Create UPI Source'}
       </button>
@@ -100,7 +141,7 @@ export default function UPISources() {
       </div>
 
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
               {['UPI ID', 'Brand', 'Range', 'Daily Capacity', 'Status', ...(canWrite ? ['Actions'] : [])].map((h) => (
@@ -114,7 +155,7 @@ export default function UPISources() {
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-2.5 font-mono font-medium text-gray-800 text-xs">{r.upi_id}</td>
                 <td className="px-4 py-2.5">
-                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.brand_name}</span>
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
                 </td>
                 <td className="px-4 py-2.5 text-gray-500 text-xs">₹{r.range_from} – ₹{r.range_to}</td>
                 <td className="px-4 py-2.5"><CapacityBar capacity={r.capacity} /></td>
@@ -122,10 +163,10 @@ export default function UPISources() {
                 {canWrite && (
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 justify-end">
-                      <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} title={r.is_active ? 'Deactivate' : 'Activate'} className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors ${r.is_active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
-                        {r.is_active ? <CheckCircle size={13} /> : <XCircle size={13} />}
+                      <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} title={r.is_active ? 'Deactivate' : 'Activate'} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors">
+                        {r.is_active ? <PowerOff size={13} /> : <Power size={13} />}
                       </button>
-                      <button onClick={() => setModal({ mode: 'edit', data: r })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><Pencil size={12} /></button>
+                      <button onClick={() => setModal({ mode: 'edit', data: r })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><SquarePen size={12} /></button>
                       <button onClick={() => setDelTarget(r)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"><Trash2 size={12} /></button>
                     </div>
                   </td>
@@ -139,11 +180,13 @@ export default function UPISources() {
 
       {canWrite && (
         <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Edit UPI Source' : 'New UPI Source'}>
-          <UPIForm initial={modal?.data} brands={brands} loading={createM.isPending || updateM.isPending}
-            onSubmit={(vals) => modal?.mode === 'edit' ? updateM.mutate({ id: modal.data.id, d: vals }) : createM.mutate(vals)} />
-          {(createM.isError || updateM.isError) && (
-            <p className="text-red-500 text-sm mt-3">{createM.error?.response?.data?.message || updateM.error?.response?.data?.message || 'Error'}</p>
-          )}
+          <UPIForm
+            initial={modal?.data}
+            brands={brands}
+            loading={createM.isPending || updateM.isPending}
+            apiErrors={extractApiErrors(createM.error || updateM.error || {})}
+            onSubmit={(vals) => modal?.mode === 'edit' ? updateM.mutate({ id: modal.data.id, d: vals }) : createM.mutate(vals)}
+          />
         </Modal>
       )}
 

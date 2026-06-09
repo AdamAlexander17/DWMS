@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Search, QrCode as QrIcon, MoreVertical, X, Download, Maximize2 } from 'lucide-react'
+import { Plus, SquarePen, Trash2, Power, PowerOff, Search, QrCode as QrIcon, MoreVertical, X, Download, Maximize2 } from 'lucide-react'
 import { getQRCodes, createQRCode, updateQRCode, deleteQRCode, activateQRCode, deactivateQRCode } from '../api/payments'
 import { getBrands } from '../api/brands'
 import Modal         from '../components/ui/Modal'
@@ -9,6 +9,9 @@ import Pagination    from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
 import CapacityBar   from '../components/ui/CapacityBar'
 import { useAuthStore } from '../store/authStore'
+import { positiveAmount, rangeOrder as vRangeOrder, extractApiErrors } from '../utils/validators'
+
+const vFromAmt = (v, label = 'Amount') => positiveAmount(v, { label })
 
 // ── Download helper ───────────────────────────────────────────────────────
 async function downloadQR(imageUrl, fileName) {
@@ -51,16 +54,16 @@ function CardMenu({ record, onEdit, onDelete, onToggle }) {
         <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl border border-gray-200 shadow-lg z-20 overflow-hidden py-1">
           <button
             onClick={() => { onToggle(record); setOpen(false) }}
-            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-gray-50 ${record.is_active ? 'text-amber-600' : 'text-green-600'}`}
+            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-amber-50 text-amber-600`}
           >
-            {record.is_active ? <XCircle size={14} /> : <CheckCircle size={14} />}
+            {record.is_active ? <PowerOff size={14} /> : <Power size={14} />}
             {record.is_active ? 'Deactivate' : 'Activate'}
           </button>
           <button
             onClick={() => { onEdit(record); setOpen(false) }}
             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <Pencil size={14} /> Edit
+            <SquarePen size={14} className="text-teal-600" /> Edit
           </button>
           <div className="border-t border-gray-100 my-1" />
           <button
@@ -85,7 +88,7 @@ function ImageLightbox({ src, name, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/30"
       onClick={onClose}
     >
       <div
@@ -178,7 +181,7 @@ function QRCard({ r, canWrite, onEdit, onDelete, onToggle }) {
 }
 
 // ── Create / Edit form ─────────────────────────────────────────────────────
-function QRForm({ initial, brands, onSubmit, loading }) {
+function QRForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
   const [form, setForm] = useState({
     qr_name:     initial?.qr_name     ?? '',
     brand:       initial?.brand       ?? '',
@@ -187,40 +190,84 @@ function QRForm({ initial, brands, onSubmit, loading }) {
     daily_limit: initial?.daily_limit ?? '',
     qr_image:    null,
   })
-  const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
+  const [local, setLocal] = useState({})
+  const errors = { ...apiErrors, ...local }
+  const f = (k) => (v) => { setForm((p) => ({ ...p, [k]: v })); if (local[k]) setLocal(p => ({ ...p, [k]: undefined })) }
+  const E = (k) => errors[k] && <p className="mt-1 text-xs text-red-600">{errors[k]}</p>
+  const cls = (k) => `input ${errors[k] ? 'border-red-300' : ''}`
   const isEdit = !!initial
 
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const errs = {}
+    if (!form.qr_name?.trim()) errs.qr_name = 'QR name is required.'
+    else if (form.qr_name.length > 100) errs.qr_name = 'QR name must be at most 100 characters.'
+    if (!form.brand) errs.brand = 'Please select a brand.'
+    if (!isEdit && !form.qr_image) errs.qr_image = 'QR image is required.'
+    if (form.qr_image) {
+      const file = form.qr_image
+      const sizeMB = file.size / (1024 * 1024)
+      if (sizeMB > 5) errs.qr_image = `Image is ${sizeMB.toFixed(1)} MB — must be ≤ 5 MB.`
+      else if (!/\.(jpe?g|png|webp|gif|bmp|tiff?)$/i.test(file.name)) {
+        errs.qr_image = 'Image must be JPG, PNG, WebP, GIF, BMP, or TIFF.'
+      }
+    }
+    if (vFromAmt(form.range_from, 'Range From')) errs.range_from = vFromAmt(form.range_from, 'Range From')
+    if (vFromAmt(form.range_to, 'Range To'))     errs.range_to   = vFromAmt(form.range_to, 'Range To')
+    if (!errs.range_from && !errs.range_to) {
+      const r = vRangeOrder(form.range_from, form.range_to, 'Range To'); if (r) errs.range_to = r
+    }
+    if (form.daily_limit !== '' && form.daily_limit !== null) {
+      const dl = vFromAmt(form.daily_limit, 'Daily Limit'); if (dl) errs.daily_limit = dl
+      else if (form.range_to && Number(form.daily_limit) < Number(form.range_to)) {
+        errs.daily_limit = 'Daily limit must be ≥ Range To.'
+      }
+    }
+    setLocal(errs)
+    if (Object.keys(errs).length === 0) onSubmit({ ...form, qr_name: form.qr_name.trim() })
+  }
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">QR Name *</label>
-        <input className="input" value={form.qr_name} onChange={(e) => f('qr_name')(e.target.value)} required />
+        <input className={cls('qr_name')} value={form.qr_name} onChange={(e) => f('qr_name')(e.target.value)} maxLength={100} />
+        {E('qr_name')}
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
-        <select className="input" value={form.brand} onChange={(e) => f('brand')(e.target.value)} required>
+        <select className={cls('brand')} value={form.brand} onChange={(e) => f('brand')(e.target.value)}>
           <option value="">Select brand</option>
           {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        {E('brand')}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Range From *</label>
-          <input type="number" className="input" value={form.range_from} onChange={(e) => f('range_from')(e.target.value)} required step="0.01" />
+          <input type="number" className={cls('range_from')} value={form.range_from} onChange={(e) => f('range_from')(e.target.value)} step="0.01" min="0" />
+          {E('range_from')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Range To *</label>
-          <input type="number" className="input" value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} required step="0.01" />
+          <input type="number" className={cls('range_to')} value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} step="0.01" min="0" />
+          {E('range_to')}
         </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Daily Limit (₹) <span className="text-gray-400 font-normal">— optional</span></label>
-        <input type="number" className="input" placeholder="e.g. 100000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
+        <input type="number" className={cls('daily_limit')} placeholder="e.g. 100000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
+        {E('daily_limit')}
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">QR Image {isEdit ? '(leave blank to keep)' : '*'}</label>
-        <input type="file" accept="image/*" className="input py-1.5" onChange={(e) => f('qr_image')(e.target.files[0] || null)} required={!isEdit} />
+        <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,image/*" className={`${cls('qr_image')} py-1.5`} onChange={(e) => f('qr_image')(e.target.files[0] || null)} />
+        <p className="text-xs text-gray-400 mt-1">Max 5 MB. JPG/PNG/WebP/GIF/BMP/TIFF.</p>
+        {E('qr_image')}
       </div>
+      {errors.non_field && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{errors.non_field}</div>
+      )}
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center mt-2">
         {loading ? 'Saving…' : isEdit ? 'Update QR Code' : 'Upload QR Code'}
       </button>
@@ -319,13 +366,9 @@ export default function QRCodes() {
             initial={modal?.data}
             brands={brands}
             loading={createM.isPending || updateM.isPending}
+            apiErrors={extractApiErrors(createM.error || updateM.error || {})}
             onSubmit={(vals) => modal?.mode === 'edit' ? updateM.mutate({ id: modal.data.id, d: vals }) : createM.mutate(vals)}
           />
-          {(createM.isError || updateM.isError) && (
-            <p className="text-red-500 text-sm mt-3">
-              {createM.error?.response?.data?.message || updateM.error?.response?.data?.message || 'An error occurred.'}
-            </p>
-          )}
         </Modal>
       )}
 

@@ -37,7 +37,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     """
 
     username  = models.CharField(max_length=50, unique=True, db_index=True)
-    mobile    = models.CharField(max_length=15, blank=True)
     role = models.ForeignKey(
         'roles.Role',
         on_delete=models.SET_NULL,

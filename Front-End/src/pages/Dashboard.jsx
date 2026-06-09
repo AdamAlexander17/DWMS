@@ -1,209 +1,394 @@
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { QrCode, Wallet, Building2, Tag, Users, Activity, Clock, CheckCircle2, XCircle, TrendingUp, ArrowDownCircle, FileText, AlertTriangle, ArrowUpCircle } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts'
-import StatCard from '../components/ui/StatCard'
+import {
+  ArrowDownCircle, ArrowUpCircle, Clock, CheckCircle2, Activity,
+  TrendingUp, TrendingDown, Wallet, Layers,
+} from 'lucide-react'
+import {
+  ResponsiveContainer,
+  PieChart, Pie, Cell, Tooltip, Legend,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar,
+} from 'recharts'
+import { getDashboardSummary } from '../api/dashboard'
 import { PageSpinner } from '../components/ui/Spinner'
-import { getBrands } from '../api/brands'
-import { getQRCodes, getUPISources, getBankAccounts } from '../api/payments'
-import { getUsers } from '../api/users'
-import { getWithdrawalStats } from '../api/withdrawals'
-import { useAuthStore } from '../store/authStore'
 
-const COLORS = ['#f59e0b', '#0d1117', '#d97706', '#fde68a', '#6b7280']
+// ── Theme palette (matches TradeKaro yellow/black/light-gray look) ────────
+const C = {
+  yellow:    '#0D9488',   // teal (replaces yellow)
+  yellowDk:  '#0F766E',   // dark teal
+  black:     '#0F172A',
+  blue:      '#1D4ED8',   // dark blue
+  blueDk:    '#1E3A8A',   // deeper blue
+  green:     '#15803D',   // dark green
+  red:       '#991B1B',   // dark red
+  amber:     '#F59E0B',
+  purple:    '#8B5CF6',
+  slate:     '#64748B',
+  grid:      '#E2E8F0',
+}
 
+const STATUS_COLOR = {
+  // deposit
+  pending:     C.amber,
+  for_review:  C.purple,
+  in_progress: C.blue,
+  completed:   C.green,
+  approved:    C.green,
+  rejected:    C.red,
+  // withdrawal-only
+  slip_uploaded:          C.blue,
+  bank_followup_required: C.red,
+  email_sent_to_bank:     C.purple,
+  closed:                 C.green,
+}
+
+const CHANNEL_COLOR = { qr: C.yellow, upi: C.blue, bank: C.purple }
+const BRAND_COLORS  = [C.yellow, C.blue, C.purple, C.green, C.amber, C.red, C.yellowDk, C.slate]
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const fmtInt = (n) => Number(n ?? 0).toLocaleString('en-IN')
+const fmtINR = (n) => `₹${Number(n ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+
+const PeriodPill = ({ value, label, active, onClick }) => (
+  <button
+    type="button"
+    onClick={() => onClick(value)}
+    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+      active
+        ? 'bg-accent text-white shadow-sm'
+        : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+    }`}
+  >
+    {label}
+  </button>
+)
+
+const KpiCard = ({ icon: Icon, label, value, sub, accent = 'amber', delta }) => {
+  const accentMap = {
+    amber:  { iconBg: 'bg-amber-50',  iconFg: 'text-amber-600',  bar: 'bg-amber-400' },
+    blue:   { iconBg: 'bg-blue-100',  iconFg: 'text-blue-800',   bar: 'bg-blue-800' },
+    red:    { iconBg: 'bg-red-100',   iconFg: 'text-red-800',    bar: 'bg-red-800' },
+    green:  { iconBg: 'bg-green-100', iconFg: 'text-green-800',  bar: 'bg-green-800' },
+    slate:  { iconBg: 'bg-slate-50',  iconFg: 'text-slate-600',  bar: 'bg-slate-400' },
+  }[accent]
+  const positive = typeof delta === 'number' && delta >= 0
+  return (
+    <div className="card relative overflow-hidden">
+      <div className={`absolute top-0 left-0 h-1 w-full ${accentMap.bar}`} />
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{label}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1.5">{value}</p>
+          {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+        </div>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${accentMap.iconBg} ${accentMap.iconFg}`}>
+          <Icon size={18} />
+        </div>
+      </div>
+      {typeof delta === 'number' && (
+        <div className={`mt-3 inline-flex items-center gap-1 text-[11px] font-semibold ${positive ? 'text-green-800' : 'text-red-800'}`}>
+          {positive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+          {positive ? '+' : ''}{delta}%
+          <span className="text-gray-400 font-normal ml-1">vs previous</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const ChartCard = ({ title, hint, right, children, height = 280 }) => (
+  <div className="card">
+    <div className="flex items-start justify-between mb-3">
+      <div>
+        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+        {hint && <p className="text-[11px] text-gray-400 mt-0.5">{hint}</p>}
+      </div>
+      {right}
+    </div>
+    <div style={{ width: '100%', height }}>{children}</div>
+  </div>
+)
+
+const EmptyState = ({ msg = 'No data for this period' }) => (
+  <div className="w-full h-full flex items-center justify-center text-xs text-gray-300">
+    {msg}
+  </div>
+)
+
+const tipStyle = {
+  fontSize: 12,
+  borderRadius: 8,
+  border: '1px solid #e2e8f0',
+  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)',
+}
+
+// Donut with a big bold number in the middle
+function CenteredDonut({ data, total, centerLabel, dataKey = 'count', nameKey = 'label', colors }) {
+  if (!data || data.length === 0) return <EmptyState />
+  return (
+    <div className="relative w-full h-full">
+      <ResponsiveContainer>
+        <PieChart>
+          <Pie
+            data={data}
+            innerRadius="60%"
+            outerRadius="90%"
+            paddingAngle={2}
+            dataKey={dataKey}
+            nameKey={nameKey}
+            stroke="#fff"
+            strokeWidth={2}
+          >
+            {data.map((d, i) => (
+              <Cell key={i} fill={colors[i % colors.length]} />
+            ))}
+          </Pie>
+          <Tooltip contentStyle={tipStyle} formatter={(v, n) => [fmtInt(v), n]} />
+          <Legend
+            iconType="circle" iconSize={8}
+            wrapperStyle={{ fontSize: 11, paddingTop: 6 }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-[-22px]">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{centerLabel}</p>
+        <p className="text-xl font-bold text-gray-900">{fmtInt(total)}</p>
+      </div>
+    </div>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { user } = useAuthStore()
-  const isAdmin = user?.role === 'admin'
+  const [period, setPeriod] = useState('month')
 
-  const { data: brands,  isLoading: l1 } = useQuery({ queryKey: ['brands-summary'],  queryFn: () => getBrands({ page_size: 1 }) })
-  const { data: qr,      isLoading: l2 } = useQuery({ queryKey: ['qr-summary'],      queryFn: () => getQRCodes({ page_size: 1 }) })
-  const { data: upi,     isLoading: l3 } = useQuery({ queryKey: ['upi-summary'],     queryFn: () => getUPISources({ page_size: 1 }) })
-  const { data: bank,    isLoading: l4 } = useQuery({ queryKey: ['bank-summary'],    queryFn: () => getBankAccounts({ page_size: 1 }) })
-  const { data: users,   isLoading: l5 } = useQuery({ queryKey: ['users-summary'],   queryFn: () => getUsers({ page_size: 1 }), enabled: isAdmin })
-  const { data: brandsAll               } = useQuery({ queryKey: ['brands-chart'],   queryFn: () => getBrands({ page_size: 100 }) })
-  const { data: wStats                  } = useQuery({ queryKey: ['withdrawal-stats'], queryFn: getWithdrawalStats, staleTime: 30_000 })
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard-summary', period],
+    queryFn:  () => getDashboardSummary(period),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
 
-  if (l1 || l2 || l3 || l4 || (isAdmin && l5)) return <PageSpinner />
+  const d = data?.data?.data
+  const kpis            = d?.kpis              ?? {}
+  const depositStatus   = d?.deposit_status    ?? []
+  const withdrawStatus  = d?.withdrawal_status ?? []
+  const brandDeposits   = d?.brand_deposits    ?? []
+  const brandWithdrawals= d?.brand_withdrawals ?? []
+  const channelMix      = d?.channel_mix       ?? []
+  const ticketSplit     = d?.ticket_split      ?? []
+  const trend           = d?.trend             ?? []
+  const gatewayVolume   = d?.gateway_volume    ?? []
 
-  const totalBrands = brands?.data?.data?.count ?? 0
-  const totalQR     = qr?.data?.data?.count     ?? 0
-  const totalUPI    = upi?.data?.data?.count    ?? 0
-  const totalBank   = bank?.data?.data?.count   ?? 0
-  const totalUsers  = users?.data?.data?.count  ?? 0
+  const depColors = useMemo(
+    () => depositStatus.map((s) => STATUS_COLOR[s.status] || C.slate), [depositStatus],
+  )
+  const wdColors = useMemo(
+    () => withdrawStatus.map((s) => {
+      if (s.status === 'closed')  return C.blue
+      if (s.status === 'pending') return '#EF4444'
+      return STATUS_COLOR[s.status] || C.slate
+    }), [withdrawStatus],
+  )
+  const chanColors = useMemo(
+    () => channelMix.map((c) => CHANNEL_COLOR[c.channel] || C.slate), [channelMix],
+  )
 
-  const brandsData = (brandsAll?.data?.data?.results ?? []).map((b) => ({
-    name: b.name,
-    active: b.is_active ? 1 : 0,
-  }))
+  const depTotal = depositStatus.reduce((s, x) => s + (x.count || 0), 0)
+  const wdTotal  = withdrawStatus.reduce((s, x) => s + (x.count || 0), 0)
 
-  const ws       = wStats?.data?.data
-  const wCounts  = ws?.counts  ?? {}
-  const wAmounts = ws?.amounts ?? {}
-  const wMonthly = ws?.monthly ?? []
-  const wTotal   = (wCounts.pending ?? 0) + (wCounts.slip_uploaded ?? 0) + (wCounts.bank_followup_required ?? 0) + (wCounts.email_sent_to_bank ?? 0) + (wCounts.closed ?? 0)
-  const followupCount = wCounts.bank_followup_required ?? 0
+  const periodHint = {
+    week:  'Last 7 days',
+    month: 'Last 30 days',
+    year:  'Last 12 months',
+  }[period]
 
-  const withdrawalCards = [
-    { key: 'pending',                label: 'Pending',            icon: Clock,         bg: 'bg-amber-50',  border: 'border-amber-200',  text: 'text-amber-600' },
-    { key: 'slip_uploaded',          label: 'Slip Uploaded',      icon: FileText,      bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-600' },
-    { key: 'bank_followup_required', label: 'Follow-Up Required', icon: AlertTriangle, bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-500' },
-    { key: 'closed',                 label: 'Closed',             icon: CheckCircle2,  bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-600' },
-  ]
-
-  const chartData = [
-    { label: 'QR Codes',     count: totalQR,   fill: '#f59e0b' },
-    { label: 'UPI Sources',  count: totalUPI,  fill: '#0d1117' },
-    { label: 'Bank Accounts',count: totalBank, fill: '#d97706' },
-  ]
+  if (isLoading) return <PageSpinner />
 
   return (
-    <div className="space-y-8">
-      {/* Page heading */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Welcome back, {user?.username}</p>
+          <p className="page-subtitle">{periodHint} · live overview of all deposits, withdrawals and channels</p>
         </div>
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-500 shadow-card">
-          <Activity size={13} className="text-accent" />
-          Live
+        <div className="flex items-center gap-2">
+          <PeriodPill value="week"  label="Weekly"  active={period === 'week'}  onClick={setPeriod} />
+          <PeriodPill value="month" label="Monthly" active={period === 'month'} onClick={setPeriod} />
+          <PeriodPill value="year"  label="Yearly"  active={period === 'year'}  onClick={setPeriod} />
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className={`grid gap-4 ${isAdmin ? 'grid-cols-2 xl:grid-cols-5' : 'grid-cols-2 xl:grid-cols-4'}`}>
-        {isAdmin && <StatCard label="Total Users"   value={totalUsers}  icon={Users}    color="purple" />}
-        <StatCard label="Active Brands"   value={totalBrands} icon={Tag}      color="amber"  />
-        <StatCard label="QR Codes"        value={totalQR}     icon={QrCode}   color="blue"   />
-        <StatCard label="UPI Sources"     value={totalUPI}    icon={Wallet}   color="green"  />
-        <StatCard label="Bank Accounts"   value={totalBank}   icon={Building2} color="rose"  />
+      {/* 5 KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <KpiCard
+          icon={ArrowDownCircle}
+          label="Total Deposits"
+          value={fmtInt(kpis.deposits_count)}
+          sub="logged this period"
+          accent="amber"
+          delta={kpis.deposits_delta_pct}
+        />
+        <KpiCard
+          icon={ArrowUpCircle}
+          label="Total Withdrawals"
+          value={fmtINR(kpis.withdrawals_amount)}
+          sub={`${fmtInt(kpis.withdrawals_count)} tickets`}
+          accent="blue"
+          delta={kpis.withdrawals_delta_pct}
+        />
+        <KpiCard
+          icon={Clock}
+          label="Pending Tickets"
+          value={fmtInt(kpis.pending_tickets)}
+          sub="awaiting action"
+          accent="red"
+        />
+        <KpiCard
+          icon={CheckCircle2}
+          label="Closed Tickets"
+          value={fmtInt(kpis.closed_tickets)}
+          sub="resolved in period"
+          accent="green"
+        />
+        <KpiCard
+          icon={Activity}
+          label="Active Channels"
+          value={fmtInt(kpis.active_channels)}
+          sub="QR + UPI + bank"
+          accent="slate"
+        />
       </div>
 
-      {/* Charts row */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Payment sources bar chart */}
-        <div className="card">
-          <h3 className="font-semibold text-gray-800 text-sm mb-1">Payment Sources Overview</h3>
-          <p className="text-gray-400 text-xs mb-5">Total records per source type</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData} barSize={48}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,.12)', fontSize: 12 }}
-                cursor={{ fill: 'rgba(245,158,11,0.06)' }}
-              />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {chartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-              </Bar>
-            </BarChart>
+      {/* Row: two status donuts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartCard title="Deposit Status" hint="Breakdown of deposit tickets by current status" height={260}>
+          <CenteredDonut data={depositStatus} total={depTotal} centerLabel="Deposits" colors={depColors} />
+        </ChartCard>
+        <ChartCard title="Withdrawal Status" hint="Breakdown of withdrawal tickets by current status" height={260}>
+          <CenteredDonut data={withdrawStatus} total={wdTotal} centerLabel="Withdrawals" colors={wdColors} />
+        </ChartCard>
+      </div>
+
+      {/* Trend chart (full width) */}
+      <ChartCard
+        title="Deposits vs Withdrawals — Trend"
+        hint={`Volume per ${period === 'year' ? 'month' : 'day'} across the selected period`}
+        height={300}
+      >
+        {trend.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <ResponsiveContainer>
+            <AreaChart data={trend} margin={{ top: 8, right: 16, left: -4, bottom: 0 }}>
+              <defs>
+                <linearGradient id="depGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={C.yellow} stopOpacity={0.55} />
+                  <stop offset="95%" stopColor={C.yellow} stopOpacity={0.05} />
+                </linearGradient>
+                <linearGradient id="wdGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={C.blue} stopOpacity={0.45} />
+                  <stop offset="95%" stopColor={C.blue} stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={C.grid} vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={36} />
+              <Tooltip contentStyle={tipStyle} formatter={(v, n) => [fmtInt(v), n]} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+              <Area type="monotone" dataKey="deposits"          name="Deposits"    stroke={C.yellow} strokeWidth={2} fill="url(#depGrad)" />
+              <Area type="monotone" dataKey="withdrawals_count" name="Withdrawals" stroke={C.blue}   strokeWidth={2} fill="url(#wdGrad)" />
+            </AreaChart>
           </ResponsiveContainer>
-        </div>
-
-        {/* Brands list */}
-        <div className="card">
-          <h3 className="font-semibold text-gray-800 text-sm mb-1">Brands</h3>
-          <p className="text-gray-400 text-xs mb-5">Registered brand status</p>
-          {brandsData.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
-              <Tag size={32} className="opacity-30" />
-              <p className="text-sm">No brands yet</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {(brandsAll?.data?.data?.results ?? []).map((b) => (
-                <div key={b.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-50 hover:bg-amber-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-accent text-sidebar-bg flex items-center justify-center font-bold text-sm">
-                      {b.name.charAt(0)}
-                    </div>
-                    <span className="font-medium text-gray-800 text-sm">{b.name}</span>
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${b.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {b.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      {/* ── Withdrawal Overview ─────────────────────────────────────── */}
-      <div className="space-y-4">
-        {/* Section heading */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
-            <ArrowDownCircle size={14} className="text-accent" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-gray-800">Withdrawal Overview</h2>
-            <p className="text-[11px] text-gray-400">{wTotal} total request{wTotal !== 1 ? 's' : ''}</p>
-          </div>
-        </div>
-
-        {/* Bank follow-up alert */}
-        {followupCount > 0 && (
-          <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-            <div className="w-9 h-9 rounded-lg bg-red-500 flex items-center justify-center animate-pulse">
-              <AlertTriangle size={16} className="text-white" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-red-700">{followupCount} ticket{followupCount > 1 ? 's' : ''} awaiting bank follow-up</p>
-              <p className="text-[11px] text-red-600">Client(s) have not received their withdrawal amount. Please email the bank.</p>
-            </div>
-          </div>
         )}
+      </ChartCard>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {withdrawalCards.map(({ key, label, icon: Icon, bg, border, text }) => (
-            <div key={key} className={`card flex items-center gap-4 py-4 px-5 border ${bg} ${border}`}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg}`}>
-                <Icon size={18} className={text} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{label}</p>
-                <p className={`text-2xl font-bold ${text}`}>{wCounts[key]}</p>
-                <p className="text-[11px] text-gray-400 truncate">
-                  ₹{Number(wAmounts[key]).toLocaleString('en-IN')} total
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Monthly trend chart */}
-        <div className="card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={15} className="text-accent" />
-            <h3 className="text-sm font-semibold text-gray-700">Monthly Withdrawal Trend</h3>
-          </div>
-          {wMonthly.length === 0 ? (
-            <div className="h-52 flex flex-col items-center justify-center gap-2 text-gray-300">
-              <TrendingUp size={32} className="opacity-40" />
-              <p className="text-sm">No withdrawal data yet</p>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={wMonthly} barSize={14} barGap={3}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={28} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px #0001' }}
-                  cursor={{ fill: '#f8fafc' }}
-                />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                <Bar dataKey="pending"                name="Pending"            fill="#f59e0b" radius={[3,3,0,0]} />
-                <Bar dataKey="slip_uploaded"          name="Slip Uploaded"      fill="#3b82f6" radius={[3,3,0,0]} />
-                <Bar dataKey="bank_followup_required" name="Follow-Up Required" fill="#ef4444" radius={[3,3,0,0]} />
-                <Bar dataKey="closed"                 name="Closed"             fill="#22c55e" radius={[3,3,0,0]} />
+      {/* Row: brand-wise bars */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartCard title="Brand-wise Deposits" hint="Top brands by deposit count" height={280}>
+          {brandDeposits.length === 0 ? <EmptyState /> : (
+            <ResponsiveContainer>
+              <BarChart data={brandDeposits} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.grid} horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="brand" tick={{ fontSize: 11, fill: '#334155' }} axisLine={false} tickLine={false} width={90} />
+                <Tooltip contentStyle={tipStyle} formatter={(v) => [fmtInt(v), 'Deposits']} />
+                <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={14}>
+                  {brandDeposits.map((_, i) => <Cell key={i} fill={C.yellow} />)}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
-        </div>
+        </ChartCard>
+
+        <ChartCard title="Brand-wise Withdrawals" hint="Top brands by withdrawal amount" height={280}>
+          {brandWithdrawals.length === 0 ? <EmptyState /> : (
+            <ResponsiveContainer>
+              <BarChart data={brandWithdrawals} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.grid} horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+                       tickFormatter={(v) => `₹${(v/1000).toFixed(v >= 100000 ? 0 : 1)}k`} />
+                <YAxis type="category" dataKey="brand" tick={{ fontSize: 11, fill: '#334155' }} axisLine={false} tickLine={false} width={90} />
+                <Tooltip contentStyle={tipStyle} formatter={(v) => [fmtINR(v), 'Amount']} />
+                <Bar dataKey="amount" radius={[0, 6, 6, 0]} barSize={14}>
+                  {brandWithdrawals.map((_, i) => <Cell key={i} fill={C.blue} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
       </div>
+
+      {/* Row: ticket split + channel mix */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartCard title="Pending vs Closed Tickets" hint="Overall pipeline health" height={260}>
+          {ticketSplit.every((s) => !s.count) ? <EmptyState /> : (
+            <CenteredDonut
+              data={ticketSplit.map((s) => ({ ...s, label: s.type === 'pending' ? 'Pending' : 'Closed' }))}
+              total={ticketSplit.reduce((s, x) => s + (x.count || 0), 0)}
+              centerLabel="Tickets"
+              dataKey="count"
+              nameKey="label"
+              colors={['#EF4444', C.blue]}
+            />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Payment Channel Mix" hint="Deposits split by channel used" height={260}>
+          {channelMix.length === 0 ? <EmptyState /> : (
+            <CenteredDonut
+              data={channelMix}
+              total={channelMix.reduce((s, x) => s + (x.count || 0), 0)}
+              centerLabel="Channels"
+              colors={chanColors}
+            />
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Gateway volume bar */}
+      <ChartCard
+        title="Gateway-wise Deposit Volume"
+        hint="How deposits are distributed across gateways"
+        height={300}
+        right={<Wallet size={16} className="text-gray-400" />}
+      >
+        {gatewayVolume.length === 0 ? <EmptyState /> : (
+          <ResponsiveContainer>
+            <BarChart data={gatewayVolume} margin={{ top: 8, right: 16, left: -4, bottom: 0 }} barSize={28}>
+              <CartesianGrid strokeDasharray="3 3" stroke={C.grid} vertical={false} />
+              <XAxis dataKey="gateway" tick={{ fontSize: 11, fill: '#475569' }} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={36} />
+              <Tooltip contentStyle={tipStyle} formatter={(v) => [fmtInt(v), 'Deposits']} />
+              <Bar dataKey="deposits" radius={[6, 6, 0, 0]}>
+                {gatewayVolume.map((_, i) => <Cell key={i} fill={BRAND_COLORS[i % BRAND_COLORS.length]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
     </div>
   )
 }

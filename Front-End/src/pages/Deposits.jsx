@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Pencil, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2 } from 'lucide-react'
+import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2 } from 'lucide-react'
 import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit } from '../api/deposits'
 import { getGateways }     from '../api/master'
 import { getQRCodes }      from '../api/payments'
@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Pagination    from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useAuthStore } from '../store/authStore'
+import { slipFile as vSlipFile, extractApiErrors } from '../utils/validators'
 
 // Gateway options are fetched from master API – see useGateways() hook below
 
@@ -21,9 +22,9 @@ const CHANNEL_OPTS = [
 ]
 
 const CHANNEL_BADGE = {
-  qr:   'bg-purple-100 text-purple-700',
-  upi:  'bg-blue-100 text-blue-700',
-  bank: 'bg-teal-100 text-teal-700',
+  qr:   'bg-purple-50 text-purple-700 border-purple-200',
+  upi:  'bg-blue-50 text-blue-700 border-blue-200',
+  bank: 'bg-teal-50 text-teal-700 border-teal-200',
 }
 
 const CHANNEL_LABEL = { qr: 'QR Code', upi: 'UPI', bank: 'Bank Account' }
@@ -36,14 +37,14 @@ const RM_STATUS_OPTS = [
 
 // Unified "Ticket Status" derived from both slip_status + review status
 const TICKET_STATUS_CONFIG = {
-  not_received: { label: 'Not Received', bg: 'bg-red-100',    text: 'text-red-700',    Icon: XCircle     },
-  pending:      { label: 'Pending',      bg: 'bg-amber-100',  text: 'text-amber-700',  Icon: Clock       },
-  in_progress:  { label: 'In Progress',  bg: 'bg-purple-100', text: 'text-purple-700', Icon: Loader2     },
-  added:        { label: 'Added',        bg: 'bg-teal-100',   text: 'text-teal-700',   Icon: FileCheck2  },
-  completed:    { label: 'Completed',    bg: 'bg-green-100',  text: 'text-green-700',  Icon: BadgeCheck  },
+  not_received: { label: 'Not Received', bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    Icon: XCircle     },
+  pending:      { label: 'Pending',      bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  Icon: Clock       },
+  in_progress:  { label: 'In Progress',  bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', Icon: Loader2     },
+  added:        { label: 'Added',        bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200',   Icon: FileCheck2  },
+  completed:    { label: 'Completed',    bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  Icon: BadgeCheck  },
   // legacy
-  approved:     { label: 'Approved',     bg: 'bg-green-100',  text: 'text-green-700',  Icon: CheckCircle2 },
-  rejected:     { label: 'Rejected',     bg: 'bg-red-100',    text: 'text-red-700',    Icon: XCircle     },
+  approved:     { label: 'Approved',     bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  Icon: CheckCircle2 },
+  rejected:     { label: 'Rejected',     bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    Icon: XCircle     },
 }
 
 function deriveTicketStatus(r) {
@@ -141,7 +142,7 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
 }
 
 // ── Create / Log Deposit Form ──────────────────────────────────────────────
-function CreateForm({ onSubmit, loading, error }) {
+function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
   const gateways = useGateways()
   const [form, setForm] = useState({
     gateway: '',
@@ -151,10 +152,28 @@ function CreateForm({ onSubmit, loading, error }) {
     rm_status:    'not_received',
     comment:      '',
   })
-  const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
+  const [local, setLocal] = useState({})
+  const errors = { ...apiErrors, ...local }
+  const f = (k) => (v) => { setForm((p) => ({ ...p, [k]: v })); if (local[k]) setLocal((p) => ({ ...p, [k]: undefined })) }
+
+  const validate = () => {
+    const errs = {}
+    if (!form.gateway) errs.gateway = 'Gateway is required.'
+    if (!form.channel_type) errs.channel_type = 'Channel type is required.'
+    if (form.channel_type && !form.channel_id) errs.channel_id = 'Please select a channel item.'
+    if (form.slip) {
+      const e = vSlipFile(form.slip)
+      if (e) errs.slip = e
+    }
+    if (form.rm_status === 'completed' && !form.slip) errs.slip = 'Slip is required when status is completed.'
+    if (form.comment && form.comment.length > 2000) errs.comment = 'Comment must be at most 2000 characters.'
+    setLocal(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (!validate()) return
     const fd = new FormData()
     fd.append('gateway', form.gateway)
     if (form.channel_type) fd.append('channel_type', form.channel_type)
@@ -181,15 +200,17 @@ function CreateForm({ onSubmit, loading, error }) {
       <ChannelSelector
         channelType={form.channel_type}
         channelId={form.channel_id}
-        onTypeChange={(v) => setForm((p) => ({ ...p, channel_type: v, channel_id: '' }))}
+        onTypeChange={(v) => { setForm((p) => ({ ...p, channel_type: v, channel_id: '' })); if (local.channel_type) setLocal((p) => ({ ...p, channel_type: undefined })); if (local.channel_id) setLocal((p) => ({ ...p, channel_id: undefined })) }}
         onIdChange={f('channel_id')}
       />
+      {errors.channel_type && <p className="text-xs text-red-600 -mt-2">{errors.channel_type}</p>}
+      {errors.channel_id && <p className="text-xs text-red-600 -mt-2">{errors.channel_id}</p>}
 
       {/* Gateway Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name <span className="text-red-500">*</span></label>
         <select
-          className="input"
+          className={`input ${errors.gateway ? 'border-red-300' : ''}`}
           value={form.gateway}
           onChange={(e) => f('gateway')(e.target.value)}
         >
@@ -198,23 +219,25 @@ function CreateForm({ onSubmit, loading, error }) {
             <option key={gw.id} value={gw.id}>{gw.name}</option>
           ))}
         </select>
+        {errors.gateway && <p className="mt-1 text-xs text-red-600">{errors.gateway}</p>}
       </div>
 
       {/* Slip upload */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
-        <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded-lg px-4 py-3 hover:border-accent transition-colors">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip{form.rm_status === 'completed' && <span className="text-red-500"> *</span>}</label>
+        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
           <Paperclip size={15} className="text-gray-400 shrink-0" />
           <span className="text-sm text-gray-500 truncate">
-            {form.slip ? form.slip.name : 'Click to attach slip (image / PDF)'}
+            {form.slip ? form.slip.name : 'Click to attach slip (image / PDF, max 8 MB)'}
           </span>
           <input
             type="file"
-            accept="image/*,.pdf"
+            accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
             className="hidden"
             onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
           />
         </label>
+        {errors.slip && <p className="mt-1 text-xs text-red-600">{errors.slip}</p>}
       </div>
 
       {/* Status */}
@@ -242,15 +265,17 @@ function CreateForm({ onSubmit, loading, error }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Comment</label>
         <textarea
-          className="input resize-none"
+          className={`input resize-none ${errors.comment ? 'border-red-300' : ''}`}
           rows={3}
           placeholder="Optional comment…"
+          maxLength={2000}
           value={form.comment}
           onChange={(e) => f('comment')(e.target.value)}
         />
+        {errors.comment && <p className="mt-1 text-xs text-red-600">{errors.comment}</p>}
       </div>
 
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {(error || errors.non_field) && <p className="text-red-500 text-sm">{errors.non_field || error}</p>}
       <button
         type="submit"
         disabled={loading || (form.channel_type && !form.channel_id)}
@@ -263,13 +288,27 @@ function CreateForm({ onSubmit, loading, error }) {
 }
 
 // ── Review Form (back office / admin) ──────────────────────────────────────
-function ReviewForm({ initial, onSubmit, loading, error }) {
+function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const [decision,    setDecision]    = useState('in_progress')
   const [message,     setMessage]     = useState('')
   const [reviewSlip,  setReviewSlip]  = useState(null)
+  const [local, setLocal] = useState({})
+  const errors = { ...apiErrors, ...local }
+
+  const validate = () => {
+    const errs = {}
+    if (reviewSlip) {
+      const e = vSlipFile(reviewSlip)
+      if (e) errs.review_slip = e
+    }
+    if (message && message.length > 2000) errs.message = 'Message must be at most 2000 characters.'
+    setLocal(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (!validate()) return
     const fd = new FormData()
     // 'added' is a display-only state: submit in_progress with a receipt
     fd.append('action',  'in_progress')
@@ -290,7 +329,7 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
           <div className="flex justify-between">
             <span className="text-gray-500">Channel</span>
             <div className="flex items-center gap-1.5">
-              <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${CHANNEL_BADGE[initial.channel_type] ?? 'bg-gray-100 text-gray-600'}`}>
+              <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[initial.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                 {CHANNEL_LABEL[initial.channel_type]}
               </span>
               {initial?.channel_label && (
@@ -355,18 +394,19 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
       {/* Back-office receipt upload */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Upload Receipt</label>
-        <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded-lg px-4 py-3 hover:border-accent transition-colors">
+        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.review_slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
           <Paperclip size={15} className="text-gray-400 shrink-0" />
           <span className="text-sm text-gray-500 truncate">
-            {reviewSlip ? reviewSlip.name : (initial?.review_slip ? 'Replace existing receipt…' : 'Attach receipt (image / PDF)')}
+            {reviewSlip ? reviewSlip.name : (initial?.review_slip ? 'Replace existing receipt…' : 'Attach receipt (image / PDF, max 8 MB)')}
           </span>
           <input
             type="file"
-            accept="image/*,.pdf"
+            accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
             className="hidden"
-            onChange={(e) => setReviewSlip(e.target.files?.[0] ?? null)}
+            onChange={(e) => { setReviewSlip(e.target.files?.[0] ?? null); if (local.review_slip) setLocal((p) => ({ ...p, review_slip: undefined })) }}
           />
         </label>
+        {errors.review_slip && <p className="mt-1 text-xs text-red-600">{errors.review_slip}</p>}
         {initial?.review_slip && !reviewSlip && (
           <a
             href={initial.review_slip}
@@ -383,15 +423,17 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Message to RM</label>
         <textarea
-          className="input resize-none"
+          className={`input resize-none ${errors.message ? 'border-red-300' : ''}`}
           rows={3}
           placeholder="e.g. Payment confirmed, processing…"
+          maxLength={2000}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => { setMessage(e.target.value); if (local.message) setLocal((p) => ({ ...p, message: undefined })) }}
         />
+        {errors.message && <p className="mt-1 text-xs text-red-600">{errors.message}</p>}
       </div>
 
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {(error || errors.non_field) && <p className="text-red-500 text-sm">{errors.non_field || error}</p>}
       <button
         type="submit"
         disabled={loading || (decision === 'added' && !reviewSlip && !initial?.review_slip)}
@@ -403,7 +445,7 @@ function ReviewForm({ initial, onSubmit, loading, error }) {
   )
 }
 // ── Edit Form ──────────────────────────────────────────────────────────────
-function EditForm({ initial, onSubmit, loading, error }) {
+function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const gateways = useGateways()
   // Resolve the initial channel_id from the correct FK field
   const initChannelId = initial?.channel_type === 'qr'   ? String(initial?.qr_code   ?? '')
@@ -419,10 +461,29 @@ function EditForm({ initial, onSubmit, loading, error }) {
     slip:         null,
     rm_status:    initial?.status === 'completed' ? 'completed' : 'not_received',
   })
-  const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
+  const [local, setLocal] = useState({})
+  const errors = { ...apiErrors, ...local }
+  const f = (k) => (v) => { setForm((p) => ({ ...p, [k]: v })); if (local[k]) setLocal((p) => ({ ...p, [k]: undefined })) }
+
+  const validate = () => {
+    const errs = {}
+    if (!form.gateway) errs.gateway = 'Gateway is required.'
+    if (form.channel_type && !form.channel_id) errs.channel_id = 'Please select a channel item.'
+    if (form.slip) {
+      const e = vSlipFile(form.slip)
+      if (e) errs.slip = e
+    }
+    if (form.rm_status === 'completed' && !form.slip && !initial?.slip) {
+      errs.slip = 'Slip is required when status is completed.'
+    }
+    if (form.comment && form.comment.length > 2000) errs.comment = 'Comment must be at most 2000 characters.'
+    setLocal(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (!validate()) return
     const fd = new FormData()
     fd.append('gateway', form.gateway)
     fd.append('channel_type', form.channel_type ?? '')
@@ -449,15 +510,16 @@ function EditForm({ initial, onSubmit, loading, error }) {
       <ChannelSelector
         channelType={form.channel_type}
         channelId={form.channel_id}
-        onTypeChange={(v) => setForm((p) => ({ ...p, channel_type: v, channel_id: '' }))}
+        onTypeChange={(v) => { setForm((p) => ({ ...p, channel_type: v, channel_id: '' })); if (local.channel_id) setLocal((p) => ({ ...p, channel_id: undefined })) }}
         onIdChange={f('channel_id')}
       />
+      {errors.channel_id && <p className="text-xs text-red-600 -mt-2">{errors.channel_id}</p>}
 
       {/* Gateway Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name <span className="text-red-500">*</span></label>
         <select
-          className="input"
+          className={`input ${errors.gateway ? 'border-red-300' : ''}`}
           value={form.gateway}
           onChange={(e) => f('gateway')(e.target.value)}
         >
@@ -466,23 +528,25 @@ function EditForm({ initial, onSubmit, loading, error }) {
             <option key={gw.id} value={gw.id}>{gw.name}</option>
           ))}
         </select>
+        {errors.gateway && <p className="mt-1 text-xs text-red-600">{errors.gateway}</p>}
       </div>
 
       {/* Slip upload */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
-        <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded-lg px-4 py-3 hover:border-accent transition-colors">
+        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
           <Paperclip size={15} className="text-gray-400 shrink-0" />
           <span className="text-sm text-gray-500 truncate">
-            {form.slip ? form.slip.name : (initial?.slip ? 'Replace existing slip…' : 'Click to attach slip (image / PDF)')}
+            {form.slip ? form.slip.name : (initial?.slip ? 'Replace existing slip…' : 'Click to attach slip (image / PDF, max 8 MB)')}
           </span>
           <input
             type="file"
-            accept="image/*,.pdf"
+            accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
             className="hidden"
             onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
           />
         </label>
+        {errors.slip && <p className="mt-1 text-xs text-red-600">{errors.slip}</p>}
       </div>
 
       {/* Status */}
@@ -510,15 +574,17 @@ function EditForm({ initial, onSubmit, loading, error }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Comment</label>
         <textarea
-          className="input resize-none"
+          className={`input resize-none ${errors.comment ? 'border-red-300' : ''}`}
           rows={3}
           placeholder="Optional comment…"
+          maxLength={2000}
           value={form.comment}
           onChange={(e) => f('comment')(e.target.value)}
         />
+        {errors.comment && <p className="mt-1 text-xs text-red-600">{errors.comment}</p>}
       </div>
 
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {(error || errors.non_field) && <p className="text-red-500 text-sm">{errors.non_field || error}</p>}
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center mt-1">
         {loading ? 'Saving…' : 'Save Changes'}
       </button>
@@ -606,7 +672,7 @@ export default function Deposits() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
               {['Gateway', 'Channel', 'Channel Detail', 'Slip', 'Comment', 'Logged By', 'Ticket Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
@@ -624,12 +690,12 @@ export default function Deposits() {
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
                 {/* Gateway */}
                 <td className="px-4 py-2.5">
-                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.gateway_detail?.name ?? '—'}</span>
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.gateway_detail?.name ?? '—'}</span>
                 </td>
                 {/* Channel Type */}
                 <td className="px-4 py-2.5">
                   {r.channel_type ? (
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                       {CHANNEL_LABEL[r.channel_type]}
                     </span>
                   ) : (
@@ -664,7 +730,7 @@ export default function Deposits() {
                     const Icon = cfg.Icon
                     return (
                       <div className="flex flex-col gap-1">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold w-fit ${cfg.bg} ${cfg.text}`}>
+                        <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap w-fit ${cfg.bg} ${cfg.text} ${cfg.border}`}>
                           <Icon size={10} /> {cfg.label}
                         </span>
                         {r.review_message && (
@@ -689,8 +755,8 @@ export default function Deposits() {
                       {canWrite && (
                         <>
                           <button onClick={() => setModal({ mode: 'edit', data: r })}
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
-                            <Pencil size={12} />
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                            <SquarePen size={12} />
                           </button>
                           <button onClick={() => setDelTarget(r)}
                             className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
@@ -715,6 +781,7 @@ export default function Deposits() {
           <CreateForm
             loading={createM.isPending}
             error={createM.error?.response?.data?.message || (createM.isError ? 'Failed to log deposit.' : null)}
+            apiErrors={extractApiErrors(createM.error || {})}
             onSubmit={(vals) => createM.mutate(vals)}
           />
         </Modal>
@@ -726,6 +793,7 @@ export default function Deposits() {
           initial={modal?.data}
           loading={updateM.isPending}
           error={updateM.error?.response?.data?.message || (updateM.isError ? 'Failed to update deposit.' : null)}
+          apiErrors={extractApiErrors(updateM.error || {})}
           onSubmit={(vals) => updateM.mutate({ id: modal.data.id, d: vals })}
         />
       </Modal>
@@ -736,6 +804,7 @@ export default function Deposits() {
           initial={modal?.data}
           loading={reviewM.isPending}
           error={reviewM.error?.response?.data?.message || (reviewM.isError ? 'Failed to submit review.' : null)}
+          apiErrors={extractApiErrors(reviewM.error || {})}
           onSubmit={(vals) => reviewM.mutate({ id: modal.data.id, d: vals })}
         />
       </Modal>

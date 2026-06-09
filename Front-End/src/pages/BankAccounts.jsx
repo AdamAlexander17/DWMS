@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Search } from 'lucide-react'
+import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
 import { getBankAccounts, createBankAccount, updateBankAccount, deleteBankAccount, activateBankAccount, deactivateBankAccount } from '../api/payments'
 import { getBrands } from '../api/brands'
 import Modal from '../components/ui/Modal'
@@ -10,8 +10,16 @@ import Pagination from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
 import CapacityBar from '../components/ui/CapacityBar'
 import { useAuthStore } from '../store/authStore'
+import {
+  ifsc as vIfsc,
+  accountNumber as vAcct,
+  safeName as vSafe,
+  positiveAmount as vAmt,
+  rangeOrder,
+  extractApiErrors,
+} from '../utils/validators'
 
-function BankForm({ initial, brands, onSubmit, loading }) {
+function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
   const [form, setForm] = useState({
     bank_name:            initial?.bank_name            ?? '',
     account_holder_name:  initial?.account_holder_name  ?? '',
@@ -23,50 +31,113 @@ function BankForm({ initial, brands, onSubmit, loading }) {
     range_to:             initial?.range_to             ?? '',
     daily_limit:          initial?.daily_limit          ?? '',
   })
-  const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
+  const [local, setLocal] = useState({})
+  const errors = { ...apiErrors, ...local }
+  const f = (k) => (v) => { setForm((p) => ({ ...p, [k]: v })); if (local[k]) setLocal(p => ({ ...p, [k]: undefined })) }
+  const E = (k) => errors[k] && <p className="mt-1 text-xs text-red-600">{errors[k]}</p>
+  const cls = (k) => `input ${errors[k] ? 'border-red-300' : ''}`
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const errs = {}
+    const bn  = vSafe(form.bank_name, 'Bank name', 100);            if (bn)  errs.bank_name = bn
+    const ah  = vSafe(form.account_holder_name, 'Account holder', 150); if (ah) errs.account_holder_name = ah
+    const an  = vAcct(form.account_number);                         if (an)  errs.account_number = an
+    const ic  = vIfsc(form.ifsc_code);                              if (ic)  errs.ifsc_code = ic
+    if (form.branch_name) {
+      const br = vSafe(form.branch_name, 'Branch name', 100);        if (br)  errs.branch_name = br
+    }
+    if (!form.brand) errs.brand = 'Please select a brand.'
+    const rf = vAmt(form.range_from, { label: 'Range From' });      if (rf)  errs.range_from = rf
+    const rt = vAmt(form.range_to, { label: 'Range To' });          if (rt)  errs.range_to = rt
+    const rorder = rangeOrder(form.range_from, form.range_to, 'Range To'); if (rorder) errs.range_to = rorder
+    if (form.daily_limit !== '' && form.daily_limit !== null) {
+      const dl = vAmt(form.daily_limit, { label: 'Daily Limit' });
+      if (dl) errs.daily_limit = dl
+      else if (form.range_to && Number(form.daily_limit) < Number(form.range_to)) {
+        errs.daily_limit = 'Daily limit must be ≥ Range To.'
+      }
+    }
+    setLocal(errs)
+    if (Object.keys(errs).length === 0) {
+      onSubmit({
+        ...form,
+        bank_name:           form.bank_name.trim(),
+        account_holder_name: form.account_holder_name.trim(),
+        ifsc_code:           form.ifsc_code.toUpperCase().trim(),
+        account_number:      String(form.account_number).replace(/\D/g, ''),
+        branch_name:         form.branch_name.trim(),
+      })
+    }
+  }
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Bank Name *</label>
-          <input className="input" value={form.bank_name} onChange={(e) => f('bank_name')(e.target.value)} required />
+          <input className={cls('bank_name')} value={form.bank_name} onChange={(e) => f('bank_name')(e.target.value)} maxLength={100} />
+          {E('bank_name')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
-          <select className="input" value={form.brand} onChange={(e) => f('brand')(e.target.value)} required>
+          <select className={cls('brand')} value={form.brand} onChange={(e) => f('brand')(e.target.value)}>
             <option value="">Select brand</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
+          {E('brand')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Account Holder *</label>
-          <input className="input" value={form.account_holder_name} onChange={(e) => f('account_holder_name')(e.target.value)} required />
+          <input className={cls('account_holder_name')} value={form.account_holder_name} onChange={(e) => f('account_holder_name')(e.target.value)} maxLength={150} />
+          {E('account_holder_name')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Account Number *</label>
-          <input className="input" value={form.account_number} onChange={(e) => f('account_number')(e.target.value)} required />
+          <input
+            className={cls('account_number')}
+            inputMode="numeric"
+            value={form.account_number}
+            onChange={(e) => f('account_number')(e.target.value.replace(/\D/g, ''))}
+            maxLength={18}
+          />
+          {E('account_number')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">IFSC Code *</label>
-          <input className="input" value={form.ifsc_code} onChange={(e) => f('ifsc_code')(e.target.value)} required />
+          <input
+            className={cls('ifsc_code')}
+            value={form.ifsc_code}
+            onChange={(e) => f('ifsc_code')(e.target.value.toUpperCase())}
+            maxLength={11}
+            placeholder="HDFC0001234"
+          />
+          {E('ifsc_code')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Branch Name</label>
-          <input className="input" value={form.branch_name} onChange={(e) => f('branch_name')(e.target.value)} />
+          <input className={cls('branch_name')} value={form.branch_name} onChange={(e) => f('branch_name')(e.target.value)} maxLength={100} />
+          {E('branch_name')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Range From *</label>
-          <input type="number" className="input" value={form.range_from} onChange={(e) => f('range_from')(e.target.value)} required step="0.01" />
+          <input type="number" className={cls('range_from')} value={form.range_from} onChange={(e) => f('range_from')(e.target.value)} step="0.01" min="0" />
+          {E('range_from')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Range To *</label>
-          <input type="number" className="input" value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} required step="0.01" />
+          <input type="number" className={cls('range_to')} value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} step="0.01" min="0" />
+          {E('range_to')}
         </div>
         <div className="col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Daily Limit (₹) <span className="text-gray-400 font-normal">— optional</span></label>
-          <input type="number" className="input" placeholder="e.g. 200000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
+          <input type="number" className={cls('daily_limit')} placeholder="e.g. 200000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
+          {E('daily_limit')}
         </div>
       </div>
+      {errors.non_field && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{errors.non_field}</div>
+      )}
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center mt-2">
         {loading ? 'Saving…' : initial ? 'Update Bank Account' : 'Add Bank Account'}
       </button>
@@ -120,7 +191,7 @@ export default function BankAccounts() {
       </div>
 
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
               {['Bank', 'Account Holder', 'Account No.', 'IFSC', 'Brand', 'Range', 'Daily Capacity', 'Status', ...(canWrite ? ['Actions'] : [])].map((h) => (
@@ -137,7 +208,7 @@ export default function BankAccounts() {
                 <td className="px-4 py-2.5 font-mono text-gray-700 text-xs">{r.account_number}</td>
                 <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{r.ifsc_code}</td>
                 <td className="px-4 py-2.5">
-                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2 py-0.5 rounded-md">{r.brand_name}</span>
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
                 </td>
                 <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">₹{r.range_from} – ₹{r.range_to}</td>
                 <td className="px-4 py-2.5"><CapacityBar capacity={r.capacity} /></td>
@@ -145,10 +216,10 @@ export default function BankAccounts() {
                 {canWrite && (
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 justify-end">
-                      <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} title={r.is_active ? 'Deactivate' : 'Activate'} className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors ${r.is_active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
-                        {r.is_active ? <CheckCircle size={13} /> : <XCircle size={13} />}
+                      <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} title={r.is_active ? 'Deactivate' : 'Activate'} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors">
+                        {r.is_active ? <PowerOff size={13} /> : <Power size={13} />}
                       </button>
-                      <button onClick={() => setModal({ mode: 'edit', data: r })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><Pencil size={12} /></button>
+                      <button onClick={() => setModal({ mode: 'edit', data: r })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><SquarePen size={12} /></button>
                       <button onClick={() => setDelTarget(r)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"><Trash2 size={12} /></button>
                     </div>
                   </td>
@@ -162,11 +233,13 @@ export default function BankAccounts() {
 
       {canWrite && (
         <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Edit Bank Account' : 'Add Bank Account'} size="lg">
-          <BankForm initial={modal?.data} brands={brands} loading={createM.isPending || updateM.isPending}
-            onSubmit={(vals) => modal?.mode === 'edit' ? updateM.mutate({ id: modal.data.id, d: vals }) : createM.mutate(vals)} />
-          {(createM.isError || updateM.isError) && (
-            <p className="text-red-500 text-sm mt-3">{createM.error?.response?.data?.message || updateM.error?.response?.data?.message || 'Error'}</p>
-          )}
+          <BankForm
+            initial={modal?.data}
+            brands={brands}
+            loading={createM.isPending || updateM.isPending}
+            apiErrors={extractApiErrors(createM.error || updateM.error || {})}
+            onSubmit={(vals) => modal?.mode === 'edit' ? updateM.mutate({ id: modal.data.id, d: vals }) : createM.mutate(vals)}
+          />
         </Modal>
       )}
 

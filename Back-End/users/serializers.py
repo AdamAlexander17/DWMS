@@ -1,7 +1,12 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password as dj_validate_password
 from rest_framework import serializers
 
 from brands.models import Brand
+from common.validators import (
+    validate_password_strength,
+    validate_username,
+)
 from roles.models import Role
 
 User = get_user_model()
@@ -29,7 +34,7 @@ class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = User
         fields = [
-            'id', 'username', 'mobile',
+            'id', 'username',
             'role', 'role_name', 'role_detail',
             'brands', 'brands_detail', 'is_active',
             'must_change_password',
@@ -39,7 +44,7 @@ class UserListSerializer(serializers.ModelSerializer):
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, max_length=128)
     role = serializers.PrimaryKeyRelatedField(
         queryset=Role.objects.filter(is_active=True),
         allow_null=True,
@@ -53,9 +58,18 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = User
-        fields = [
-            'username', 'role', 'brands', 'password',
-        ]
+        fields = ['username', 'role', 'brands', 'password']
+
+    def validate_username(self, value):
+        v = validate_username(value)
+        if User.objects.filter(username__iexact=v).exists():
+            raise serializers.ValidationError('A user with this username already exists.')
+        return v
+
+    def validate_password(self, value):
+        validate_password_strength(value)
+        dj_validate_password(value)
+        return value
 
     def validate(self, attrs):
         role      = attrs.get('role')
@@ -102,6 +116,18 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'brands': 'RM users must be assigned to at least one brand'}
             )
+        # Prevent admins from removing their own admin role / deactivating themselves
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        if request and self.instance and request.user.pk == self.instance.pk:
+            new_active = attrs.get('is_active', self.instance.is_active)
+            if new_active is False:
+                raise serializers.ValidationError(
+                    {'is_active': "You cannot deactivate your own account."}
+                )
+            if role and role_name != (self.instance.role.name.lower() if self.instance.role_id else None):
+                raise serializers.ValidationError(
+                    {'role': "You cannot change your own role."}
+                )
         return attrs
 
     def update(self, instance, validated_data):

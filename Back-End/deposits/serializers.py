@@ -1,5 +1,8 @@
 from rest_framework import serializers
 
+from common.file_validators import validate_slip
+from common.validators import validate_text
+
 from master.serializers import GatewaySerializer
 from .models import DepositLog, DepositNotification
 
@@ -58,6 +61,26 @@ class DepositLogSerializer(serializers.ModelSerializer):
             return f'{obj.bank_account.bank_name} – {obj.bank_account.account_number}'
         return None
 
+    def validate_slip(self, value):
+        if value is None:
+            return value
+        validate_slip(value, field='Deposit slip')
+        return value
+
+    def validate_review_slip(self, value):
+        if value is None:
+            return value
+        validate_slip(value, field='Review slip')
+        return value
+
+    def validate_comment(self, value):
+        return validate_text(value, field='Comment', max_length=2000, allow_blank=True)
+
+    def validate_gateway(self, value):
+        if value is not None and not value.is_active:
+            raise serializers.ValidationError('Selected gateway is inactive.')
+        return value
+
     def validate(self, attrs):
         channel_type = attrs.get('channel_type', getattr(self.instance, 'channel_type', None))
         qr_code      = attrs.get('qr_code',      getattr(self.instance, 'qr_code',      None))
@@ -70,6 +93,19 @@ class DepositLogSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'upi_source': 'A UPI Source must be selected for channel type "upi".'})
         if channel_type == DepositLog.CHANNEL_BANK and not bank_account:
             raise serializers.ValidationError({'bank_account': 'A Bank Account must be selected for channel type "bank".'})
+
+        # Selected channel must be active
+        for src, label in ((qr_code, 'QR Code'), (upi_source, 'UPI source'), (bank_account, 'Bank account')):
+            if src is not None and hasattr(src, 'is_active') and not src.is_active:
+                raise serializers.ValidationError(f'Selected {label} is inactive.')
+
+        # Slip status consistency
+        slip        = attrs.get('slip',        getattr(self.instance, 'slip',        None))
+        slip_status = attrs.get('slip_status', getattr(self.instance, 'slip_status', None))
+        if slip_status == DepositLog.SLIP_ADDED and not slip:
+            raise serializers.ValidationError(
+                {'slip': 'A slip file is required when slip_status is "added".'}
+            )
 
         # Clear irrelevant FK fields to keep data clean
         if channel_type != DepositLog.CHANNEL_QR:

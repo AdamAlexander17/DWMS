@@ -16,7 +16,6 @@ import Withdrawals  from './pages/Withdrawals'
 import WithdrawalHistory from './pages/WithdrawalHistory'
 import AuditLogs    from './pages/AuditLogs'
 import Gateways     from './pages/Gateways'
-import Profile      from './pages/Profile'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } })
 
@@ -100,12 +99,6 @@ function AppRoutes() {
       <Route path="/gateways" element={
         <ProtectedRoute roles={['admin']}>
           <Layout><Gateways /></Layout>
-        </ProtectedRoute>
-      } />
-
-      <Route path="/profile" element={
-        <ProtectedRoute>
-          <Layout><Profile /></Layout>
         </ProtectedRoute>
       } />
 

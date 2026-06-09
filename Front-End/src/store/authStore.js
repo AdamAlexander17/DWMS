@@ -7,6 +7,8 @@ export const useAuthStore = create(
       user:         null,
       accessToken:  null,
       refreshToken: null,
+      profileDrawerOpen:  false,
+      profileForceChange: false,
 
       setAuth: ({ user, access, refresh }) =>
         set({ user, accessToken: access, refreshToken: refresh }),
@@ -14,9 +16,19 @@ export const useAuthStore = create(
       setAccessToken: (token) => set({ accessToken: token }),
 
       clearMustChangePassword: () =>
-        set((s) => ({ user: s.user ? { ...s.user, must_change_password: false } : s.user })),
+        set((s) => ({
+          user: s.user ? { ...s.user, must_change_password: false } : s.user,
+          profileForceChange: false,
+        })),
 
-      logout: () => set({ user: null, accessToken: null, refreshToken: null }),
+      openProfile:  (opts = {}) => set({ profileDrawerOpen: true, profileForceChange: !!opts.force }),
+      closeProfile: () => {
+        const { profileForceChange } = get()
+        if (profileForceChange) return   // cannot close while forced
+        set({ profileDrawerOpen: false })
+      },
+
+      logout: () => set({ user: null, accessToken: null, refreshToken: null, profileDrawerOpen: false, profileForceChange: false }),
 
       /**
        * Check if the current user's role has the given permission.
@@ -31,6 +43,9 @@ export const useAuthStore = create(
         return !!perms[module]?.[action]
       },
     }),
-    { name: 'dwms-auth' }
+    {
+      name: 'dwms-auth',
+      partialize: (s) => ({ user: s.user, accessToken: s.accessToken, refreshToken: s.refreshToken }),
+    }
   )
 )

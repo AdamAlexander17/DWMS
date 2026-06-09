@@ -1,6 +1,6 @@
 ﻿import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, Search, LockKeyhole, X, Clock, Calendar, ChevronDown, ChevronUp, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Plus, SquarePen, Trash2, Search, LockKeyhole, X, Clock, Calendar, ChevronDown, ChevronUp, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getUsers, createUser, updateUser, deleteUser, activateUser, deactivateUser, resetPassword, bulkImportUsers } from '../api/users'
 import { getBrands } from '../api/brands'
 import { getRoles } from '../api/roles'
@@ -9,8 +9,13 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Badge from '../components/ui/Badge'
 import Pagination from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
+import {
+  username as vUsername,
+  strongPassword as vStrongPw,
+  extractApiErrors,
+} from '../utils/validators'
 
-function UserModal({ initial, brands, roles, onSubmit, onClose, loading }) {
+function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErrors = {} }) {
   const isEdit = !!initial
   const [form, setForm] = useState({
     username: initial?.username ?? '',
@@ -18,6 +23,26 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading }) {
     brands:   (initial?.brands ?? []).map(String),
     password: '123456',
   })
+  const [localErrors, setLocalErrors] = useState({})
+
+  const errors = { ...apiErrors, ...localErrors }
+
+  const clearErr = (k) => setLocalErrors(p => ({ ...p, [k]: undefined }))
+
+  const validate = () => {
+    const errs = {}
+    if (!isEdit) {
+      const u = vUsername(form.username)
+      if (u) errs.username = u
+    }
+    if (!form.role) errs.role = 'Please select a role.'
+    const roleObj = roles.find(r => String(r.id) === String(form.role))
+    if (roleObj && roleObj.name.toLowerCase() === 'rm' && form.brands.length === 0) {
+      errs.brands = 'RM users must be assigned to at least one brand.'
+    }
+    setLocalErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const toggleBrand = (id) => {
     const sid = String(id)
@@ -25,29 +50,30 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading }) {
       ...p,
       brands: p.brands.includes(sid) ? p.brands.filter(b => b !== sid) : [...p.brands, sid],
     }))
+    clearErr('brands')
   }
 
   const roleLabel = (r) => r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/30 px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
 
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 rounded-t-2xl bg-accent">
           <div>
             <h2 className="text-base font-bold text-white">{isEdit ? 'Edit User' : 'Add User'}</h2>
-            <p className="text-xs text-white/60 mt-0.5">
+            <p className="text-xs text-white/70 mt-0.5">
               {isEdit ? 'Update the details for this user account' : 'Fill in the details to create a new user account'}
             </p>
           </div>
-          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors ml-4 mt-0.5">
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors ml-4 mt-0.5 p-1 rounded-lg hover:bg-white/10">
             <X size={18} />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="px-6 py-5 space-y-5">
+        <form onSubmit={(e) => { e.preventDefault(); if (validate()) onSubmit(form) }} className="px-6 py-5 space-y-5">
 
           {/* Username + Default Password */}
           <div className="grid grid-cols-2 gap-4">
@@ -56,13 +82,15 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading }) {
                 Username <span className="text-red-500">*</span>
               </label>
               <input
-                className="input"
+                className={`input ${errors.username ? 'border-red-300' : ''}`}
                 placeholder="Enter username"
                 value={form.username}
-                onChange={(e) => setForm(p => ({ ...p, username: e.target.value }))}
+                onChange={(e) => { setForm(p => ({ ...p, username: e.target.value })); clearErr('username') }}
                 required
                 disabled={isEdit}
+                maxLength={50}
               />
+              {errors.username && <p className="mt-1 text-xs text-red-600">{errors.username}</p>}
             </div>
             {!isEdit && (
               <div>
@@ -80,7 +108,7 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading }) {
           {/* Brands */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2 pb-2 border-b border-gray-200">
-              Brands <span className="text-red-500">*</span>
+              Brands {roles.find(r => String(r.id) === String(form.role))?.name?.toLowerCase() === 'rm' && <span className="text-red-500">*</span>}
             </label>
             <div className="flex flex-wrap gap-2">
               {brands.map(b => {
@@ -100,6 +128,7 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading }) {
                 )
               })}
             </div>
+            {errors.brands && <p className="mt-1 text-xs text-red-600">{errors.brands}</p>}
             <p className="text-xs text-gray-400 mt-2">
               The new user will only see data belonging to the selected brand(s).
             </p>
@@ -116,7 +145,7 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading }) {
                 return (
                   <button
                     key={r.id} type="button"
-                    onClick={() => setForm(p => ({ ...p, role: String(r.id) }))}
+                    onClick={() => { setForm(p => ({ ...p, role: String(r.id) })); clearErr('role') }}
                     className={`px-4 py-1.5 rounded-lg border text-sm font-medium transition-all
                       ${sel
                         ? 'bg-accent text-white border-accent shadow-sm'
@@ -128,7 +157,14 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading }) {
                 )
               })}
             </div>
+            {errors.role && <p className="mt-1 text-xs text-red-600">{errors.role}</p>}
           </div>
+
+          {errors.non_field && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">
+              {errors.non_field}
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-3 border-t border-gray-100">
@@ -179,16 +215,16 @@ function BulkImportModal({ onClose, onSuccess }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/30 px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
 
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 rounded-t-2xl bg-accent">
           <div>
             <h2 className="text-base font-bold text-white">Bulk Import Users</h2>
-            <p className="text-xs text-white/60 mt-0.5">Upload a CSV or Excel file to create multiple users at once</p>
+            <p className="text-xs text-white/70 mt-0.5">Upload a CSV or Excel file to create multiple users at once</p>
           </div>
-          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors ml-4 mt-0.5"><X size={18} /></button>
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors ml-4 mt-0.5 p-1 rounded-lg hover:bg-white/10"><X size={18} /></button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
@@ -265,14 +301,75 @@ function BulkImportModal({ onClose, onSuccess }) {
   )
 }
 
-function ResetPwForm({ onSubmit, loading }) {
+function ResetPwForm({ onSubmit, loading, apiErrors = {} }) {
   const [pw, setPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [show, setShow] = useState(false)
+  const [localErr, setLocalErr] = useState({})
+
+  const errors = { ...apiErrors, ...localErr }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const errs = {}
+    const pwErr = vStrongPw(pw)
+    if (pwErr) errs.new_password = pwErr
+    if (!confirmPw) errs.confirm = 'Please confirm the password.'
+    else if (confirmPw !== pw) errs.confirm = 'Passwords do not match.'
+    setLocalErr(errs)
+    if (Object.keys(errs).length === 0) onSubmit(pw)
+  }
+
+  // Live strength feedback
+  const rules = [
+    { label: '8+ characters',          ok: pw.length >= 8 },
+    { label: 'Uppercase letter',       ok: /[A-Z]/.test(pw) },
+    { label: 'Lowercase letter',       ok: /[a-z]/.test(pw) },
+    { label: 'Digit',                  ok: /\d/.test(pw) },
+    { label: 'Symbol',                 ok: /[^A-Za-z0-9]/.test(pw) },
+  ]
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(pw) }} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
-        <input type="password" className="input" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
+        <div className="relative">
+          <input
+            type={show ? 'text' : 'password'}
+            className={`input pr-16 ${errors.new_password ? 'border-red-300' : ''}`}
+            value={pw}
+            onChange={(e) => { setPw(e.target.value); setLocalErr(p => ({ ...p, new_password: undefined })) }}
+            maxLength={128}
+          />
+          <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500 hover:text-gray-700">
+            {show ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        {errors.new_password && <p className="mt-1 text-xs text-red-600">{errors.new_password}</p>}
       </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
+        <input
+          type={show ? 'text' : 'password'}
+          className={`input ${errors.confirm ? 'border-red-300' : ''}`}
+          value={confirmPw}
+          onChange={(e) => { setConfirmPw(e.target.value); setLocalErr(p => ({ ...p, confirm: undefined })) }}
+          maxLength={128}
+        />
+        {errors.confirm && <p className="mt-1 text-xs text-red-600">{errors.confirm}</p>}
+      </div>
+      {pw && (
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          {rules.map(r => (
+            <li key={r.label} className={`flex items-center gap-1.5 ${r.ok ? 'text-green-600' : 'text-gray-400'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${r.ok ? 'bg-green-500' : 'bg-gray-300'}`} />{r.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      {errors.non_field && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{errors.non_field}</div>
+      )}
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
         {loading ? 'Resetting…' : 'Reset Password'}
       </button>
@@ -364,7 +461,7 @@ export default function Users() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <table className="w-full">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80 text-left">
               {['User', 'Brand', 'Roles', 'Status', 'Last Login'].map((h) => (
@@ -391,11 +488,11 @@ export default function Users() {
                 {/* User */}
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2.5">
-                    <div className={`w-8 h-8 rounded-full ${avatarColor(u.username)} flex items-center justify-center font-bold text-white text-xs shrink-0`}>
+                    <div className={`w-7 h-7 rounded-full ${avatarColor(u.username)} flex items-center justify-center font-bold text-white text-[11px] shrink-0`}>
                       {u.username[0].toUpperCase()}
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-800 text-xs leading-tight">{u.username}</p>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-800 text-xs leading-tight truncate">{u.username}</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">@{u.username}</p>
                     </div>
                   </div>
@@ -422,7 +519,7 @@ export default function Users() {
 
                 {/* Last Login */}
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-1.5 text-gray-400 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-gray-500 text-[11px]">
                     <Clock size={11} className="text-gray-300 shrink-0" />
                     {fmtDateTime(u.last_login)}
                   </div>
@@ -430,7 +527,7 @@ export default function Users() {
 
                 {/* Created */}
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-1.5 text-gray-400 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-gray-500 text-[11px]">
                     <Calendar size={11} className="text-gray-300 shrink-0" />
                     {fmtDate(u.created_at)}
                   </div>
@@ -440,7 +537,7 @@ export default function Users() {
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-1 justify-end">
                     <button onClick={() => setResetTarget(u)} title="Reset Password" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><LockKeyhole size={13} /></button>
-                    <button onClick={() => setModal({ mode: 'edit', data: u })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><Pencil size={13} /></button>
+                    <button onClick={() => setModal({ mode: 'edit', data: u })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><SquarePen size={13} /></button>
                     <button onClick={() => setDelTarget(u)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
                   </div>
                 </td>
@@ -462,14 +559,18 @@ export default function Users() {
           brands={brands}
           roles={roles}
           loading={createM.isPending || updateM.isPending}
+          apiErrors={extractApiErrors(createM.error || updateM.error || {})}
           onClose={() => setModal(null)}
           onSubmit={(vals) => modal?.mode === 'edit' ? updateM.mutate({ id: modal.data.id, d: vals }) : createM.mutate(vals)}
         />
       )}
-      {(createM.isError || updateM.isError) && null}
 
       <Modal open={!!resetTarget} onClose={() => setResetTarget(null)} title={`Reset Password — ${resetTarget?.username}`} size="sm">
-        <ResetPwForm loading={resetM.isPending} onSubmit={(pw) => resetM.mutate({ id: resetTarget.id, pw })} />
+        <ResetPwForm
+          loading={resetM.isPending}
+          apiErrors={extractApiErrors(resetM.error || {})}
+          onSubmit={(pw) => resetM.mutate({ id: resetTarget.id, pw })}
+        />
       </Modal>
 
       <ConfirmDialog open={!!delTarget} onClose={() => setDelTarget(null)} onConfirm={() => deleteM.mutate(delTarget.id)}

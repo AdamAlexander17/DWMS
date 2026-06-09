@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login as apiLogin } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
+import { extractApiErrors } from '../utils/validators'
 
 /* Decorative bar-chart SVG (purely visual, mimics BMS chart bg) */
 function ChartDecoration() {
@@ -33,10 +34,20 @@ export default function Login() {
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  const validate = () => {
+    const errs = {}
+    if (!form.username.trim()) errs.username = 'Username is required.'
+    if (!form.password) errs.password = 'Password is required.'
+    setFieldErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    if (!validate()) return
     setLoading(true)
     try {
       const res = await apiLogin(form)
@@ -44,8 +55,13 @@ export default function Login() {
       setAuth({ user, access, refresh })
       navigate('/')
     } catch (err) {
+      const fe = extractApiErrors(err)
+      setFieldErrors({
+        ...(fe.username ? { username: fe.username } : {}),
+        ...(fe.password ? { password: fe.password } : {}),
+      })
       setError(
-        err.response?.data?.errors?.non_field_errors?.[0] ||
+        fe.non_field ||
         err.response?.data?.message ||
         'Invalid username or password'
       )
@@ -73,13 +89,14 @@ export default function Login() {
                 Username <span className="text-red-500">*</span>
               </label>
               <input
-                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition placeholder-gray-400"
+                className={`w-full border rounded-lg px-4 py-2.5 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition placeholder-gray-400 ${fieldErrors.username ? 'border-red-300' : 'border-gray-200'}`}
                 placeholder="admin"
                 value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
-                required
+                onChange={(e) => { setForm({ ...form, username: e.target.value }); if (fieldErrors.username) setFieldErrors({ ...fieldErrors, username: undefined }) }}
                 autoComplete="username"
+                maxLength={50}
               />
+              {fieldErrors.username && <p className="mt-1 text-xs text-red-600">{fieldErrors.username}</p>}
             </div>
 
             <div>
@@ -89,12 +106,12 @@ export default function Login() {
               <div className="relative">
                 <input
                   type={showPw ? 'text' : 'password'}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-16 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition placeholder-gray-400"
+                  className={`w-full border rounded-lg px-4 py-2.5 pr-16 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition placeholder-gray-400 ${fieldErrors.password ? 'border-red-300' : 'border-gray-200'}`}
                   placeholder="••••••••"
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required
+                  onChange={(e) => { setForm({ ...form, password: e.target.value }); if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined }) }}
                   autoComplete="current-password"
+                  maxLength={128}
                 />
                 <button
                   type="button"
@@ -104,6 +121,7 @@ export default function Login() {
                   {showPw ? 'Hide' : 'Show'}
                 </button>
               </div>
+              {fieldErrors.password && <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>}
             </div>
 
             {error && (

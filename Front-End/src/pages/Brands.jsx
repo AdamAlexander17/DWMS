@@ -1,21 +1,44 @@
 ﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Search, RefreshCw } from 'lucide-react'
+import { Plus, SquarePen, Trash2, Power, PowerOff, Search, RefreshCw } from 'lucide-react'
 import { getBrands, createBrand, updateBrand, deleteBrand, activateBrand, deactivateBrand } from '../api/brands'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Badge from '../components/ui/Badge'
 import Pagination from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
+import FormField from '../components/ui/FormField'
+import { brandName as vBrandName, extractApiErrors } from '../utils/validators'
 
-function BrandForm({ initial, onSubmit, loading }) {
+function BrandForm({ initial, onSubmit, loading, apiErrors = {} }) {
   const [name, setName] = useState(initial?.name ?? '')
+  const [error, setError] = useState(null)
+
+  // Surface server-side error if it arrives
+  const nameError = error || apiErrors.name
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const err = vBrandName(name)
+    if (err) { setError(err); return }
+    setError(null)
+    onSubmit({ name: name.toUpperCase().trim() })
+  }
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name }) }} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand Name</label>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. TK" required />
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <FormField label="Brand Name" required error={nameError} hint="2–50 uppercase characters (letters, digits, space, _ or -).">
+        <input
+          className={`input ${nameError ? 'border-red-300' : ''}`}
+          value={name}
+          onChange={(e) => { setName(e.target.value.toUpperCase()); if (error) setError(null) }}
+          placeholder="e.g. TK"
+          maxLength={50}
+        />
+      </FormField>
+      {apiErrors.non_field && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{apiErrors.non_field}</div>
+      )}
       <div className="flex gap-3 pt-2">
         <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center">
           {loading ? 'Saving…' : initial ? 'Update Brand' : 'Create Brand'}
@@ -77,7 +100,7 @@ export default function Brands() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
               <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider">Brand Name</th>
@@ -107,12 +130,12 @@ export default function Brands() {
                     <button
                       onClick={() => toggleM.mutate({ id: b.id, active: b.is_active })}
                       title={b.is_active ? 'Deactivate' : 'Activate'}
-                      className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors ${b.is_active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
                     >
-                      {b.is_active ? <CheckCircle size={13} /> : <XCircle size={13} />}
+                      {b.is_active ? <PowerOff size={13} /> : <Power size={13} />}
                     </button>
-                    <button onClick={() => setModal({ mode: 'edit', data: b })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
-                      <Pencil size={12} />
+                    <button onClick={() => setModal({ mode: 'edit', data: b })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                      <SquarePen size={12} />
                     </button>
                     <button onClick={() => setDelTarget(b)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
                       <Trash2 size={12} />
@@ -132,16 +155,12 @@ export default function Brands() {
         <BrandForm
           initial={modal?.data}
           loading={createM.isPending || updateM.isPending}
+          apiErrors={extractApiErrors(createM.error || updateM.error || {})}
           onSubmit={(vals) => {
             if (modal?.mode === 'edit') updateM.mutate({ id: modal.data.id, d: vals })
             else createM.mutate(vals)
           }}
         />
-        {(createM.isError || updateM.isError) && (
-          <p className="text-red-500 text-sm mt-3">
-            {createM.error?.response?.data?.message || updateM.error?.response?.data?.message || 'An error occurred'}
-          </p>
-        )}
       </Modal>
 
       {/* Delete confirm */}

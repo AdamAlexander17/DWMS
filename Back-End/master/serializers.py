@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from common.validators import validate_brand_name
+
 from .models import Gateway
 
 
@@ -16,8 +18,8 @@ class GatewayWriteSerializer(serializers.ModelSerializer):
         fields = ['name']
 
     def validate_name(self, value: str) -> str:
-        value = value.upper().strip()
-        qs = Gateway.objects.filter(name=value)
+        value = validate_brand_name(value)
+        qs = Gateway.objects.filter(name__iexact=value)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():

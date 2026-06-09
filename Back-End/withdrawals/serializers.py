@@ -1,5 +1,13 @@
 from rest_framework import serializers
 
+from common.file_validators import validate_attachment, validate_slip
+from common.validators import (
+    validate_client_arc_id,
+    validate_positive_amount,
+    validate_safe_name,
+    validate_text,
+)
+
 from .models import Withdrawal, WithdrawalMessage, WithdrawalNotification
 
 
@@ -52,10 +60,22 @@ class WithdrawalSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
 
+    def validate_client_arc_id(self, value):
+        return validate_client_arc_id(value)
+
+    def validate_client_name(self, value):
+        return validate_safe_name(value, field='Client name', max_length=150)
+
+    def validate_amount(self, value):
+        return validate_positive_amount(value, field='Amount')
+
+    def validate_comment(self, value):
+        return validate_text(value, field='Comment', max_length=2000, allow_blank=True)
+
 
 class WithdrawalReviewSerializer(serializers.Serializer):
     action         = serializers.ChoiceField(choices=['approve', 'reject'])
-    review_message = serializers.CharField(required=False, allow_blank=True)
+    review_message = serializers.CharField(required=False, allow_blank=True, max_length=1000)
 
     def validate(self, attrs):
         if attrs['action'] == 'reject' and not attrs.get('review_message', '').strip():
@@ -67,20 +87,28 @@ class WithdrawalReviewSerializer(serializers.Serializer):
 
 class UploadSlipSerializer(serializers.Serializer):
     slip = serializers.FileField()
-    note = serializers.CharField(required=False, allow_blank=True, default='')
+    note = serializers.CharField(required=False, allow_blank=True, default='', max_length=1000)
+
+    def validate_slip(self, value):
+        validate_slip(value, field='Slip')
+        return value
+
+    def validate_note(self, value):
+        return validate_text(value, field='Note', max_length=1000, allow_blank=True)
 
 
 class NotReceivedSerializer(serializers.Serializer):
-    followup_remarks = serializers.CharField()
+    followup_remarks = serializers.CharField(max_length=2000)
 
     def validate_followup_remarks(self, v):
-        if not v.strip():
-            raise serializers.ValidationError('Remarks are required.')
-        return v
+        return validate_text(v, field='Remarks', max_length=2000, min_length=3, allow_blank=False)
 
 
 class EmailSentSerializer(serializers.Serializer):
-    bank_followup_note = serializers.CharField(required=False, allow_blank=True, default='')
+    bank_followup_note = serializers.CharField(required=False, allow_blank=True, default='', max_length=2000)
+
+    def validate_bank_followup_note(self, v):
+        return validate_text(v, field='Note', max_length=2000, allow_blank=True)
 
 
 class WithdrawalNotificationSerializer(serializers.ModelSerializer):
@@ -127,18 +155,37 @@ class WithdrawalMessageSerializer(serializers.ModelSerializer):
 
 
 class PostMessageSerializer(serializers.Serializer):
-    message       = serializers.CharField(required=False, allow_blank=True, default='')
+    message       = serializers.CharField(required=False, allow_blank=True, default='', max_length=5000)
     attachment    = serializers.FileField(required=False, allow_null=True)
     is_protected  = serializers.BooleanField(required=False, default=False)
-    password_hint = serializers.CharField(required=False, allow_blank=True, default='')
+    password_hint = serializers.CharField(required=False, allow_blank=True, default='', max_length=200)
+
+    def validate_message(self, value):
+        return validate_text(value, field='Message', max_length=5000, allow_blank=True)
+
+    def validate_password_hint(self, value):
+        return validate_text(value, field='Password hint', max_length=200, allow_blank=True)
+
+    def validate_attachment(self, value):
+        if value is None:
+            return value
+        validate_attachment(value, field='Attachment')
+        return value
 
     def validate(self, attrs):
         msg = (attrs.get('message') or '').strip()
         att = attrs.get('attachment')
         if not msg and not att:
             raise serializers.ValidationError('Please type a message or attach a file.')
+        if attrs.get('is_protected') and not att:
+            raise serializers.ValidationError(
+                {'is_protected': 'A protected message must include an attachment.'}
+            )
         return attrs
 
 
 class ManualCloseSerializer(serializers.Serializer):
-    note = serializers.CharField(required=False, allow_blank=True, default='')
+    note = serializers.CharField(required=False, allow_blank=True, default='', max_length=1000)
+
+    def validate_note(self, value):
+        return validate_text(value, field='Note', max_length=1000, allow_blank=True)

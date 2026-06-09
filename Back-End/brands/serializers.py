@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from common.validators import validate_brand_name
+
 from .models import Brand
 
 
@@ -18,4 +20,10 @@ class BrandWriteSerializer(serializers.ModelSerializer):
         fields = ['name']
 
     def validate_name(self, value: str) -> str:
-        return value.upper().strip()
+        name = validate_brand_name(value)
+        qs = Brand.objects.filter(name__iexact=name)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('A brand with this name already exists.')
+        return name

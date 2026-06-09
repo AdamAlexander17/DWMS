@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/', include('deposits.urls')),
     path('api/', include('withdrawals.urls')),
     path('api/', include('audit_logs.urls')),
+    path('api/', include('common.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # Serve media files in development

@@ -1,39 +1,47 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Power, PowerOff } from 'lucide-react'
-import { getGateways, createGateway, updateGateway, activateGateway, deactivateGateway } from '../api/master'
+import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
+import { getGateways, createGateway, updateGateway, activateGateway, deactivateGateway, deleteGateway } from '../api/master'
 import Modal         from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
+import { brandName as vBrandName, extractApiErrors } from '../utils/validators'
 
 // ── Form ──────────────────────────────────────────────────────────────────
-function GatewayForm({ initial, onSubmit, loading, error }) {
+function GatewayForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const [name, setName] = useState(initial?.name ?? '')
+  const [local, setLocal] = useState({})
+  const errors = { ...apiErrors, ...local }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const nameErr = vBrandName(name)
+    if (nameErr) { setLocal({ name: nameErr }); return }
+    setLocal({})
+    onSubmit({ name: name.trim() })
+  }
 
   return (
-    <form
-      onSubmit={(e) => { e.preventDefault(); onSubmit({ name }) }}
-      className="space-y-4"
-    >
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Gateway Name *
+          Gateway Name <span className="text-red-500">*</span>
         </label>
         <input
-          className="input"
+          className={`input ${errors.name ? 'border-red-300' : ''}`}
           placeholder="e.g. PG1"
           value={name}
-          onChange={(e) => setName(e.target.value.toUpperCase())}
-          required
+          onChange={(e) => { setName(e.target.value.toUpperCase()); if (local.name) setLocal({}) }}
           maxLength={50}
         />
-        <p className="mt-1 text-xs text-gray-400">Name will be saved in uppercase.</p>
+        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+        <p className="mt-1 text-xs text-gray-400">2–50 characters. Letters, digits, space, &amp; - _ allowed. Saved in uppercase.</p>
       </div>
 
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {(error || errors.non_field) && <p className="text-red-500 text-sm">{errors.non_field || error}</p>}
 
       <button
         type="submit"
-        disabled={loading || !name.trim()}
+        disabled={loading}
         className="btn-primary w-full justify-center"
       >
         {loading ? 'Saving…' : initial ? 'Save Changes' : 'Add Gateway'}
@@ -45,8 +53,10 @@ function GatewayForm({ initial, onSubmit, loading, error }) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function Gateways() {
   const qc = useQueryClient()
-  const [modal,     setModal]     = useState(null)   // { mode: 'create' | 'edit', data? }
-  const [toggleTarget, setToggleTarget] = useState(null) // gateway to activate/deactivate
+  const [modal,     setModal]     = useState(null)
+  const [toggleTarget, setToggleTarget] = useState(null)
+  const [delTarget,    setDelTarget]    = useState(null)
+  const [search, setSearch] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['master-gateways-all'],
@@ -56,6 +66,9 @@ export default function Gateways() {
   // For the management page show ALL gateways (active + inactive) — fetch without filter
   // The API only returns active ones, so we manage via the admin page using activate/deactivate
   const gateways = data?.data?.data ?? []
+  const filtered  = search.trim()
+    ? gateways.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
+    : gateways
 
   const inv = () => qc.invalidateQueries({ queryKey: ['master-gateways'] })
              + qc.invalidateQueries({ queryKey: ['master-gateways-all'] })
@@ -64,6 +77,7 @@ export default function Gateways() {
   const updateM     = useMutation({ mutationFn: ({ id, d }) => updateGateway(id, d),         onSuccess: () => { inv(); setModal(null) } })
   const activateM   = useMutation({ mutationFn: activateGateway,                             onSuccess: () => { inv(); setToggleTarget(null) } })
   const deactivateM = useMutation({ mutationFn: deactivateGateway,                           onSuccess: () => { inv(); setToggleTarget(null) } })
+  const deleteM     = useMutation({ mutationFn: deleteGateway,                                onSuccess: () => { inv(); setDelTarget(null) } })
 
   const createErr = createM.error?.response?.data?.message || (createM.isError ? 'Failed to create gateway.' : null)
   const updateErr = updateM.error?.response?.data?.message || (updateM.isError ? 'Failed to update gateway.' : null)
@@ -81,9 +95,22 @@ export default function Gateways() {
         </button>
       </div>
 
+      {/* Search bar */}
+      <div className="card py-3 px-4">
+        <div className="relative max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input pl-9"
+            placeholder="Search gateway name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
               {['#', 'Name', 'Status', 'Created', 'Actions'].map((h) => (
@@ -97,26 +124,26 @@ export default function Gateways() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {!isLoading && gateways.length === 0 && (
+            {!isLoading && filtered.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">
-                  No gateways yet. Click "Add Gateway" to create one.
+                  {search ? 'No gateways match your search.' : 'No gateways yet. Click "Add Gateway" to create one.'}
                 </td>
               </tr>
             )}
-            {gateways.map((gw) => (
+            {filtered.map((gw) => (
               <tr key={gw.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-3 text-xs text-gray-400">{gw.id}</td>
                 <td className="px-4 py-3">
-                  <span className="bg-accent/10 text-accent-dark text-xs font-bold px-2.5 py-1 rounded-md">
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">
                     {gw.name}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${
                     gw.is_active
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-500'
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-gray-100 text-gray-500 border-gray-200'
                   }`}>
                     {gw.is_active ? 'Active' : 'Inactive'}
                   </span>
@@ -128,21 +155,24 @@ export default function Gateways() {
                   <div className="flex items-center gap-1.5 justify-end">
                     <button
                       onClick={() => setModal({ mode: 'edit', data: gw })}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                       title="Edit"
                     >
-                      <Pencil size={12} />
+                      <SquarePen size={12} />
                     </button>
                     <button
                       onClick={() => setToggleTarget(gw)}
-                      className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
-                        gw.is_active
-                          ? 'bg-amber-50 text-amber-500 hover:bg-amber-100'
-                          : 'bg-green-50 text-green-500 hover:bg-green-100'
-                      }`}
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
                       title={gw.is_active ? 'Deactivate' : 'Activate'}
                     >
                       {gw.is_active ? <PowerOff size={12} /> : <Power size={12} />}
+                    </button>
+                    <button
+                      onClick={() => setDelTarget(gw)}
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </td>
@@ -157,6 +187,7 @@ export default function Gateways() {
         <GatewayForm
           loading={createM.isPending}
           error={createErr}
+          apiErrors={extractApiErrors(createM.error || {})}
           onSubmit={(vals) => createM.mutate(vals)}
         />
       </Modal>
@@ -167,9 +198,20 @@ export default function Gateways() {
           initial={modal?.data}
           loading={updateM.isPending}
           error={updateErr}
+          apiErrors={extractApiErrors(updateM.error || {})}
           onSubmit={(vals) => updateM.mutate({ id: modal.data.id, d: vals })}
         />
       </Modal>
+
+      {/* Delete Confirm */}
+      <ConfirmDialog
+        open={!!delTarget}
+        onClose={() => setDelTarget(null)}
+        onConfirm={() => deleteM.mutate(delTarget.id)}
+        loading={deleteM.isPending}
+        title="Delete Gateway"
+        message={`Delete "${delTarget?.name}"? This action cannot be undone.`}
+      />
 
       {/* Activate / Deactivate Confirm */}
       <ConfirmDialog

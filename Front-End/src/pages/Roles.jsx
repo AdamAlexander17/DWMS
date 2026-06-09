@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState, useCallback } from 'react';
-import { Shield, Plus, Edit2, Trash2, CheckCircle, XCircle, Lock, Search, X } from 'lucide-react';
+import { Shield, Plus, SquarePen, Trash2, CheckCircle, XCircle, Lock, Search, X, Power, PowerOff } from 'lucide-react';
 import {
   getRoles, getRole, createRole, updateRole, deleteRole,
   activateRole, deactivateRole, getModules,
@@ -158,14 +158,19 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
   const [saving,        setSaving]        = useState(false);
   const [loadingPerms,  setLoadingPerms]  = useState(false);
 
-  // Always fetch fresh modules inside the modal so checkboxes always appear
+  // Always fetch modules fresh on mount so checkboxes always appear
   useEffect(() => {
-    if (!propModules?.length) {
-      getModules().then((res) => setLocalModules(res.data?.data ?? []));
-    } else {
+    if (propModules?.length) {
       setLocalModules(propModules);
     }
-  }, [propModules]);
+    getModules()
+      .then((res) => {
+        const mods = res.data?.data ?? [];
+        if (mods.length) setLocalModules(mods);
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isEdit && role?.id) {
@@ -188,6 +193,12 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
   const validate = () => {
     const errs = {};
     if (!form.name.trim()) errs.name = 'Role name is required';
+    else if (!/^[A-Za-z][A-Za-z0-9 _-]{1,49}$/.test(form.name.trim())) {
+      errs.name = 'Role name must be 2–50 chars, start with a letter, and contain only letters, digits, space, underscore or hyphen.';
+    }
+    if (form.description && form.description.length > 500) {
+      errs.description = 'Description must be at most 500 characters.';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -197,7 +208,7 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
     if (!validate()) return;
     setSaving(true);
     try {
-      const payload = { ...form, permissions };
+      const payload = { ...form, name: form.name.trim(), permissions };
       if (isEdit) {
         await updateRole(role.id, payload);
       } else {
@@ -206,8 +217,16 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
       onSave();
     } catch (err) {
       const data = err.response?.data;
-      if (data?.errors) setErrors(data.errors);
-      else setErrors({ name: data?.message || 'Something went wrong' });
+      const apiErrs = data?.errors;
+      if (apiErrs && typeof apiErrs === 'object') {
+        const mapped = {};
+        for (const [k, v] of Object.entries(apiErrs)) {
+          mapped[k] = Array.isArray(v) ? v[0] : String(v);
+        }
+        setErrors(mapped);
+      } else {
+        setErrors({ name: data?.message || 'Something went wrong' });
+      }
     } finally {
       setSaving(false);
     }
@@ -217,18 +236,18 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
     sum + ACTIONS.filter((a) => p[`can_${a}`]).length, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/30 px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[92vh]">
 
-        {/* Header — accent blue */}
-        <div className="flex items-center justify-between px-4 py-2.5 rounded-t-2xl bg-accent">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 rounded-t-2xl bg-accent">
           <div>
             <h2 className="text-base font-bold text-white">
               {isEdit ? 'Edit Role' : 'Create New Role'}
             </h2>
-            <p className="text-xs text-white/60 mt-0.5">Define role permissions and access levels</p>
+            <p className="text-xs text-white/70 mt-0.5">Define role permissions and access levels</p>
           </div>
-          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors"><X size={18} /></button>
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10"><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
@@ -281,8 +300,10 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
                   value={form.description}
                   onChange={handleField}
                   placeholder="Brief description of the role"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+                  maxLength={500}
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 ${errors.description ? 'border-red-400' : 'border-gray-300'}`}
                 />
+                {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
               </div>
             </div>
 
@@ -432,7 +453,7 @@ export default function Roles() {
         {loading ? (
           <div className="p-12 text-center text-gray-400">Loading…</div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-left">
                 {['Role', 'Description', 'Permissions', 'Status', 'System', 'Actions'].map((h) => (
@@ -455,11 +476,11 @@ export default function Roles() {
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     {role.is_active ? (
-                      <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                      <span className="inline-flex items-center justify-center gap-1 min-w-[64px] bg-green-50 text-green-700 border border-green-200 rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
                         <CheckCircle size={10} /> Active
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                      <span className="inline-flex items-center justify-center gap-1 min-w-[64px] bg-red-50 text-red-600 border border-red-200 rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
                         <XCircle size={10} /> Inactive
                       </span>
                     )}
@@ -476,14 +497,14 @@ export default function Roles() {
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-1.5">
                       <button onClick={() => handleToggleActive(role)}
-                        className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors ${role.is_active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
                         title={role.is_active ? 'Deactivate' : 'Activate'}>
-                        {role.is_active ? <CheckCircle size={13} /> : <XCircle size={13} />}
+                        {role.is_active ? <PowerOff size={13} /> : <Power size={13} />}
                       </button>
                       <button onClick={() => setModal({ mode: 'edit', role })}
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                         title="Edit role">
-                        <Edit2 size={12} />
+                        <SquarePen size={12} />
                       </button>
                       <button onClick={() => setDelConfirm(role)}
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
@@ -511,7 +532,7 @@ export default function Roles() {
 
       {/* Delete confirmation */}
       {delConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/30">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
             <h3 className="text-lg font-bold text-gray-800 mb-2">Delete Role</h3>
             <p className="text-sm text-gray-600 mb-5">

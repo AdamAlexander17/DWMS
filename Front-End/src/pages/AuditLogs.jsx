@@ -6,12 +6,12 @@ import Pagination from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
 
 const moduleColors = {
-  Auth:  'bg-purple-100 text-purple-700',
-  User:  'bg-blue-100 text-blue-700',
-  Brand: 'bg-amber-100 text-amber-700',
-  'QR Code':       'bg-green-100 text-green-700',
-  UPI:             'bg-cyan-100 text-cyan-700',
-  'Bank Account':  'bg-rose-100 text-rose-700',
+  Auth:  'bg-purple-50 text-purple-700 border-purple-200',
+  User:  'bg-blue-50 text-blue-700 border-blue-200',
+  Brand: 'bg-amber-50 text-amber-700 border-amber-200',
+  'QR Code':       'bg-green-50 text-green-700 border-green-200',
+  UPI:             'bg-cyan-50 text-cyan-700 border-cyan-200',
+  'Bank Account':  'bg-rose-50 text-rose-700 border-rose-200',
 }
 
 export default function AuditLogs() {
@@ -49,7 +49,7 @@ export default function AuditLogs() {
       </div>
 
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left">
               {['Time', 'User', 'Module', 'Action', 'IP Address'].map((h) => (
@@ -68,7 +68,7 @@ export default function AuditLogs() {
                   <p className="font-medium text-gray-800">@{log.username || 'system'}</p>
                 </td>
                 <td className="px-4 py-2.5">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${moduleColors[log.module] || 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${moduleColors[log.module] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                     {log.module}
                   </span>
                 </td>
