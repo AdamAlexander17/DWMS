@@ -463,9 +463,9 @@ export default function Users() {
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50/80 text-left">
+            <tr className="border-b border-gray-100 bg-gray-50/80 text-center">
               {['User', 'Brand', 'Roles', 'Status', 'Last Login'].map((h) => (
-                <th key={h} className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider">{h}</th>
+                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'User' ? 'text-left' : ''}`}>{h}</th>
               ))}
               <th
                 className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider cursor-pointer select-none"
@@ -499,15 +499,15 @@ export default function Users() {
                 </td>
 
                 {/* Brand */}
-                <td className="px-4 py-2.5 text-gray-500 text-xs">
+                <td className="px-4 py-2.5 text-gray-500 text-xs text-center">
                   {u.brands_detail?.length ? u.brands_detail.map(b => b.name).join(', ') : <span className="text-gray-300">—</span>}
                 </td>
 
                 {/* Roles */}
-                <td className="px-4 py-2.5"><Badge variant={u.role_name} /></td>
+                <td className="px-4 py-2.5 text-center"><Badge variant={u.role_name} /></td>
 
                 {/* Status — toggle switch */}
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 text-center">
                   <button
                     onClick={() => toggleM.mutate({ id: u.id, active: u.is_active })}
                     title={u.is_active ? 'Deactivate' : 'Activate'}
@@ -518,16 +518,16 @@ export default function Users() {
                 </td>
 
                 {/* Last Login */}
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-1.5 text-gray-500 text-[11px]">
+                <td className="px-4 py-2.5 text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-gray-500 text-[11px]">
                     <Clock size={11} className="text-gray-300 shrink-0" />
                     {fmtDateTime(u.last_login)}
                   </div>
                 </td>
 
                 {/* Created */}
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-1.5 text-gray-500 text-[11px]">
+                <td className="px-4 py-2.5 text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-gray-500 text-[11px]">
                     <Calendar size={11} className="text-gray-300 shrink-0" />
                     {fmtDate(u.created_at)}
                   </div>

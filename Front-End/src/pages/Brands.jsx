@@ -102,8 +102,8 @@ export default function Brands() {
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider">Brand Name</th>
+            <tr className="border-b border-gray-100 bg-gray-50 text-center">
+              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-left">Brand Name</th>
               <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider">Status</th>
               <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider">Created</th>
               <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
@@ -123,8 +123,8 @@ export default function Brands() {
                     <span className="font-semibold text-gray-800">{b.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-2.5"><Badge variant={b.is_active ? 'active' : 'inactive'} /></td>
-                <td className="px-4 py-2.5 text-gray-500 text-xs">{new Date(b.created_at).toLocaleDateString()}</td>
+                <td className="px-4 py-2.5 text-center"><Badge variant={b.is_active ? 'active' : 'inactive'} /></td>
+                <td className="px-4 py-2.5 text-gray-500 text-xs text-center">{new Date(b.created_at).toLocaleDateString()}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-1.5 justify-end">
                     <button

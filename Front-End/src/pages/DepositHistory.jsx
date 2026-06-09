@@ -119,9 +119,9 @@ export default function DepositHistory() {
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left">
+            <tr className="border-b border-gray-100 bg-gray-50 text-center">
               {cols.map((h) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>
+                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : h === 'Gateway' ? 'text-left' : ''}`}>
                   {h}
                 </th>
               ))}
@@ -139,15 +139,15 @@ export default function DepositHistory() {
               <tr key={r.id} className="hover:bg-green-50/20 transition-colors">
                 {/* Gateway */}
                 <td className="px-4 py-2.5">
-                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">
                     {r.gateway_detail?.name ?? '—'}
                   </span>
                 </td>
 
                 {/* Channel Type */}
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 text-center">
                   {r.channel_type ? (
-                    <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                    <span className={`inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                       {CHANNEL_LABEL[r.channel_type]}
                     </span>
                   ) : (
@@ -156,12 +156,12 @@ export default function DepositHistory() {
                 </td>
 
                 {/* Channel Detail */}
-                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[160px]">
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[160px] text-center">
                   <span className="truncate block">{r.channel_label ?? '—'}</span>
                 </td>
 
                 {/* RM Slip */}
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 text-center">
                   {r.slip ? (
                     <a href={r.slip} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
@@ -173,18 +173,18 @@ export default function DepositHistory() {
                 </td>
 
                 {/* Comment */}
-                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[200px]">
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[200px] text-center">
                   <span className="line-clamp-2">{r.comment || '—'}</span>
                 </td>
 
                 {/* Logged By */}
-                <td className="px-4 py-2.5 text-xs text-gray-500">{r.submitted_by_name ?? '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{r.submitted_by_name ?? '—'}</td>
 
                 {/* Reviewed By */}
-                <td className="px-4 py-2.5 text-xs text-gray-500">{r.reviewed_by_name ?? '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{r.reviewed_by_name ?? '—'}</td>
 
                 {/* BO Receipt */}
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 text-center">
                   {r.review_slip ? (
                     <a href={r.review_slip} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline font-medium">

@@ -193,9 +193,9 @@ export default function BankAccounts() {
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left">
+            <tr className="border-b border-gray-100 bg-gray-50 text-center">
               {['Bank', 'Account Holder', 'Account No.', 'IFSC', 'Brand', 'Range', 'Daily Capacity', 'Status', ...(canWrite ? ['Actions'] : [])].map((h) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
+                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : h === 'Bank' ? 'text-left' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -204,15 +204,15 @@ export default function BankAccounts() {
             {records.map((r, i) => (
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-2.5 font-medium text-gray-800 text-xs whitespace-nowrap">{r.bank_name}</td>
-                <td className="px-4 py-2.5 text-gray-600 text-xs">{r.account_holder_name}</td>
-                <td className="px-4 py-2.5 font-mono text-gray-700 text-xs">{r.account_number}</td>
-                <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{r.ifsc_code}</td>
-                <td className="px-4 py-2.5">
-                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
+                <td className="px-4 py-2.5 text-gray-600 text-xs text-center">{r.account_holder_name}</td>
+                <td className="px-4 py-2.5 font-mono text-gray-700 text-xs text-center">{r.account_number}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-gray-600 text-center">{r.ifsc_code}</td>
+                <td className="px-4 py-2.5 text-center">
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
                 </td>
-                <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">₹{r.range_from} – ₹{r.range_to}</td>
-                <td className="px-4 py-2.5"><CapacityBar capacity={r.capacity} /></td>
-                <td className="px-4 py-2.5"><Badge variant={r.is_active ? 'active' : 'inactive'} /></td>
+                <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap text-center">₹{r.range_from} – ₹{r.range_to}</td>
+                <td className="px-4 py-2.5 text-center"><CapacityBar capacity={r.capacity} /></td>
+                <td className="px-4 py-2.5 text-center"><Badge variant={r.is_active ? 'active' : 'inactive'} /></td>
                 {canWrite && (
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 justify-end">

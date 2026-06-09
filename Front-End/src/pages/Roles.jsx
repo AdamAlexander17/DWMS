@@ -455,9 +455,9 @@ export default function Roles() {
         ) : (
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-left">
+              <tr className="border-b border-gray-100 bg-gray-50 text-center">
                 {['Role', 'Description', 'Permissions', 'Status', 'System', 'Actions'].map((h) => (
-                  <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Actions' ? 'text-right' : h === 'Status' || h === 'System' ? 'text-center' : ''}`}>{h}</th>
+                  <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Actions' ? 'text-right' : h === 'Role' ? 'text-left' : ''}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -470,17 +470,17 @@ export default function Roles() {
                   <td className="px-4 py-2.5">
                     <span className="font-semibold text-gray-800 capitalize">{role.name.replace(/_/g, ' ')}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-gray-500 text-xs max-w-xs truncate">{role.description || '—'}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-2.5 text-gray-500 text-xs max-w-xs truncate text-center">{role.description || '—'}</td>
+                  <td className="px-4 py-2.5 text-center">
                     <PermissionBadges role={role} />
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     {role.is_active ? (
-                      <span className="inline-flex items-center justify-center gap-1 min-w-[64px] bg-green-50 text-green-700 border border-green-200 rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
+                      <span className="inline-flex items-center justify-center gap-1 min-w-[96px] bg-green-50 text-green-700 border border-green-200 rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
                         <CheckCircle size={10} /> Active
                       </span>
                     ) : (
-                      <span className="inline-flex items-center justify-center gap-1 min-w-[64px] bg-red-50 text-red-600 border border-red-200 rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
+                      <span className="inline-flex items-center justify-center gap-1 min-w-[96px] bg-red-50 text-red-600 border border-red-200 rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
                         <XCircle size={10} /> Inactive
                       </span>
                     )}

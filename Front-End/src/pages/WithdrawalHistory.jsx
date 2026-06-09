@@ -24,7 +24,7 @@ function StatusChip({ status }) {
   const cfg = STATUS[status] ?? STATUS.closed
   const Icon = cfg.Icon
   return (
-    <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+    <span className={`inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${cfg.bg} ${cfg.text} ${cfg.border}`}>
       <Icon size={10} /> {cfg.label}
     </span>
   )
@@ -189,9 +189,9 @@ export default function WithdrawalHistory() {
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50/80 text-left">
-              {COLS.map((h) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
+            <tr className="border-b border-gray-100 bg-gray-50/80 text-center">
+              {COLS.map((h, idx) => (
+                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Actions' ? 'text-right' : idx === 0 ? 'text-left' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -209,24 +209,24 @@ export default function WithdrawalHistory() {
                   <td className="px-4 py-2.5">
                     <p className="font-medium text-gray-800 text-xs">{r.client_name}</p>
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{r.client_arc_id}</td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-0.5 font-bold text-gray-800 text-xs">
+                  <td className="px-4 py-2.5 font-mono text-xs text-gray-600 text-center">{r.client_arc_id}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    <div className="flex items-center justify-center gap-0.5 font-bold text-gray-800 text-xs">
                       <IndianRupee size={11} className="text-gray-400" />
                       {Number(r.amount).toLocaleString('en-IN')}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-[11px] text-gray-500 whitespace-nowrap">
-                    <div className="flex items-center gap-1">
+                  <td className="px-4 py-2.5 text-[11px] text-gray-500 whitespace-nowrap text-center">
+                    <div className="flex items-center justify-center gap-1">
                       <Calendar size={11} className="text-gray-300 shrink-0" />
                       {fmtDt(r.withdrawal_datetime)}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5"><StatusChip status={r.status} /></td>
-                  <td className="px-4 py-2.5 text-[11px] text-gray-500 whitespace-nowrap">
+                  <td className="px-4 py-2.5 text-center"><StatusChip status={r.status} /></td>
+                  <td className="px-4 py-2.5 text-[11px] text-gray-500 whitespace-nowrap text-center">
                     {r.submitted_by_name}
                   </td>
-                  <td className="px-4 py-2.5 text-[11px] text-gray-400 whitespace-nowrap">
+                  <td className="px-4 py-2.5 text-[11px] text-gray-400 whitespace-nowrap text-center">
                     {fmtDate(r.updated_at)}
                   </td>
                   <td className="px-4 py-2.5">

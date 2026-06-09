@@ -329,7 +329,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
           <div className="flex justify-between">
             <span className="text-gray-500">Channel</span>
             <div className="flex items-center gap-1.5">
-              <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[initial.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+              <span className={`inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[initial.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                 {CHANNEL_LABEL[initial.channel_type]}
               </span>
               {initial?.channel_label && (
@@ -674,9 +674,9 @@ export default function Deposits() {
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left">
+            <tr className="border-b border-gray-100 bg-gray-50 text-center">
               {['Gateway', 'Channel', 'Channel Detail', 'Slip', 'Comment', 'Logged By', 'Ticket Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
+                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : h === 'Gateway' ? 'text-left' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -690,12 +690,12 @@ export default function Deposits() {
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
                 {/* Gateway */}
                 <td className="px-4 py-2.5">
-                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.gateway_detail?.name ?? '—'}</span>
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.gateway_detail?.name ?? '—'}</span>
                 </td>
                 {/* Channel Type */}
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 text-center">
                   {r.channel_type ? (
-                    <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                    <span className={`inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[r.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                       {CHANNEL_LABEL[r.channel_type]}
                     </span>
                   ) : (
@@ -703,10 +703,10 @@ export default function Deposits() {
                   )}
                 </td>
                 {/* Channel Detail */}
-                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[160px]">
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[160px] text-center">
                   <span className="truncate block">{r.channel_label ?? '—'}</span>
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 text-center">
                   {r.slip ? (
                     <a href={r.slip} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
@@ -717,20 +717,20 @@ export default function Deposits() {
                   )}
                 </td>
                 {/* Comment */}
-                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[200px]">
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[200px] text-center">
                   <span className="line-clamp-2">{r.comment || '—'}</span>
                 </td>
                 {/* Logged By */}
-                <td className="px-4 py-2.5 text-xs text-gray-500">{r.submitted_by_name ?? '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{r.submitted_by_name ?? '—'}</td>
                 {/* Ticket Status */}
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 text-center">
                   {(() => {
                     const key  = deriveTicketStatus(r)
                     const cfg  = TICKET_STATUS_CONFIG[key] ?? TICKET_STATUS_CONFIG.pending
                     const Icon = cfg.Icon
                     return (
-                      <div className="flex flex-col gap-1">
-                        <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap w-fit ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap w-fit ${cfg.bg} ${cfg.text} ${cfg.border}`}>
                           <Icon size={10} /> {cfg.label}
                         </span>
                         {r.review_message && (

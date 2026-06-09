@@ -112,11 +112,11 @@ export default function Gateways() {
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              {['#', 'Name', 'Status', 'Created', 'Actions'].map((h) => (
+            <tr className="border-b border-gray-100 bg-gray-50 text-center">
+              {['Name', 'Status', 'Created', 'Actions'].map((h) => (
                 <th
                   key={h}
-                  className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}
+                  className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : h === 'Name' ? 'text-left' : ''}`}
                 >
                   {h}
                 </th>
@@ -126,21 +126,20 @@ export default function Gateways() {
           <tbody className="divide-y divide-gray-50">
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">
+                <td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-sm">
                   {search ? 'No gateways match your search.' : 'No gateways yet. Click "Add Gateway" to create one.'}
                 </td>
               </tr>
             )}
             {filtered.map((gw) => (
               <tr key={gw.id} className="hover:bg-blue-50/20 transition-colors">
-                <td className="px-4 py-3 text-xs text-gray-400">{gw.id}</td>
                 <td className="px-4 py-3">
-                  <span className="inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">
                     {gw.name}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex items-center justify-center gap-1 min-w-[64px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${
+                <td className="px-4 py-3 text-center">
+                  <span className={`inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${
                     gw.is_active
                       ? 'bg-green-50 text-green-700 border-green-200'
                       : 'bg-gray-100 text-gray-500 border-gray-200'
@@ -148,7 +147,7 @@ export default function Gateways() {
                     {gw.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-500">
+                <td className="px-4 py-3 text-xs text-gray-500 text-center">
                   {new Date(gw.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-4 py-3">
