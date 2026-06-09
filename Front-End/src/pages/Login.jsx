@@ -4,23 +4,23 @@ import { login as apiLogin } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
 import { extractApiErrors } from '../utils/validators'
 
-/* Decorative bar-chart SVG (purely visual, mimics BMS chart bg) */
+/* Decorative bar-chart SVG (purely visual) */
 function ChartDecoration() {
   const bars = [40, 65, 45, 80, 55, 70, 50, 90, 60, 75, 48, 85, 62, 70, 58]
   return (
-    <svg viewBox="0 0 420 180" className="w-full opacity-20 mt-auto" preserveAspectRatio="none">
+    <svg viewBox="0 0 420 180" className="w-full opacity-25 mt-auto" preserveAspectRatio="none">
       {bars.map((h, i) => (
-        <rect key={i} x={i * 28 + 2} y={180 - h} width={20} height={h} rx="3" fill="#f59e0b" />
+        <rect key={i} x={i * 28 + 2} y={180 - h} width={20} height={h} rx="3" fill="#ffffff" />
       ))}
       <polyline
         fill="none"
-        stroke="#f59e0b"
+        stroke="#ffffff"
         strokeWidth="2.5"
         points={bars.map((h, i) => `${i * 28 + 12},${180 - h - 10}`).join(' ')}
       />
       {bars.map((h, i) =>
         h > 75 ? (
-          <polygon key={`tri-${i}`} points={`${i*28+12},${180-h-22} ${i*28+8},${180-h-12} ${i*28+16},${180-h-12}`} fill="#f59e0b" />
+          <polygon key={`tri-${i}`} points={`${i*28+12},${180-h-22} ${i*28+8},${180-h-12} ${i*28+16},${180-h-12}`} fill="#ffffff" />
         ) : null
       )}
     </svg>
@@ -89,7 +89,7 @@ export default function Login() {
                 Username <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border rounded-lg px-4 py-2.5 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition placeholder-gray-400 ${fieldErrors.username ? 'border-red-300' : 'border-gray-200'}`}
+                className={`w-full border rounded-lg px-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition placeholder-gray-400 ${fieldErrors.username ? 'border-red-300' : 'border-gray-200'}`}
                 placeholder="admin"
                 value={form.username}
                 onChange={(e) => { setForm({ ...form, username: e.target.value }); if (fieldErrors.username) setFieldErrors({ ...fieldErrors, username: undefined }) }}
@@ -106,7 +106,7 @@ export default function Login() {
               <div className="relative">
                 <input
                   type={showPw ? 'text' : 'password'}
-                  className={`w-full border rounded-lg px-4 py-2.5 pr-16 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition placeholder-gray-400 ${fieldErrors.password ? 'border-red-300' : 'border-gray-200'}`}
+                  className={`w-full border rounded-lg px-4 py-2.5 pr-16 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition placeholder-gray-400 ${fieldErrors.password ? 'border-red-300' : 'border-gray-200'}`}
                   placeholder="••••••••"
                   value={form.password}
                   onChange={(e) => { setForm({ ...form, password: e.target.value }); if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined }) }}
@@ -116,7 +116,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-500 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-500 hover:text-accent"
                 >
                   {showPw ? 'Hide' : 'Show'}
                 </button>
@@ -133,7 +133,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0d1117] hover:bg-[#161b22] text-white font-bold py-3 rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-1"
+              className="w-full bg-accent hover:bg-accent-dark disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-1"
             >
               {loading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               {loading ? 'Signing in…' : 'Login'}
@@ -142,21 +142,21 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL — branding (dark) ── */}
-      <div className="hidden lg:flex w-[55%] bg-[#0d1117] flex-col p-10 relative overflow-hidden">
+      {/* ── RIGHT PANEL — branding (blue accent) ── */}
+      <div className="hidden lg:flex w-[55%] bg-blue-500 flex-col p-10 relative overflow-hidden">
         {/* Logo + app name */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#1a2030] flex items-center justify-center border border-white/10">
+          <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center border border-white/20">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="10" width="3" height="8" rx="1" fill="#f59e0b"/>
-              <rect x="7" y="6" width="3" height="12" rx="1" fill="#f59e0b"/>
-              <rect x="12" y="2" width="3" height="16" rx="1" fill="#f59e0b"/>
-              <rect x="17" y="8" width="3" height="10" rx="1" fill="#f59e0b"/>
+              <rect x="2" y="10" width="3" height="8" rx="1" fill="#ffffff"/>
+              <rect x="7" y="6" width="3" height="12" rx="1" fill="#ffffff"/>
+              <rect x="12" y="2" width="3" height="16" rx="1" fill="#ffffff"/>
+              <rect x="17" y="8" width="3" height="10" rx="1" fill="#ffffff"/>
             </svg>
           </div>
           <div>
             <p className="text-white font-black text-lg leading-none tracking-wide">DWMS</p>
-            <p className="text-gray-400 text-[10px] uppercase tracking-widest mt-0.5">Deposit Details Management</p>
+            <p className="text-white/70 text-[10px] uppercase tracking-widest mt-0.5">Deposit Withdrawal Management System</p>
           </div>
         </div>
 
@@ -165,7 +165,7 @@ export default function Login() {
           <h1 className="text-white text-4xl font-black leading-tight">
             Smarter Deposit<br />Management Starts Here
           </h1>
-          <p className="text-gray-400 text-sm mt-4 leading-relaxed max-w-md">
+          <p className="text-white/80 text-sm mt-4 leading-relaxed max-w-md">
             Upload and manage QR codes, UPI IDs, and bank account details — organised by brand,
             secured by role-based access, and tracked with a full audit trail.
           </p>
@@ -176,8 +176,8 @@ export default function Login() {
               'Multi-brand bank account organisation',
               'Role-based access with full audit trail',
             ].map((item) => (
-              <li key={item} className="flex items-center gap-3 text-sm text-gray-300">
-                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+              <li key={item} className="flex items-center gap-3 text-sm text-white/90">
+                <span className="w-2 h-2 rounded-full bg-white shrink-0" />
                 {item}
               </li>
             ))}
@@ -190,8 +190,8 @@ export default function Login() {
         </div>
 
         {/* Copyright */}
-        <p className="absolute bottom-5 left-0 right-0 text-center text-gray-600 text-xs">
-          © {new Date().getFullYear()} DWMS — Deposit Details Management System
+        <p className="absolute bottom-5 left-0 right-0 text-center text-white/50 text-xs">
+          © {new Date().getFullYear()} DWMS — Deposit Withdrawal Management System
         </p>
       </div>
     </div>
