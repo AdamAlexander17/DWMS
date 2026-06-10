@@ -41,9 +41,10 @@ User = get_user_model()
 class UserViewSet(ModelViewSet):
     permission_classes  = [IsAuthenticated, IsAdmin]
     queryset            = User.objects.select_related('role').prefetch_related('brands').all()
-    search_fields       = ['username', 'mobile']
+    search_fields       = ['username', 'role__name']   # 'mobile' removed — field doesn't exist
     ordering_fields     = ['created_at', 'is_active']
-    filterset_fields    = ['role', 'is_active']
+    # Note: role is filtered manually by role__name (not FK id) — see list()
+    filterset_fields    = ['is_active']
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -57,6 +58,10 @@ class UserViewSet(ModelViewSet):
     # ------------------------------------------------------------------
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        # Filter by role name string (e.g. ?role=rm) — FK id would cause 500
+        role_name = request.query_params.get('role')
+        if role_name:
+            queryset = queryset.filter(role__name__iexact=role_name)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = UserListSerializer(page, many=True)

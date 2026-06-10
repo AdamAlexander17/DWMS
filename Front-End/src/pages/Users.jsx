@@ -1,5 +1,5 @@
-﻿import { useState, useRef } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useState, useRef, useEffect } from 'react'
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, SquarePen, Trash2, Search, LockKeyhole, X, Clock, Calendar, ChevronDown, ChevronUp, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getUsers, createUser, updateUser, deleteUser, activateUser, deactivateUser, resetPassword, bulkImportUsers } from '../api/users'
 import { getBrands } from '../api/brands'
@@ -56,7 +56,7 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
   const roleLabel = (r) => r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/30 px-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/40 px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
 
         {/* Header */}
@@ -67,23 +67,23 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
               {isEdit ? 'Update the details for this user account' : 'Fill in the details to create a new user account'}
             </p>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors ml-4 mt-0.5 p-1 rounded-lg hover:bg-white/10">
-            <X size={18} />
+          <button onClick={onClose} className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors ml-4 mt-0.5">
+            <X size={17} />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={(e) => { e.preventDefault(); if (validate()) onSubmit(form) }} className="px-6 py-5 space-y-5">
+        <form onSubmit={(e) => { e.preventDefault(); if (validate()) onSubmit(form) }} className="px-6 py-5 space-y-4">
 
           {/* Username + Default Password */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={isEdit ? '' : 'grid grid-cols-2 gap-4'}>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Username <span className="text-red-500">*</span>
               </label>
               <input
                 className={`input ${errors.username ? 'border-red-300' : ''}`}
-                placeholder="Enter username"
+                placeholder="Name"
                 value={form.username}
                 onChange={(e) => { setForm(p => ({ ...p, username: e.target.value })); clearErr('username') }}
                 required
@@ -100,14 +100,14 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
             )}
           </div>
           {!isEdit && (
-            <p className="text-xs text-gray-400 -mt-3">
+            <p className="text-xs text-gray-400 -mt-2">
               New users are created with password 123456 and must change it on first login.
             </p>
           )}
 
           {/* Brands */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 pb-2 border-b border-gray-200">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Brands {roles.find(r => String(r.id) === String(form.role))?.name?.toLowerCase() === 'rm' && <span className="text-red-500">*</span>}
             </label>
             <div className="flex flex-wrap gap-2">
@@ -129,14 +129,12 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
               })}
             </div>
             {errors.brands && <p className="mt-1 text-xs text-red-600">{errors.brands}</p>}
-            <p className="text-xs text-gray-400 mt-2">
-              The new user will only see data belonging to the selected brand(s).
-            </p>
+            <p className="text-xs text-gray-400 mt-1.5">The new user will only see data belonging to the selected brand(s).</p>
           </div>
 
           {/* Role */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 pb-2 border-b border-gray-200">
+            <label className="block text-xs font-bold tracking-wider uppercase text-accent mb-2">
               Role <span className="text-red-500">*</span>
             </label>
             <div className="flex flex-wrap gap-2">
@@ -381,6 +379,7 @@ export default function Users() {
   const qc = useQueryClient()
   const [page, setPage]     = useState(1)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [sortAsc, setSortAsc] = useState(false)
   const [modal, setModal]   = useState(null)
@@ -388,15 +387,22 @@ export default function Users() {
   const [resetTarget, setResetTarget] = useState(null)
   const [showImport, setShowImport] = useState(false)
 
+  // Debounce search — wait 400ms after last keystroke before firing API
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const AVATAR_COLORS = ['bg-teal-500','bg-blue-600','bg-indigo-500','bg-violet-500','bg-cyan-600','bg-sky-600','bg-emerald-600','bg-blue-500']
   const avatarColor = (name) => AVATAR_COLORS[name.split('').reduce((a,c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length]
 
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
   const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : '—'
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['users', page, search, roleFilter, sortAsc],
-    queryFn:  () => getUsers({ page, search, role: roleFilter || undefined, ordering: sortAsc ? 'created_at' : '-created_at' }),
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['users', page, debouncedSearch, roleFilter, sortAsc],
+    queryFn:  () => getUsers({ page, search: debouncedSearch, role: roleFilter || undefined, ordering: sortAsc ? 'created_at' : '-created_at' }),
+    placeholderData: keepPreviousData,   // keep previous results visible while fetching new page/search
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
   const { data: rolesData }  = useQuery({ queryKey: ['roles-all'],  queryFn: () => getRoles({ is_active: true }) })
@@ -431,7 +437,10 @@ export default function Users() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">Users</h1>
-          <p className="page-subtitle">{total} user{total !== 1 ? 's' : ''}</p>
+          <p className="page-subtitle">
+            {total} user{total !== 1 ? 's' : ''}
+            {isFetching && !isLoading && <span className="ml-2 text-[11px] text-gray-400 font-normal animate-pulse">Searching…</span>}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowImport(true)} className="btn-secondary flex items-center gap-1.5">
@@ -447,7 +456,8 @@ export default function Users() {
       <div className="card py-4 flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input className="input pl-9" placeholder="Search users…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+          <input className="input pl-9" placeholder="Search users…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          {isFetching && !isLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />}
         </div>
         <select className="input max-w-[180px]" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
           <option value="">All Roles</option>
