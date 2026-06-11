@@ -236,20 +236,28 @@ export default function NotificationBell() {
   })
 
   const handleWdClick = (n) => {
-    if (!n.is_read) wdReadM.mutate(n.id)
+    const notifId = Number(n?.id)
+    if (!n?.is_read && Number.isInteger(notifId) && notifId > 0) {
+      wdReadM.mutate(notifId)
+    }
     setOpen(false)
-    if (n.withdrawal_id) {
-      navigate(`/withdrawals?ticket=${n.withdrawal_id}`)
+    const ticketId = Number(n?.withdrawal_id)
+    if (Number.isInteger(ticketId) && ticketId > 0) {
+      navigate(`/withdrawals?ticket=${ticketId}`)
     } else {
       navigate('/withdrawals')
     }
   }
 
   const handleMsgClick = (n) => {
-    if (!n.is_read) wdReadM.mutate(n.id)
+    const notifId = Number(n?.id)
+    if (!n?.is_read && Number.isInteger(notifId) && notifId > 0) {
+      wdReadM.mutate(notifId)
+    }
     setOpen(false)
-    if (n.withdrawal_id) {
-      navigate(`/withdrawals?ticket=${n.withdrawal_id}&chat=1`)
+    const ticketId = Number(n?.withdrawal_id)
+    if (Number.isInteger(ticketId) && ticketId > 0) {
+      navigate(`/withdrawals?ticket=${ticketId}&chat=1`)
     } else {
       navigate('/withdrawals')
     }
@@ -400,7 +408,11 @@ export default function NotificationBell() {
                       </div>
                       {!n.is_read && <div className="shrink-0 w-2 h-2 rounded-full bg-accent self-start mt-2" />}
                       <button
-                        onClick={(e) => { e.stopPropagation(); wdDelM.mutate(n.id) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const notifId = Number(n?.id)
+                          if (Number.isInteger(notifId) && notifId > 0) wdDelM.mutate(notifId)
+                        }}
                         title="Dismiss"
                         className="absolute top-2 right-2 w-5 h-5 rounded-full text-gray-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
                       >
@@ -439,7 +451,11 @@ export default function NotificationBell() {
                       </div>
                       {!n.is_read && <div className="shrink-0 w-2 h-2 rounded-full bg-accent self-start mt-2" />}
                       <button
-                        onClick={(e) => { e.stopPropagation(); wdDelM.mutate(n.id) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const notifId = Number(n?.id)
+                          if (Number.isInteger(notifId) && notifId > 0) wdDelM.mutate(notifId)
+                        }}
                         title="Dismiss"
                         className="absolute top-2 right-2 w-5 h-5 rounded-full text-gray-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
                       >

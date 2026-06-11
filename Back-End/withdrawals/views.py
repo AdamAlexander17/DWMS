@@ -496,8 +496,13 @@ class WithdrawalViewSet(ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='notifications-read')
     def notification_read(self, request, pk=None):
+        try:
+            notif_id = int(pk)
+        except (TypeError, ValueError):
+            return error_response('Invalid notification id', status_code=status.HTTP_400_BAD_REQUEST)
+
         WithdrawalNotification.objects.filter(
-            pk=pk, recipient=request.user
+            pk=notif_id, recipient=request.user
         ).update(is_read=True)
         unread = WithdrawalNotification.objects.filter(recipient=request.user, is_read=False).count()
         _push_unread_count(request.user.pk, unread)
@@ -505,8 +510,13 @@ class WithdrawalViewSet(ModelViewSet):
 
     @action(detail=True, methods=['delete'], url_path='notifications-delete')
     def notification_delete(self, request, pk=None):
+        try:
+            notif_id = int(pk)
+        except (TypeError, ValueError):
+            return error_response('Invalid notification id', status_code=status.HTTP_400_BAD_REQUEST)
+
         WithdrawalNotification.objects.filter(
-            pk=pk, recipient=request.user
+            pk=notif_id, recipient=request.user
         ).delete()
         unread = WithdrawalNotification.objects.filter(recipient=request.user, is_read=False).count()
         _push_unread_count(request.user.pk, unread)

@@ -1095,14 +1095,6 @@ export default function Withdrawals() {
                         </button>
                       )}
 
-                      {/* RM: Edit (own ticket — any status) */}
-                      {isOwnTicket && (
-                        <button onClick={() => setEdit(r)} title="Edit"
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                          <SquarePen size={13} />
-                        </button>
-                      )}
-
                       {/* Delete: admin always; RM only on own (any status) */}
                       {(role === 'admin' || isOwnTicket) && (
                         <button onClick={() => setDel(r)} title="Delete"
