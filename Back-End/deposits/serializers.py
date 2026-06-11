@@ -32,6 +32,7 @@ class DepositLogSerializer(serializers.ModelSerializer):
             'channel_label',
             'slip',
             'slip_status', 'slip_status_display',
+            'ark_id',
             'comment',
             'submitted_by', 'submitted_by_name',
             'status', 'status_display',
@@ -76,12 +77,22 @@ class DepositLogSerializer(serializers.ModelSerializer):
     def validate_comment(self, value):
         return validate_text(value, field='Comment', max_length=2000, allow_blank=True)
 
+    def validate_ark_id(self, value):
+        value = validate_text(value, field='ARK ID', max_length=100, allow_blank=False)
+        if not value.isdigit():
+            raise serializers.ValidationError('ARK ID must contain only integers.')
+        return value
+
     def validate_gateway(self, value):
         if value is not None and not value.is_active:
             raise serializers.ValidationError('Selected gateway is inactive.')
         return value
 
     def validate(self, attrs):
+        ark_id = attrs.get('ark_id', getattr(self.instance, 'ark_id', ''))
+        if not str(ark_id).strip():
+            raise serializers.ValidationError({'ark_id': 'ARK ID is required.'})
+
         channel_type = attrs.get('channel_type', getattr(self.instance, 'channel_type', None))
         qr_code      = attrs.get('qr_code',      getattr(self.instance, 'qr_code',      None))
         upi_source   = attrs.get('upi_source',   getattr(self.instance, 'upi_source',   None))

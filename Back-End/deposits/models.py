@@ -88,6 +88,7 @@ class DepositLog(models.Model):
         default=SLIP_PENDING,
         db_index=True,
     )
+    ark_id = models.CharField(max_length=100, blank=True, default='')
     comment = models.TextField(blank=True, default='')
 
     submitted_by = models.ForeignKey(

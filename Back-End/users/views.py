@@ -58,10 +58,13 @@ class UserViewSet(ModelViewSet):
     # ------------------------------------------------------------------
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        # Filter by role name string (e.g. ?role=rm) — FK id would cause 500
-        role_name = request.query_params.get('role')
-        if role_name:
-            queryset = queryset.filter(role__name__iexact=role_name)
+        # Accept both role id (?role=1) and role name (?role=rm).
+        role_param = (request.query_params.get('role') or '').strip()
+        if role_param:
+            if role_param.isdigit():
+                queryset = queryset.filter(role_id=int(role_param))
+            else:
+                queryset = queryset.filter(role__name__iexact=role_param.replace(' ', '_'))
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = UserListSerializer(page, many=True)

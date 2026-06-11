@@ -96,7 +96,7 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
     <>
       {/* Channel Type */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Channel *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Channel</label>
         <div className="grid grid-cols-3 gap-2">
           {CHANNEL_OPTS.map(({ value, label, Icon }) => (
             <button
@@ -119,13 +119,12 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
       {channelType && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Select {CHANNEL_LABEL[channelType]} *
+            Select {CHANNEL_LABEL[channelType]}
           </label>
           <select
             className="input"
             value={channelId}
             onChange={(e) => onIdChange(e.target.value)}
-            required
           >
             <option value="">Choose {CHANNEL_LABEL[channelType]}…</option>
             {options.map((c) => (
@@ -150,6 +149,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
     channel_id:   '',
     slip:         null,
     rm_status:    'not_received',
+    ark_id:       '',
     comment:      '',
   })
   const [local, setLocal] = useState({})
@@ -159,13 +159,15 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
   const validate = () => {
     const errs = {}
     if (!form.gateway) errs.gateway = 'Gateway is required.'
-    if (!form.channel_type) errs.channel_type = 'Channel type is required.'
     if (form.channel_type && !form.channel_id) errs.channel_id = 'Please select a channel item.'
+    if (!form.ark_id) errs.ark_id = 'ARK ID is required.'
+    if (form.ark_id && !/^\d+$/.test(form.ark_id)) errs.ark_id = 'ARK ID must contain only integers.'
     if (form.slip) {
       const e = vSlipFile(form.slip)
       if (e) errs.slip = e
     }
     if (form.rm_status === 'completed' && !form.slip) errs.slip = 'Slip is required when status is completed.'
+    if (form.ark_id && form.ark_id.length > 100) errs.ark_id = 'ARK ID must be at most 100 characters.'
     if (form.comment && form.comment.length > 2000) errs.comment = 'Comment must be at most 2000 characters.'
     setLocal(errs)
     return Object.keys(errs).length === 0
@@ -189,6 +191,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
     } else {
       fd.append('slip_status', 'not_received')
     }
+    fd.append('ark_id',      form.ark_id)
     fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
     onSubmit(fd)
@@ -203,8 +206,22 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
         onTypeChange={(v) => { setForm((p) => ({ ...p, channel_type: v, channel_id: '' })); if (local.channel_type) setLocal((p) => ({ ...p, channel_type: undefined })); if (local.channel_id) setLocal((p) => ({ ...p, channel_id: undefined })) }}
         onIdChange={f('channel_id')}
       />
-      {errors.channel_type && <p className="text-xs text-red-600 -mt-2">{errors.channel_type}</p>}
       {errors.channel_id && <p className="text-xs text-red-600 -mt-2">{errors.channel_id}</p>}
+
+      {/* ARK ID */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">ARK ID <span className="text-red-500">*</span></label>
+        <input
+          className={`input ${errors.ark_id ? 'border-red-300' : ''}`}
+          placeholder="Enter ARK ID"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={100}
+          value={form.ark_id}
+          onChange={(e) => f('ark_id')(e.target.value.replace(/\D/g, ''))}
+        />
+        {errors.ark_id && <p className="mt-1 text-xs text-red-600">{errors.ark_id}</p>}
+      </div>
 
       {/* Gateway Name */}
       <div>
@@ -457,6 +474,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
     gateway:      String(initial?.gateway ?? ''),
     channel_type: initial?.channel_type ?? '',
     channel_id:   initChannelId,
+    ark_id:       initial?.ark_id ?? '',
     comment:      initial?.comment      ?? '',
     slip:         null,
     rm_status:    initial?.status === 'completed' ? 'completed' : 'not_received',
@@ -469,6 +487,8 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
     const errs = {}
     if (!form.gateway) errs.gateway = 'Gateway is required.'
     if (form.channel_type && !form.channel_id) errs.channel_id = 'Please select a channel item.'
+    if (!form.ark_id) errs.ark_id = 'ARK ID is required.'
+    if (form.ark_id && !/^\d+$/.test(form.ark_id)) errs.ark_id = 'ARK ID must contain only integers.'
     if (form.slip) {
       const e = vSlipFile(form.slip)
       if (e) errs.slip = e
@@ -476,6 +496,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
     if (form.rm_status === 'completed' && !form.slip && !initial?.slip) {
       errs.slip = 'Slip is required when status is completed.'
     }
+    if (form.ark_id && form.ark_id.length > 100) errs.ark_id = 'ARK ID must be at most 100 characters.'
     if (form.comment && form.comment.length > 2000) errs.comment = 'Comment must be at most 2000 characters.'
     setLocal(errs)
     return Object.keys(errs).length === 0
@@ -499,6 +520,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
     } else {
       fd.append('slip_status', 'not_received')
     }
+    fd.append('ark_id',      form.ark_id)
     fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
     onSubmit(fd)
@@ -514,6 +536,21 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         onIdChange={f('channel_id')}
       />
       {errors.channel_id && <p className="text-xs text-red-600 -mt-2">{errors.channel_id}</p>}
+
+      {/* ARK ID */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">ARK ID <span className="text-red-500">*</span></label>
+        <input
+          className={`input ${errors.ark_id ? 'border-red-300' : ''}`}
+          placeholder="Enter ARK ID"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={100}
+          value={form.ark_id}
+          onChange={(e) => f('ark_id')(e.target.value.replace(/\D/g, ''))}
+        />
+        {errors.ark_id && <p className="mt-1 text-xs text-red-600">{errors.ark_id}</p>}
+      </div>
 
       {/* Gateway Name */}
       <div>
@@ -609,6 +646,10 @@ export default function Deposits() {
   const [modal,           setModal]           = useState(null)
   const [delTarget,       setDelTarget]       = useState(null)
 
+  const fmtDate = (d) => d
+    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—'
+
   const { data, isLoading } = useQuery({
     queryKey: ['deposits', page, search, gatewayFilter, channelFilter],
     queryFn:  () => getDeposits({ page, search, gateway: gatewayFilter || undefined, channel_type: channelFilter || undefined }),
@@ -675,14 +716,14 @@ export default function Deposits() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
-              {['Gateway', 'Channel', 'Channel Detail', 'Slip', 'Comment', 'Logged By', 'Ticket Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
+              {['Gateway', 'Channel', 'Channel Detail', 'ARK ID', 'Slip', 'Comment', 'Logged By', 'Created At', 'Ticket Status', ...(canWrite || canReview ? ['Actions'] : [])].map((h) => (
                 <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : h === 'Gateway' ? 'text-left' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
-              <tr><td colSpan={canWrite || canReview ? 8 : 7} className="px-4 py-10 text-center text-gray-400 text-sm">
+              <tr><td colSpan={canWrite || canReview ? 10 : 9} className="px-4 py-10 text-center text-gray-400 text-sm">
                 {isRM ? 'No deposits logged yet. Use "Log Deposit" to record a deposit.' : 'No deposit logs found.'}
               </td></tr>
             )}
@@ -706,6 +747,7 @@ export default function Deposits() {
                 <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[160px] text-center">
                   <span className="truncate block">{r.channel_label ?? '—'}</span>
                 </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center">{r.ark_id || '—'}</td>
                 <td className="px-4 py-2.5 text-center">
                   {r.slip ? (
                     <a href={r.slip} target="_blank" rel="noopener noreferrer"
@@ -722,6 +764,8 @@ export default function Deposits() {
                 </td>
                 {/* Logged By */}
                 <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{r.submitted_by_name ?? '—'}</td>
+                {/* Created At */}
+                <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{fmtDate(r.created_at)}</td>
                 {/* Ticket Status */}
                 <td className="px-4 py-2.5 text-center">
                   {(() => {

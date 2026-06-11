@@ -36,7 +36,7 @@ class DepositLogViewSet(
     pagination_class = StandardResultsPagination
     filterset_class  = DepositLogFilter
     ordering_fields  = ['created_at', 'gateway', 'slip_status', 'status']
-    search_fields    = ['comment']
+    search_fields    = ['comment', 'ark_id']
 
     def get_permissions(self):
         if self.action == 'create':
