@@ -15,7 +15,7 @@ const shouldSkipRefresh = (url = '') => (
 )
 
 async function refreshAccessToken() {
-  const { refreshToken, setAccessToken, logout } = useAuthStore.getState()
+  const { refreshToken, setTokens, logout } = useAuthStore.getState()
   if (!refreshToken) {
     logout()
     return null
@@ -29,8 +29,9 @@ async function refreshAccessToken() {
     )
       .then((res) => {
         const newAccess = res?.data?.data?.access || res?.data?.access
+        const newRefresh = res?.data?.data?.refresh || res?.data?.refresh
         if (!newAccess) throw new Error('No access token in refresh response')
-        setAccessToken(newAccess)
+        setTokens({ access: newAccess, refresh: newRefresh })
         return newAccess
       })
       .catch(() => {

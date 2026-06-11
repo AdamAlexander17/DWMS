@@ -657,6 +657,10 @@ function MessageThread({ withdrawalId, currentUserId }) {
 function DetailModal({ withdrawal, currentUserId, canReview, onMarkClose, initialTab = 'details' }) {
   const [tab, setTab] = useState(initialTab)
 
+  useEffect(() => {
+    setTab(initialTab)
+  }, [initialTab, withdrawal?.id])
+
   const fmtDt   = (d) => d ? new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
   const isClosed = withdrawal.status === 'closed'
@@ -869,6 +873,8 @@ export default function Withdrawals() {
   const [page, setPage]           = useState(1)
   const [search, setSearch]       = useState('')
   const [statusFilter, setStatus] = useState('')
+  const [sortBy, setSortBy]       = useState('created_at')
+  const [sortDir, setSortDir]     = useState('desc')
   const [showForm, setShowForm]   = useState(false)
   const [editTarget, setEdit]     = useState(null)
   const [viewTarget, setView]     = useState(null)
@@ -900,12 +906,17 @@ export default function Withdrawals() {
         setSearchParams(next, { replace: true })
       })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams, setSearchParams])
 
   const { data, isLoading } = useQuery({
-    queryKey: ['withdrawals', page, search, statusFilter],
-    queryFn:  () => getWithdrawals({ page, search: search || undefined, status: statusFilter || undefined, history: 'false' }),
+    queryKey: ['withdrawals', page, search, statusFilter, sortBy, sortDir],
+    queryFn:  () => getWithdrawals({
+      page,
+      search: search || undefined,
+      status: statusFilter || undefined,
+      history: 'false',
+      ordering: sortBy ? `${sortDir === 'desc' ? '-' : ''}${sortBy}` : undefined,
+    }),
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   })
@@ -947,7 +958,32 @@ export default function Withdrawals() {
 
   if (isLoading) return <PageSpinner />
 
-  const COLS = ['Client', 'ARC ID', 'Amount', 'Date & Time', 'Status', 'Submitted', 'Actions']
+  const COLUMNS = [
+    { key: 'client', label: 'Client', sortable: true, field: 'client_name' },
+    { key: 'arc', label: 'ARC ID', sortable: true, field: 'client_arc_id' },
+    { key: 'amount', label: 'Amount', sortable: true, field: 'amount' },
+    { key: 'datetime', label: 'Date & Time', sortable: true, field: 'withdrawal_datetime' },
+    { key: 'status', label: 'Status', sortable: true, field: 'status' },
+    { key: 'submitted', label: 'Submitted', sortable: true, field: 'submitted_by_name' },
+    { key: 'actions', label: 'Actions', sortable: false },
+  ]
+
+  const toggleSort = (field) => {
+    if (!field) return
+    if (sortBy === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(field)
+      setSortDir('asc')
+    }
+    setPage(1)
+  }
+
+  const sortMarker = (field) => {
+    if (!field) return ''
+    if (sortBy !== field) return ' ↕'
+    return sortDir === 'asc' ? ' ↑' : ' ↓'
+  }
 
   return (
     <div className="space-y-6">
@@ -1004,14 +1040,20 @@ export default function Withdrawals() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80 text-center">
-              {COLS.map((h, idx) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Actions' ? 'text-right' : idx === 0 ? 'text-left' : ''}`}>{h}</th>
+              {COLUMNS.map((col, idx) => (
+                <th
+                  key={col.key}
+                  onClick={() => col.sortable && toggleSort(col.field)}
+                  className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${col.label === 'Actions' ? 'text-right' : idx === 0 ? 'text-left' : ''} ${col.sortable ? 'cursor-pointer select-none hover:text-accent' : ''}`}
+                >
+                  {col.label}{sortMarker(col.field)}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
-              <tr><td colSpan={COLS.length} className="px-4 py-10 text-center text-gray-400 text-sm">
+              <tr><td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400 text-sm">
                 {isRM ? 'No withdrawal tickets yet. Use "New Request" to raise one.' : 'No withdrawal tickets found.'}
               </td></tr>
             )}

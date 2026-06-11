@@ -15,6 +15,12 @@ export const useAuthStore = create(
 
       setAccessToken: (token) => set({ accessToken: token }),
 
+      setTokens: ({ access, refresh }) =>
+        set((s) => ({
+          accessToken: access ?? s.accessToken,
+          refreshToken: refresh ?? s.refreshToken,
+        })),
+
       clearMustChangePassword: () =>
         set((s) => ({
           user: s.user ? { ...s.user, must_change_password: false } : s.user,

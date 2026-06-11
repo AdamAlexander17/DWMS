@@ -104,6 +104,7 @@ class WithdrawalViewSet(ModelViewSet):
         status_filter = request.query_params.get('status')
         search        = request.query_params.get('search')
         history       = request.query_params.get('history')
+        ordering      = (request.query_params.get('ordering') or '').strip()
 
         is_history_view = False
         if history in ('1', 'true', 'True'):
@@ -132,6 +133,26 @@ class WithdrawalViewSet(ModelViewSet):
                 | Q(reviewed_by=request.user)
                 | Q(slip_uploaded_by=request.user)
             )
+
+        allowed_ordering = {
+            'client_name': 'client_name',
+            'client_arc_id': 'client_arc_id',
+            'amount': 'amount',
+            'withdrawal_datetime': 'withdrawal_datetime',
+            'status': 'status',
+            'created_at': 'created_at',
+            'updated_at': 'updated_at',
+            'submitted_by_name': 'submitted_by__username',
+        }
+        if ordering:
+            desc = ordering.startswith('-')
+            key = ordering[1:] if desc else ordering
+            field = allowed_ordering.get(key)
+            if field:
+                qs = qs.order_by(f'-{field}' if desc else field, '-id')
+        else:
+            qs = qs.order_by('-created_at', '-id')
+
         page = self.paginate_queryset(qs)
         if page is not None:
             return self.get_paginated_response(

@@ -120,16 +120,19 @@ export default function WithdrawalHistory() {
   const [page, setPage]         = useState(1)
   const [search, setSearch]     = useState('')
   const [statusF, setStatusF]   = useState('')
+  const [sortBy, setSortBy]     = useState('updated_at')
+  const [sortDir, setSortDir]   = useState('desc')
   const [viewTarget, setView]   = useState(null)
   const [delTarget, setDel]     = useState(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['withdrawal-history', page, search, statusF],
+    queryKey: ['withdrawal-history', page, search, statusF, sortBy, sortDir],
     queryFn:  () => getWithdrawals({
       page,
       search: search || undefined,
       history: 'true',
       status: statusF || undefined,
+      ordering: sortBy ? `${sortDir === 'desc' ? '-' : ''}${sortBy}` : undefined,
     }),
   })
 
@@ -153,7 +156,33 @@ export default function WithdrawalHistory() {
 
   if (isLoading) return <PageSpinner />
 
-  const COLS = ['Client', 'ARC ID', 'Amount', 'Withdrawal Date', 'Status', 'Submitted By', 'Closed On', 'Actions']
+  const COLUMNS = [
+    { key: 'client', label: 'Client', sortable: true, field: 'client_name' },
+    { key: 'arc', label: 'ARC ID', sortable: true, field: 'client_arc_id' },
+    { key: 'amount', label: 'Amount', sortable: true, field: 'amount' },
+    { key: 'wd_dt', label: 'Withdrawal Date', sortable: true, field: 'withdrawal_datetime' },
+    { key: 'status', label: 'Status', sortable: true, field: 'status' },
+    { key: 'submitted', label: 'Submitted By', sortable: true, field: 'submitted_by_name' },
+    { key: 'closed', label: 'Closed On', sortable: true, field: 'updated_at' },
+    { key: 'actions', label: 'Actions', sortable: false },
+  ]
+
+  const toggleSort = (field) => {
+    if (!field) return
+    if (sortBy === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(field)
+      setSortDir('asc')
+    }
+    setPage(1)
+  }
+
+  const sortMarker = (field) => {
+    if (!field) return ''
+    if (sortBy !== field) return ' ↕'
+    return sortDir === 'asc' ? ' ↑' : ' ↓'
+  }
 
   return (
     <div className="space-y-6">
@@ -190,14 +219,20 @@ export default function WithdrawalHistory() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80 text-center">
-              {COLS.map((h, idx) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Actions' ? 'text-right' : idx === 0 ? 'text-left' : ''}`}>{h}</th>
+              {COLUMNS.map((col, idx) => (
+                <th
+                  key={col.key}
+                  onClick={() => col.sortable && toggleSort(col.field)}
+                  className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${col.label === 'Actions' ? 'text-right' : idx === 0 ? 'text-left' : ''} ${col.sortable ? 'cursor-pointer select-none hover:text-accent' : ''}`}
+                >
+                  {col.label}{sortMarker(col.field)}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
-              <tr><td colSpan={COLS.length} className="px-4 py-12 text-center text-gray-400 text-sm">
+              <tr><td colSpan={COLUMNS.length} className="px-4 py-12 text-center text-gray-400 text-sm">
                 <HistoryIcon size={28} className="mx-auto mb-2 text-gray-300" />
                 {isRM ? 'No history yet. Your closed tickets will appear here.' : 'No closed tickets in the history yet.'}
               </td></tr>
