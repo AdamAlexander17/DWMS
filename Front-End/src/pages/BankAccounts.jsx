@@ -1,5 +1,5 @@
-﻿import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useEffect, useState } from 'react'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
 import { getBankAccounts, createBankAccount, updateBankAccount, deleteBankAccount, activateBankAccount, deactivateBankAccount } from '../api/payments'
 import { getBrands } from '../api/brands'
@@ -154,12 +154,19 @@ export default function BankAccounts() {
   const [page, setPage]  = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [modal, setModal]   = useState(null)
   const [delTarget, setDelTarget] = useState(null)
 
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['bank-accounts', page, pageSize, search],
-    queryFn:  () => getBankAccounts({ page, page_size: pageSize, search }),
+    queryKey: ['bank-accounts', page, pageSize, debouncedSearch],
+    queryFn:  () => getBankAccounts({ page, page_size: pageSize, search: debouncedSearch }),
+    placeholderData: keepPreviousData,
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 

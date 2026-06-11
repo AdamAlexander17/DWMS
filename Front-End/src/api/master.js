@@ -1,7 +1,7 @@
 import api from './axios'
 
 // Master – Gateways
-export const getGateways    = ()         => api.get('/master/gateways')
+export const getGateways    = (params)   => api.get('/master/gateways', { params })
 export const createGateway  = (data)     => api.post('/master/gateways', data)
 export const updateGateway  = (id, data) => api.patch(`/master/gateways/${id}`, data)
 export const deleteGateway  = (id)       => api.delete(`/master/gateways/${id}`)

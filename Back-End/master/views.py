@@ -30,6 +30,9 @@ class GatewayViewSet(ViewSet):
 
     def list(self, request):
         qs = Gateway.objects.filter(is_active=True)
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            qs = qs.filter(name__icontains=search)
         return success_response('Gateways fetched successfully', GatewaySerializer(qs, many=True).data)
 
     def create(self, request):

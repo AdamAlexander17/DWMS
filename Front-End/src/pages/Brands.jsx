@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, SquarePen, Trash2, Power, PowerOff, Search, RefreshCw } from 'lucide-react'
 import { getBrands, createBrand, updateBrand, deleteBrand, activateBrand, deactivateBrand } from '../api/brands'
@@ -55,13 +55,26 @@ export default function Brands() {
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [search, setSearch]     = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [modal, setModal]       = useState(null)   // null | {mode:'create'|'edit', data?}
   const [delTarget, setDelTarget] = useState(null)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['brands', page, pageSize, search],
-    queryFn:  () => getBrands({ page, page_size: pageSize, search }),
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['brands', page, pageSize],
+    queryFn:  () => getBrands({ page, page_size: pageSize, search: debouncedSearch }),
   })
+
+  useEffect(() => {
+    refetch()
+  }, [debouncedSearch, refetch])
 
   const brands     = data?.data?.data?.results ?? []
   const totalPages = data?.data?.data?.total_pages ?? 1

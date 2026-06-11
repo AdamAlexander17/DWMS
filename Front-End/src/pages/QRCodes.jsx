@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData } from '@tanstack/react-query'
 import { Plus, SquarePen, Trash2, Power, PowerOff, Search, QrCode as QrIcon, MoreVertical, X, Download, Maximize2 } from 'lucide-react'
 import { getQRCodes, createQRCode, updateQRCode, deleteQRCode, activateQRCode, deactivateQRCode } from '../api/payments'
 import { getBrands } from '../api/brands'
@@ -283,12 +284,19 @@ export default function QRCodes() {
   const [page,      setPage]      = useState(1)
   const [pageSize,  setPageSize]  = useState(100)
   const [search,    setSearch]    = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [modal,     setModal]     = useState(null)
   const [delTarget, setDelTarget] = useState(null)
 
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['qr-codes', page, pageSize, search],
-    queryFn:  () => getQRCodes({ page, page_size: pageSize, search }),
+    queryKey: ['qr-codes', page, pageSize, debouncedSearch],
+    queryFn:  () => getQRCodes({ page, page_size: pageSize, search: debouncedSearch }),
+    placeholderData: keepPreviousData,
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 

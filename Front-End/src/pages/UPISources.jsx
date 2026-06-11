@@ -1,5 +1,5 @@
-﻿import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useEffect, useState } from 'react'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
 import { getUPISources, createUPISource, updateUPISource, deleteUPISource, activateUPISource, deactivateUPISource } from '../api/payments'
 import { getBrands } from '../api/brands'
@@ -104,12 +104,19 @@ export default function UPISources() {
   const [page, setPage]  = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [modal, setModal]   = useState(null)
   const [delTarget, setDelTarget] = useState(null)
 
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['upi-sources', page, pageSize, search],
-    queryFn:  () => getUPISources({ page, page_size: pageSize, search }),
+    queryKey: ['upi-sources', page, pageSize, debouncedSearch],
+    queryFn:  () => getUPISources({ page, page_size: pageSize, search: debouncedSearch }),
+    placeholderData: keepPreviousData,
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 

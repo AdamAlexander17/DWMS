@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
 import { getGateways, createGateway, updateGateway, activateGateway, deactivateGateway, deleteGateway } from '../api/master'
@@ -62,18 +62,28 @@ export default function Gateways() {
   const [toggleTarget, setToggleTarget] = useState(null)
   const [delTarget,    setDelTarget]    = useState(null)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  const { data, isLoading } = useQuery({
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['master-gateways-all'],
-    queryFn:  () => getGateways(),
+    queryFn:  () => getGateways(debouncedSearch ? { search: debouncedSearch } : undefined),
   })
+
+  useEffect(() => {
+    refetch()
+  }, [debouncedSearch, refetch])
 
   // For the management page show ALL gateways (active + inactive) — fetch without filter
   // The API only returns active ones, so we manage via the admin page using activate/deactivate
   const gateways = data?.data?.data ?? []
-  const filtered  = search.trim()
-    ? gateways.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
-    : gateways
 
   const getGwVal = (row, key) => {
     if (key === 'name')       return (row.name ?? '').toLowerCase()
@@ -82,7 +92,7 @@ export default function Gateways() {
     return ''
   }
   const { sorted: sortedGateways, toggle: toggleSort, icon: sortIcon } =
-    useSortable(filtered, getGwVal, 'created_at', 'desc')
+    useSortable(gateways, getGwVal, 'created_at', 'desc')
 
   const totalPages = Math.max(1, Math.ceil(sortedGateways.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -147,7 +157,7 @@ export default function Gateways() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {!isLoading && filtered.length === 0 && (
+            {!isLoading && gateways.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-sm">
                   {search ? 'No gateways match your search.' : 'No gateways yet. Click "Add Gateway" to create one.'}
