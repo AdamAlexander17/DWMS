@@ -326,9 +326,9 @@ export default function QRCodes() {
         )}
       </div>
 
-      {/* Global Search */}
-      <div className="card py-3">
-        <div className="relative">
+      {/* Search + Pagination bar */}
+      <div className="card py-4 flex items-center justify-between gap-3">
+        <div className="relative w-[320px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             className="input pl-9"
@@ -337,11 +337,9 @@ export default function QRCodes() {
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           />
         </div>
-      </div>
-
-      {/* Pagination */}
-      <div className="card py-3">
-        <Pagination current={page} total={totalPages} onPage={setPage} pageSize={pageSize} onPageSizeChange={(v) => { setPageSize(v); setPage(1) }} />
+        <div className="shrink-0">
+          <Pagination current={page} total={totalPages} onPage={setPage} pageSize={pageSize} onPageSizeChange={(v) => { setPageSize(v); setPage(1) }} />
+        </div>
       </div>
 
       {/* Cards grid — 4 per row on xl, scales down */}
