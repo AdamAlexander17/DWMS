@@ -106,10 +106,10 @@ export default function DepositHistory() {
         </span>
       </div>
 
-      {/* Filters */}
-      <div className="card py-4">
+      {/* Filters + Pagination */}
+      <div className="card py-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative w-[320px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               className="input pl-9"
@@ -132,6 +132,9 @@ export default function DepositHistory() {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
+        </div>
+        <div className="shrink-0">
+          <Pagination current={page} total={totalPages} onPage={setPage} />
         </div>
       </div>
 
@@ -243,9 +246,6 @@ export default function DepositHistory() {
             ))}
           </tbody>
         </table>
-        <div className="px-5 py-3 border-t border-gray-50">
-          <Pagination current={page} total={totalPages} onPage={setPage} />
-        </div>
       </div>
 
       {/* Delete Confirm */}

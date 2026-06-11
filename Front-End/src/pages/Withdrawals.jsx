@@ -1018,21 +1018,26 @@ export default function Withdrawals() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="card py-4 flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input className="input pl-9" placeholder="Search client name, ARC ID…" value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+      {/* Filters + Pagination */}
+      <div className="card py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative w-[320px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input className="input pl-9" placeholder="Search client name, ARC ID…" value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+          </div>
+          <select className="input max-w-[200px]" value={statusFilter} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="slip_uploaded">Slip Uploaded</option>
+            <option value="bank_followup_required">Follow-Up Required</option>
+            <option value="email_sent_to_bank">Email Sent</option>
+            <option value="closed">Closed</option>
+          </select>
         </div>
-        <select className="input max-w-[200px]" value={statusFilter} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
-          <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="slip_uploaded">Slip Uploaded</option>
-          <option value="bank_followup_required">Follow-Up Required</option>
-          <option value="email_sent_to_bank">Email Sent</option>
-          <option value="closed">Closed</option>
-        </select>
+        <div className="shrink-0">
+          <Pagination current={page} total={totalPages} onPage={setPage} />
+        </div>
       </div>
 
       {/* Table */}
@@ -1151,9 +1156,6 @@ export default function Withdrawals() {
             })}
           </tbody>
         </table>
-        <div className="px-5 py-3 border-t border-gray-50">
-          <Pagination current={page} total={totalPages} onPage={setPage} />
-        </div>
       </div>
 
       {/* Create form */}
