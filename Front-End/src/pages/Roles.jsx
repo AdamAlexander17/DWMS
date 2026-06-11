@@ -375,13 +375,14 @@ export default function Roles() {
   const [page, setPage]       = useState(1);
   const [pageSize, setPageSize] = useState(100);
   const [search,  setSearch]  = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [modal,   setModal]   = useState(null); // null | { mode: 'create'|'edit', role? }
   const [delConfirm, setDelConfirm] = useState(null);
 
-  const fetchRoles = useCallback(async () => {
+  const fetchRoles = useCallback(async (searchTerm = '') => {
     setLoading(true);
     try {
-      const res = await getRoles();
+      const res = await getRoles(searchTerm ? { search: searchTerm } : undefined);
       setRoles(res.data?.data?.results ?? []);
     } finally {
       setLoading(false);
@@ -389,9 +390,20 @@ export default function Roles() {
   }, []);
 
   useEffect(() => {
-    fetchRoles();
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    fetchRoles(debouncedSearch);
+  }, [fetchRoles, debouncedSearch]);
+
+  useEffect(() => {
     getModules().then((res) => setModules(res.data?.data ?? []));
-  }, [fetchRoles]);
+  }, []);
 
   const handleSaved = () => {
     setModal(null);
@@ -422,10 +434,7 @@ export default function Roles() {
     }
   };
 
-  const filteredRoles = roles.filter(r =>
-    r.name.toLowerCase().includes(search.toLowerCase()) ||
-    (r.description || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredRoles = roles;
 
   const getRoleVal = (r, key) => {
     if (key === 'name')        return (r.name ?? '').toLowerCase()
@@ -461,7 +470,7 @@ export default function Roles() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             className="input pl-9"
-            placeholder="Search roles…"
+            placeholder="Search role or username…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />

@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from django.db.models import Q
 
 from audit_logs.services import AuditLogService
 from common.permissions import IsAdmin
@@ -38,6 +39,13 @@ class RoleViewSet(ModelViewSet):
         is_active = self.request.query_params.get('is_active')
         if is_active is not None:
             qs = qs.filter(is_active=is_active.lower() == 'true')
+        search = (self.request.query_params.get('search') or '').strip()
+        if search:
+            qs = qs.filter(
+                Q(name__icontains=search)
+                | Q(description__icontains=search)
+                | Q(users__username__icontains=search)
+            ).distinct()
         return qs.order_by('name')
 
     # ------------------------------------------------------------------
