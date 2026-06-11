@@ -18,12 +18,13 @@ const moduleColors = {
 
 export default function AuditLogs() {
   const [page, setPage]     = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
   const [module, setModule] = useState('')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['audit-logs', page, search, module],
-    queryFn:  () => getAuditLogs({ page, search, module: module || undefined }),
+    queryKey: ['audit-logs', page, pageSize, search, module],
+    queryFn:  () => getAuditLogs({ page, page_size: pageSize, search, module: module || undefined }),
   })
 
   const logs       = data?.data?.data?.results ?? []
@@ -50,19 +51,20 @@ export default function AuditLogs() {
         <p className="page-subtitle">{total} log entr{total !== 1 ? 'ies' : 'y'}</p>
       </div>
 
-      <div className="card py-4 flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input className="input pl-9" placeholder="Search action or user…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+      <div className="card py-4 flex items-center justify-between gap-3 overflow-x-auto">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="relative w-[320px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input className="input pl-9" placeholder="Search action or user…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+          </div>
+          <select className="input max-w-[160px]" value={module} onChange={(e) => { setModule(e.target.value); setPage(1) }}>
+            <option value="">All Modules</option>
+            {Object.keys(moduleColors).map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
         </div>
-        <select className="input max-w-[160px]" value={module} onChange={(e) => { setModule(e.target.value); setPage(1) }}>
-          <option value="">All Modules</option>
-          {Object.keys(moduleColors).map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
-      </div>
-
-      <div className="card py-3">
-        <Pagination current={page} total={totalPages} onPage={setPage} />
+        <div className="shrink-0">
+          <Pagination current={page} total={totalPages} onPage={setPage} pageSize={pageSize} onPageSizeChange={(v) => { setPageSize(v); setPage(1) }} />
+        </div>
       </div>
 
       <div className="card p-0 overflow-hidden">

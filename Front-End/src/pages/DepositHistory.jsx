@@ -41,6 +41,7 @@ export default function DepositHistory() {
   const canDelete  = isAdmin || isBO
 
   const [page,          setPage]          = useState(1)
+  const [pageSize,      setPageSize]      = useState(25)
   const [search,        setSearch]        = useState('')
   const [gatewayFilter, setGatewayFilter] = useState('')
   const [channelFilter, setChannelFilter] = useState('')
@@ -49,9 +50,10 @@ export default function DepositHistory() {
   const gateways = useGateways()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['deposit-history', page, search, gatewayFilter, channelFilter],
+    queryKey: ['deposit-history', page, pageSize, search, gatewayFilter, channelFilter],
     queryFn:  () => getDeposits({
       page,
+      page_size: pageSize,
       search,
       status:       'completed',
       gateway:      gatewayFilter || undefined,
@@ -107,8 +109,8 @@ export default function DepositHistory() {
       </div>
 
       {/* Filters + Pagination */}
-      <div className="card py-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
+      <div className="card py-4 flex items-center justify-between gap-3 overflow-x-auto">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[320px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -134,7 +136,7 @@ export default function DepositHistory() {
           </select>
         </div>
         <div className="shrink-0">
-          <Pagination current={page} total={totalPages} onPage={setPage} />
+          <Pagination current={page} total={totalPages} onPage={setPage} pageSize={pageSize} onPageSizeChange={(v) => { setPageSize(v); setPage(1) }} />
         </div>
       </div>
 

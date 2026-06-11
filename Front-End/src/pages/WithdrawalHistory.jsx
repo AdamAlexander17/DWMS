@@ -118,6 +118,7 @@ export default function WithdrawalHistory() {
   const isRM = role === 'rm'
 
   const [page, setPage]         = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [search, setSearch]     = useState('')
   const [statusF, setStatusF]   = useState('')
   const [sortBy, setSortBy]     = useState('updated_at')
@@ -126,9 +127,10 @@ export default function WithdrawalHistory() {
   const [delTarget, setDel]     = useState(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['withdrawal-history', page, search, statusF, sortBy, sortDir],
+    queryKey: ['withdrawal-history', page, pageSize, search, statusF, sortBy, sortDir],
     queryFn:  () => getWithdrawals({
       page,
+      page_size: pageSize,
       search: search || undefined,
       history: 'true',
       status: statusF || undefined,
@@ -200,8 +202,8 @@ export default function WithdrawalHistory() {
       </div>
 
       {/* Filters + Pagination */}
-      <div className="card py-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
+      <div className="card py-4 flex items-center justify-between gap-3 overflow-x-auto">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[320px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input className="input pl-9" placeholder="Search client name, ARC ID…" value={search}
@@ -215,7 +217,7 @@ export default function WithdrawalHistory() {
           </select>
         </div>
         <div className="shrink-0">
-          <Pagination current={page} total={totalPages} onPage={setPage} />
+          <Pagination current={page} total={totalPages} onPage={setPage} pageSize={pageSize} onPageSizeChange={(v) => { setPageSize(v); setPage(1) }} />
         </div>
       </div>
 
