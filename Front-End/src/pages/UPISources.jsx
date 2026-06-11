@@ -7,6 +7,8 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Badge from '../components/ui/Badge'
 import Pagination from '../components/ui/Pagination'
+import SortableTh    from '../components/ui/SortableTh'
+import { useSortable } from '../hooks/useSortable'
 import { PageSpinner } from '../components/ui/Spinner'
 import CapacityBar from '../components/ui/CapacityBar'
 import { useAuthStore } from '../store/authStore'
@@ -118,6 +120,17 @@ export default function UPISources() {
     ? allBrands
     : allBrands.filter(b => (user?.brand_ids ?? []).includes(b.id))
 
+  const getUpiVal = (r, key) => {
+    if (key === 'upi_id')    return (r.upi_id ?? '').toLowerCase()
+    if (key === 'brand')     return (r.brand_name ?? '').toLowerCase()
+    if (key === 'range')     return Number(r.range_from ?? 0)
+    if (key === 'capacity')  return Number(r.capacity?.used_today ?? 0)
+    if (key === 'status')    return r.is_active ? 1 : 0
+    return ''
+  }
+  const { sorted: sortedRecords, toggle: toggleSort, icon: sortIcon } =
+    useSortable(records, getUpiVal, 'upi_id', 'asc')
+
   const inv      = () => qc.invalidateQueries({ queryKey: ['upi-sources'] })
   const resetView = () => { setSearch(''); setPage(1) }
   const createM = useMutation({ mutationFn: createUPISource,              onSuccess: () => { resetView(); inv(); setModal(null) } })
@@ -148,14 +161,17 @@ export default function UPISources() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
-              {['UPI ID', 'Brand', 'Range', 'Daily Capacity', 'Status', ...(canWrite ? ['Actions'] : [])].map((h) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Actions' ? 'text-right' : h === 'UPI ID' ? 'text-left' : ''}`}>{h}</th>
-              ))}
+              <SortableTh label="UPI ID"         sortKey="upi_id"   toggle={toggleSort} icon={sortIcon} left />
+              <SortableTh label="Brand"          sortKey="brand"    toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Range"          sortKey="range"    toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Daily Capacity" sortKey="capacity" toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Status"         sortKey="status"   toggle={toggleSort} icon={sortIcon} />
+              {canWrite && <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {records.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">No UPI sources found</td></tr>}
-            {records.map((r, i) => (
+            {records.length === 0 && <tr><td colSpan={canWrite ? 6 : 5} className="px-4 py-10 text-center text-gray-400 text-sm">No UPI sources found</td></tr>}
+            {sortedRecords.map((r, i) => (
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-2.5 font-mono font-medium text-gray-800 text-xs">{r.upi_id}</td>
                 <td className="px-4 py-2.5 text-center">

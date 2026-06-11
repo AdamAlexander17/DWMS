@@ -1,9 +1,11 @@
-﻿import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Shield, Plus, SquarePen, Trash2, CheckCircle, XCircle, Lock, Search, X, Power, PowerOff } from 'lucide-react';
 import {
   getRoles, getRole, createRole, updateRole, deleteRole,
   activateRole, deactivateRole, getModules,
 } from '../api/roles';
+import SortableTh    from '../components/ui/SortableTh';
+import { useSortable } from '../hooks/useSortable';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -422,6 +424,17 @@ export default function Roles() {
     (r.description || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  const getRoleVal = (r, key) => {
+    if (key === 'name')        return (r.name ?? '').toLowerCase()
+    if (key === 'description') return (r.description ?? '').toLowerCase()
+    if (key === 'permissions') return (r.permissions?.length ?? r.permission_count ?? 0)
+    if (key === 'status')      return r.is_active ? 1 : 0
+    if (key === 'system')      return r.is_system ? 1 : 0
+    return ''
+  }
+  const { sorted: sortedRoles, toggle: toggleSort, icon: sortIcon } =
+    useSortable(filteredRoles, getRoleVal, 'name', 'asc');
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -456,16 +469,19 @@ export default function Roles() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-center">
-                {['Role', 'Description', 'Permissions', 'Status', 'System', 'Actions'].map((h) => (
-                  <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Actions' ? 'text-right' : h === 'Role' ? 'text-left' : ''}`}>{h}</th>
-                ))}
+                <SortableTh label="Role"        sortKey="name"        toggle={toggleSort} icon={sortIcon} left />
+                <SortableTh label="Description" sortKey="description" toggle={toggleSort} icon={sortIcon} />
+                <SortableTh label="Permissions" sortKey="permissions" toggle={toggleSort} icon={sortIcon} />
+                <SortableTh label="Status"      sortKey="status"      toggle={toggleSort} icon={sortIcon} />
+                <SortableTh label="System"      sortKey="system"      toggle={toggleSort} icon={sortIcon} />
+                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
             {filteredRoles.length === 0 && (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-sm">No roles found</td></tr>
             )}
-            {filteredRoles.map((role, i) => (
+            {sortedRoles.map((role, i) => (
                 <tr key={role.id} className="hover:bg-blue-50/20 transition-colors">
                   <td className="px-4 py-2.5">
                     <span className="font-semibold text-gray-800 capitalize">{role.name.replace(/_/g, ' ')}</span>

@@ -4,6 +4,8 @@ import { Search, Paperclip, QrCode, Wallet, Building2, BadgeCheck, Trash2, Exter
 import { getDeposits, deleteDeposit } from '../api/deposits'
 import { getGateways } from '../api/master'
 import Pagination    from '../components/ui/Pagination'
+import SortableTh    from '../components/ui/SortableTh'
+import { useSortable } from '../hooks/useSortable'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useAuthStore } from '../store/authStore'
@@ -61,6 +63,26 @@ export default function DepositHistory() {
   const total      = data?.data?.data?.count   ?? 0
   const totalPages = data?.data?.data?.total_pages ?? 1
 
+  const fmtDate = (d) => d
+    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—'
+
+  const getHistVal = (row, key) => {
+    if (key === 'gateway')        return (row.gateway_detail?.name ?? '').toLowerCase()
+    if (key === 'channel')        return (CHANNEL_LABEL[row.channel_type] ?? '').toLowerCase()
+    if (key === 'channel_detail') return (row.channel_label ?? '').toLowerCase()
+    if (key === 'rm_slip')        return row.slip ? 1 : 0
+    if (key === 'comment')        return (row.comment ?? '').toLowerCase()
+    if (key === 'logged_by')      return (row.submitted_by_name ?? '').toLowerCase()
+    if (key === 'reviewed_by')    return (row.reviewed_by_name ?? '').toLowerCase()
+    if (key === 'bo_receipt')     return row.review_slip ? 1 : 0
+    if (key === 'created_at')     return row.created_at ? new Date(row.created_at).getTime() : 0
+    return ''
+  }
+
+  const { sorted: sortedRecords, toggle: toggleSort, icon: sortIcon } =
+    useSortable(records, getHistVal, 'created_at', 'desc')
+
   const deleteM = useMutation({
     mutationFn: (id) => deleteDeposit(id),
     onSuccess: () => {
@@ -70,8 +92,6 @@ export default function DepositHistory() {
   })
 
   if (isLoading) return <PageSpinner />
-
-  const cols = ['Gateway', 'Channel', 'Channel Detail', 'RM Slip', 'Comment', 'Logged By', 'Reviewed By', 'BO Receipt', ...(canDelete ? ['Actions'] : [])]
 
   return (
     <div className="space-y-5">
@@ -120,22 +140,29 @@ export default function DepositHistory() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
-              {cols.map((h) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : h === 'Gateway' ? 'text-left' : ''}`}>
-                  {h}
-                </th>
-              ))}
+              <SortableTh label="Gateway"        sortKey="gateway"        toggle={toggleSort} icon={sortIcon} left />
+              <SortableTh label="Channel"         sortKey="channel"        toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Channel Detail"  sortKey="channel_detail" toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="RM Slip"         sortKey="rm_slip"        toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Comment"         sortKey="comment"        toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Logged By"       sortKey="logged_by"      toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Reviewed By"     sortKey="reviewed_by"    toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="BO Receipt"      sortKey="bo_receipt"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Created At"      sortKey="created_at"     toggle={toggleSort} icon={sortIcon} />
+              {canDelete && (
+                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
               <tr>
-                <td colSpan={cols.length} className="px-4 py-10 text-center text-gray-400 text-sm">
+                <td colSpan={9 + (canDelete ? 1 : 0)} className="px-4 py-10 text-center text-gray-400 text-sm">
                   No completed deposits yet.
                 </td>
               </tr>
             )}
-            {records.map((r) => (
+            {sortedRecords.map((r) => (
               <tr key={r.id} className="hover:bg-green-50/20 transition-colors">
                 {/* Gateway */}
                 <td className="px-4 py-2.5">
@@ -194,6 +221,9 @@ export default function DepositHistory() {
                     <span className="text-xs text-gray-400">—</span>
                   )}
                 </td>
+
+                {/* Created At */}
+                <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{fmtDate(r.created_at)}</td>
 
                 {/* Actions */}
                 {canDelete && (

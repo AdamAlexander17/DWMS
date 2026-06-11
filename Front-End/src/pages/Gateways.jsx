@@ -4,6 +4,8 @@ import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
 import { getGateways, createGateway, updateGateway, activateGateway, deactivateGateway, deleteGateway } from '../api/master'
 import Modal         from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
+import SortableTh    from '../components/ui/SortableTh'
+import { useSortable } from '../hooks/useSortable'
 import { brandName as vBrandName, extractApiErrors } from '../utils/validators'
 
 // ── Form ──────────────────────────────────────────────────────────────────
@@ -70,6 +72,15 @@ export default function Gateways() {
     ? gateways.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
     : gateways
 
+  const getGwVal = (row, key) => {
+    if (key === 'name')       return (row.name ?? '').toLowerCase()
+    if (key === 'status')     return row.is_active ? 1 : 0
+    if (key === 'created_at') return row.created_at ? new Date(row.created_at).getTime() : 0
+    return ''
+  }
+  const { sorted: sortedGateways, toggle: toggleSort, icon: sortIcon } =
+    useSortable(filtered, getGwVal, 'created_at', 'desc')
+
   const inv = () => qc.invalidateQueries({ queryKey: ['master-gateways'] })
              + qc.invalidateQueries({ queryKey: ['master-gateways-all'] })
 
@@ -113,14 +124,10 @@ export default function Gateways() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
-              {['Name', 'Status', 'Created', 'Actions'].map((h) => (
-                <th
-                  key={h}
-                  className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap ${h === 'Actions' ? 'text-right' : h === 'Name' ? 'text-left' : ''}`}
-                >
-                  {h}
-                </th>
-              ))}
+              <SortableTh label="Name"    sortKey="name"       toggle={toggleSort} icon={sortIcon} left />
+              <SortableTh label="Status"  sortKey="status"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Created" sortKey="created_at" toggle={toggleSort} icon={sortIcon} />
+              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -131,7 +138,7 @@ export default function Gateways() {
                 </td>
               </tr>
             )}
-            {filtered.map((gw) => (
+            {sortedGateways.map((gw) => (
               <tr key={gw.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">

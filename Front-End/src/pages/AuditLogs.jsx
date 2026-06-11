@@ -2,7 +2,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import { getAuditLogs } from '../api/auditLogs'
-import Pagination from '../components/ui/Pagination'
+import Pagination    from '../components/ui/Pagination'
+import SortableTh    from '../components/ui/SortableTh'
+import { useSortable } from '../hooks/useSortable'
 import { PageSpinner } from '../components/ui/Spinner'
 
 const moduleColors = {
@@ -28,6 +30,17 @@ export default function AuditLogs() {
   const total      = data?.data?.data?.count   ?? 0
   const totalPages = data?.data?.data?.total_pages ?? 1
 
+  const getLogVal = (log, key) => {
+    if (key === 'timestamp')  return log.timestamp ? new Date(log.timestamp).getTime() : 0
+    if (key === 'user')       return (log.username ?? '').toLowerCase()
+    if (key === 'module')     return (log.module ?? '').toLowerCase()
+    if (key === 'action')     return (log.action ?? '').toLowerCase()
+    if (key === 'ip_address') return (log.ip_address ?? '').toLowerCase()
+    return ''
+  }
+  const { sorted: sortedLogs, toggle: toggleSort, icon: sortIcon } =
+    useSortable(logs, getLogVal, 'timestamp', 'desc')
+
   if (isLoading) return <PageSpinner />
 
   return (
@@ -52,14 +65,16 @@ export default function AuditLogs() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
-              {['Time', 'User', 'Module', 'Action', 'IP Address'].map((h) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'Time' ? 'text-left' : ''}`}>{h}</th>
-              ))}
+              <SortableTh label="Time"       sortKey="timestamp"  toggle={toggleSort} icon={sortIcon} left />
+              <SortableTh label="User"       sortKey="user"       toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Module"     sortKey="module"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Action"     sortKey="action"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="IP Address" sortKey="ip_address" toggle={toggleSort} icon={sortIcon} />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {logs.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">No logs found</td></tr>}
-            {logs.map((log) => (
+            {sortedLogs.map((log) => (
               <tr key={log.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">
                   {new Date(log.timestamp).toLocaleString()}

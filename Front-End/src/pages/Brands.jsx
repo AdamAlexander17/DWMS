@@ -6,6 +6,8 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Badge from '../components/ui/Badge'
 import Pagination from '../components/ui/Pagination'
+import SortableTh    from '../components/ui/SortableTh'
+import { useSortable } from '../hooks/useSortable'
 import { PageSpinner } from '../components/ui/Spinner'
 import FormField from '../components/ui/FormField'
 import { brandName as vBrandName, extractApiErrors } from '../utils/validators'
@@ -64,6 +66,15 @@ export default function Brands() {
   const totalPages = data?.data?.data?.total_pages ?? 1
   const total      = data?.data?.data?.count ?? 0
 
+  const getBrandVal = (b, key) => {
+    if (key === 'name')       return (b.name ?? '').toLowerCase()
+    if (key === 'status')     return b.is_active ? 1 : 0
+    if (key === 'created_at') return b.created_at ? new Date(b.created_at).getTime() : 0
+    return ''
+  }
+  const { sorted: sortedBrands, toggle: toggleSort, icon: sortIcon } =
+    useSortable(brands, getBrandVal, 'created_at', 'desc')
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['brands'] })
 
   const createM  = useMutation({ mutationFn: createBrand,   onSuccess: () => { invalidate(); setModal(null) } })
@@ -103,9 +114,9 @@ export default function Brands() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
-              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-left">Brand Name</th>
-              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider">Status</th>
-              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider">Created</th>
+              <SortableTh label="Brand Name" sortKey="name"       toggle={toggleSort} icon={sortIcon} left />
+              <SortableTh label="Status"     sortKey="status"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Created"    sortKey="created_at" toggle={toggleSort} icon={sortIcon} />
               <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
@@ -113,7 +124,7 @@ export default function Brands() {
             {brands.length === 0 && (
               <tr><td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-sm">No brands found</td></tr>
             )}
-            {brands.map((b, i) => (
+            {sortedBrands.map((b, i) => (
               <tr key={b.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-3">

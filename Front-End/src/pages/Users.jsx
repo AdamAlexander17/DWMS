@@ -1,6 +1,6 @@
 ﻿import { useState, useRef, useEffect } from 'react'
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, SquarePen, Trash2, Search, LockKeyhole, X, Clock, Calendar, ChevronDown, ChevronUp, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Plus, SquarePen, Trash2, Search, LockKeyhole, X, Clock, Calendar, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getUsers, createUser, updateUser, deleteUser, activateUser, deactivateUser, resetPassword, bulkImportUsers } from '../api/users'
 import { getBrands } from '../api/brands'
 import { getRoles } from '../api/roles'
@@ -8,6 +8,8 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Badge from '../components/ui/Badge'
 import Pagination from '../components/ui/Pagination'
+import SortableTh    from '../components/ui/SortableTh'
+import { useSortable } from '../hooks/useSortable'
 import { PageSpinner } from '../components/ui/Spinner'
 import {
   username as vUsername,
@@ -413,6 +415,19 @@ export default function Users() {
   const brands = brandsData?.data?.data?.results ?? brandsData?.data?.results ?? []
   const roles  = rolesData?.data?.data?.results ?? []
 
+  const getUserVal = (u, key) => {
+    if (key === 'username')   return (u.username ?? '').toLowerCase()
+    if (key === 'brand')      return (u.brands_detail?.map(b => b.name).join(', ') ?? '').toLowerCase()
+    if (key === 'role')       return (u.role_name ?? '').toLowerCase()
+    if (key === 'status')     return u.is_active ? 1 : 0
+    if (key === 'last_login') return u.last_login ? new Date(u.last_login).getTime() : 0
+    if (key === 'created_at') return u.created_at ? new Date(u.created_at).getTime() : 0
+    return ''
+  }
+
+  const { sorted: sortedUsers, toggle: toggleSort, icon: sortIcon } =
+    useSortable(users, getUserVal, 'created_at', 'desc')
+
   const inv = () => qc.invalidateQueries({ queryKey: ['users'] })
 
   const buildPayload = (form) => {
@@ -474,17 +489,12 @@ export default function Users() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80 text-center">
-              {['User', 'Brand', 'Roles', 'Status', 'Last Login'].map((h) => (
-                <th key={h} className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider ${h === 'User' ? 'text-left' : ''}`}>{h}</th>
-              ))}
-              <th
-                className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider cursor-pointer select-none"
-                onClick={() => setSortAsc(p => !p)}
-              >
-                <span className="inline-flex items-center gap-1">
-                  Created {sortAsc ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                </span>
-              </th>
+              <SortableTh label="User"       sortKey="username"   toggle={toggleSort} icon={sortIcon} left />
+              <SortableTh label="Brand"      sortKey="brand"      toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Roles"      sortKey="role"       toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Status"     sortKey="status"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Last Login" sortKey="last_login" toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Created"    sortKey="created_at" toggle={toggleSort} icon={sortIcon} />
               <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
@@ -492,7 +502,7 @@ export default function Users() {
             {users.length === 0 && (
               <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400 text-sm">No users found</td></tr>
             )}
-            {users.map((u) => (
+            {sortedUsers.map((u) => (
               <tr key={u.id} className="hover:bg-blue-50/20 transition-colors">
 
                 {/* User */}

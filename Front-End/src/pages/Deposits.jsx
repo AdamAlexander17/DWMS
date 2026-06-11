@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2 } from 'lucide-react'
 import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit } from '../api/deposits'
@@ -7,6 +7,8 @@ import { getQRCodes }      from '../api/payments'
 import { getUPISources }   from '../api/payments'
 import { getBankAccounts } from '../api/payments'
 import Modal         from '../components/ui/Modal'
+import SortableTh    from '../components/ui/SortableTh'
+import { useSortable } from '../hooks/useSortable'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Pagination    from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
@@ -645,8 +647,6 @@ export default function Deposits() {
   const [channelFilter,   setChannelFilter]   = useState('')
   const [modal,           setModal]           = useState(null)
   const [delTarget,       setDelTarget]       = useState(null)
-  const [sortCfg,         setSortCfg]         = useState({ key: 'created_at', dir: 'desc' })
-
   const fmtDate = (d) => d
     ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '—'
@@ -654,48 +654,28 @@ export default function Deposits() {
   const { data, isLoading } = useQuery({
     queryKey: ['deposits', page, search, gatewayFilter, channelFilter],
     queryFn:  () => getDeposits({ page, search, gateway: gatewayFilter || undefined, channel_type: channelFilter || undefined }),
-    refetchInterval: 15_000,   // fallback poll — WS push is the primary mechanism
+    refetchInterval: 15_000,
   })
 
   const records    = data?.data?.data?.results ?? []
   const total      = data?.data?.data?.count   ?? 0
   const totalPages = data?.data?.data?.total_pages ?? 1
 
-  const getSortValue = (row, key) => {
-    if (key === 'gateway') return (row.gateway_detail?.name ?? '').toLowerCase()
-    if (key === 'channel') return (CHANNEL_LABEL[row.channel_type] ?? '').toLowerCase()
+  const getDepositVal = (row, key) => {
+    if (key === 'gateway')       return (row.gateway_detail?.name ?? '').toLowerCase()
+    if (key === 'channel')       return (CHANNEL_LABEL[row.channel_type] ?? '').toLowerCase()
     if (key === 'channel_detail') return (row.channel_label ?? '').toLowerCase()
-    if (key === 'ark_id') return Number(row.ark_id || 0)
-    if (key === 'slip') return row.slip ? 1 : 0
-    if (key === 'comment') return (row.comment ?? '').toLowerCase()
-    if (key === 'logged_by') return (row.submitted_by_name ?? '').toLowerCase()
-    if (key === 'created_at') return row.created_at ? new Date(row.created_at).getTime() : 0
+    if (key === 'ark_id')        return Number(row.ark_id || 0)
+    if (key === 'slip')          return row.slip ? 1 : 0
+    if (key === 'comment')       return (row.comment ?? '').toLowerCase()
+    if (key === 'logged_by')     return (row.submitted_by_name ?? '').toLowerCase()
+    if (key === 'created_at')    return row.created_at ? new Date(row.created_at).getTime() : 0
     if (key === 'ticket_status') return (TICKET_STATUS_CONFIG[deriveTicketStatus(row)]?.label ?? '').toLowerCase()
     return ''
   }
 
-  const sortedRecords = useMemo(() => {
-    const arr = [...records]
-    arr.sort((a, b) => {
-      const av = getSortValue(a, sortCfg.key)
-      const bv = getSortValue(b, sortCfg.key)
-      if (av === bv) return 0
-      const cmp = av > bv ? 1 : -1
-      return sortCfg.dir === 'asc' ? cmp : -cmp
-    })
-    return arr
-  }, [records, sortCfg])
-
-  const toggleSort = (key) => {
-    setSortCfg((prev) => {
-      if (prev.key === key) {
-        return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-      }
-      return { key, dir: 'asc' }
-    })
-  }
-
-  const sortIcon = (key) => (sortCfg.key === key ? (sortCfg.dir === 'asc' ? '▲' : '▼') : '↕')
+  const { sorted: sortedRecords, toggle: toggleSort, icon: sortIcon } =
+    useSortable(records, getDepositVal, 'created_at', 'desc')
 
   const inv = () => {
     qc.invalidateQueries({ queryKey: ['deposits'] })
@@ -753,28 +733,15 @@ export default function Deposits() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
-              {[
-                { label: 'Gateway', key: 'gateway' },
-                { label: 'Channel', key: 'channel' },
-                { label: 'Channel Detail', key: 'channel_detail' },
-                { label: 'ARK ID', key: 'ark_id' },
-                { label: 'Slip', key: 'slip' },
-                { label: 'Comment', key: 'comment' },
-                { label: 'Logged By', key: 'logged_by' },
-                { label: 'Created At', key: 'created_at' },
-                { label: 'Ticket Status', key: 'ticket_status' },
-              ].map((h) => (
-                <th
-                  key={h.label}
-                  onClick={() => toggleSort(h.key)}
-                  className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap cursor-pointer select-none ${h.label === 'Gateway' ? 'text-left' : ''}`}
-                  title={`Sort by ${h.label}`}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {h.label} <span className="text-[10px] text-gray-400">{sortIcon(h.key)}</span>
-                  </span>
-                </th>
-              ))}
+              <SortableTh label="Gateway"        sortKey="gateway"        toggle={toggleSort} icon={sortIcon} left />
+              <SortableTh label="Channel"         sortKey="channel"        toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Channel Detail"  sortKey="channel_detail" toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="ARK ID"          sortKey="ark_id"         toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Slip"            sortKey="slip"           toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Comment"         sortKey="comment"        toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Logged By"       sortKey="logged_by"      toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Created At"      sortKey="created_at"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Ticket Status"   sortKey="ticket_status"  toggle={toggleSort} icon={sortIcon} />
               {(canWrite || canReview) && (
                 <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
               )}
