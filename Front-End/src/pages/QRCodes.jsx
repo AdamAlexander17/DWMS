@@ -281,13 +281,14 @@ export default function QRCodes() {
   const { user } = useAuthStore()
   const canWrite = ['admin', 'back_office'].includes(user?.role)
   const [page,      setPage]      = useState(1)
+  const [pageSize,  setPageSize]  = useState(100)
   const [search,    setSearch]    = useState('')
   const [modal,     setModal]     = useState(null)
   const [delTarget, setDelTarget] = useState(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['qr-codes', page, search],
-    queryFn:  () => getQRCodes({ page, search }),
+    queryKey: ['qr-codes', page, pageSize, search],
+    queryFn:  () => getQRCodes({ page, page_size: pageSize, search }),
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 
@@ -338,6 +339,11 @@ export default function QRCodes() {
         </div>
       </div>
 
+      {/* Pagination */}
+      <div className="card py-3">
+        <Pagination current={page} total={totalPages} onPage={setPage} pageSize={pageSize} onPageSizeChange={(v) => { setPageSize(v); setPage(1) }} />
+      </div>
+
       {/* Cards grid — 4 per row on xl, scales down */}
       {records.length === 0 ? (
         <div className="card py-16 text-center text-gray-400">No QR codes found.</div>
@@ -353,13 +359,6 @@ export default function QRCodes() {
               onToggle={(rec) => toggleM.mutate({ id: rec.id, a: rec.is_active })}
             />
           ))}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="card py-3">
-          <Pagination current={page} total={totalPages} onPage={setPage} />
         </div>
       )}
 

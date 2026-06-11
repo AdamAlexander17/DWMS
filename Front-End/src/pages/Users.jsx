@@ -380,10 +380,10 @@ function ResetPwForm({ onSubmit, loading, apiErrors = {} }) {
 export default function Users() {
   const qc = useQueryClient()
   const [page, setPage]     = useState(1)
+  const [pageSize, setPageSize] = useState(100)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
-  const [sortAsc, setSortAsc] = useState(false)
   const [modal, setModal]   = useState(null)
   const [delTarget, setDelTarget]   = useState(null)
   const [resetTarget, setResetTarget] = useState(null)
@@ -402,8 +402,8 @@ export default function Users() {
   const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : '—'
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['users', page, debouncedSearch, roleFilter, sortAsc],
-    queryFn:  () => getUsers({ page, search: debouncedSearch, role: roleFilter || undefined, ordering: sortAsc ? 'created_at' : '-created_at' }),
+    queryKey: ['users', page, pageSize, debouncedSearch, roleFilter],
+    queryFn:  () => getUsers({ page, page_size: pageSize, search: debouncedSearch, role: roleFilter || undefined, ordering: '-created_at' }),
     placeholderData: keepPreviousData,   // keep previous results visible while fetching new page/search
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
@@ -468,20 +468,32 @@ export default function Users() {
       </div>
 
       {/* Filters */}
-      <div className="card py-4 flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input className="input pl-9" placeholder="Search users…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          {isFetching && !isLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />}
+      <div className="card py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="relative w-[320px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input className="input pl-9" placeholder="Search users…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {isFetching && !isLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />}
+          </div>
+          <select className="input w-[180px]" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
+            <option value="">All Roles</option>
+            {roles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+              </option>
+            ))}
+          </select>
         </div>
-        <select className="input max-w-[180px]" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
-          <option value="">All Roles</option>
-          {roles.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-            </option>
-          ))}
-        </select>
+
+        <div className="shrink-0">
+          <Pagination
+            current={page}
+            total={totalPages}
+            onPage={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(v) => { setPageSize(v); setPage(1) }}
+          />
+        </div>
       </div>
 
       {/* Table */}
@@ -565,9 +577,6 @@ export default function Users() {
             ))}
           </tbody>
         </table>
-        <div className="px-5 py-3 border-t border-gray-50">
-          <Pagination current={page} total={totalPages} onPage={setPage} />
-        </div>
       </div>
 
       {showImport && (

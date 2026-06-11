@@ -61,6 +61,10 @@ export default function AuditLogs() {
         </select>
       </div>
 
+      <div className="card py-3">
+        <Pagination current={page} total={totalPages} onPage={setPage} />
+      </div>
+
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
@@ -93,7 +97,6 @@ export default function AuditLogs() {
             ))}
           </tbody>
         </table>
-        <div className="px-5 py-3 border-t border-gray-50"><Pagination current={page} total={totalPages} onPage={setPage} /></div>
       </div>
     </div>
   )

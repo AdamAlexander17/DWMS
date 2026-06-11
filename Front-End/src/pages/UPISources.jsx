@@ -102,13 +102,14 @@ export default function UPISources() {
   const { user } = useAuthStore()
   const canWrite = ['admin', 'back_office'].includes(user?.role)
   const [page, setPage]  = useState(1)
+  const [pageSize, setPageSize] = useState(100)
   const [search, setSearch] = useState('')
   const [modal, setModal]   = useState(null)
   const [delTarget, setDelTarget] = useState(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['upi-sources', page, search],
-    queryFn:  () => getUPISources({ page, search }),
+    queryKey: ['upi-sources', page, pageSize, search],
+    queryFn:  () => getUPISources({ page, page_size: pageSize, search }),
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 
@@ -157,6 +158,10 @@ export default function UPISources() {
         </div>
       </div>
 
+      <div className="card py-3">
+        <Pagination current={page} total={totalPages} onPage={setPage} pageSize={pageSize} onPageSizeChange={(v) => { setPageSize(v); setPage(1) }} />
+      </div>
+
       <div className="card p-0 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
@@ -195,7 +200,6 @@ export default function UPISources() {
             ))}
           </tbody>
         </table>
-        <div className="px-5 py-3 border-t border-gray-50"><Pagination current={page} total={totalPages} onPage={setPage} /></div>
       </div>
 
       {canWrite && (

@@ -6,6 +6,7 @@ import {
 } from '../api/roles';
 import SortableTh    from '../components/ui/SortableTh';
 import { useSortable } from '../hooks/useSortable';
+import Pagination from '../components/ui/Pagination';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -371,6 +372,8 @@ export default function Roles() {
   const [roles,   setRoles]   = useState([]);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage]       = useState(1);
+  const [pageSize, setPageSize] = useState(100);
   const [search,  setSearch]  = useState('');
   const [modal,   setModal]   = useState(null); // null | { mode: 'create'|'edit', role? }
   const [delConfirm, setDelConfirm] = useState(null);
@@ -435,6 +438,10 @@ export default function Roles() {
   const { sorted: sortedRoles, toggle: toggleSort, icon: sortIcon } =
     useSortable(filteredRoles, getRoleVal, 'name', 'asc');
 
+  const totalPages = Math.max(1, Math.ceil(sortedRoles.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRoles = sortedRoles.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -448,15 +455,24 @@ export default function Roles() {
         </button>
       </div>
 
-      {/* Filter bar */}
-      <div className="card py-4">
-        <div className="relative max-w-xs">
+      {/* Filter + Pagination bar */}
+      <div className="card py-4 flex items-center justify-between gap-3">
+        <div className="relative w-[320px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             className="input pl-9"
             placeholder="Search roles…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+        <div className="shrink-0">
+          <Pagination
+            current={currentPage}
+            total={totalPages}
+            onPage={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(v) => { setPageSize(v); setPage(1); }}
           />
         </div>
       </div>
@@ -481,7 +497,7 @@ export default function Roles() {
             {filteredRoles.length === 0 && (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-sm">No roles found</td></tr>
             )}
-            {sortedRoles.map((role, i) => (
+            {pagedRoles.map((role, i) => (
                 <tr key={role.id} className="hover:bg-blue-50/20 transition-colors">
                   <td className="px-4 py-2.5">
                     <span className="font-semibold text-gray-800 capitalize">{role.name.replace(/_/g, ' ')}</span>

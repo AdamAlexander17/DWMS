@@ -4,6 +4,7 @@ import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
 import { getGateways, createGateway, updateGateway, activateGateway, deactivateGateway, deleteGateway } from '../api/master'
 import Modal         from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
+import Pagination    from '../components/ui/Pagination'
 import SortableTh    from '../components/ui/SortableTh'
 import { useSortable } from '../hooks/useSortable'
 import { brandName as vBrandName, extractApiErrors } from '../utils/validators'
@@ -55,6 +56,8 @@ function GatewayForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function Gateways() {
   const qc = useQueryClient()
+  const [page,      setPage]      = useState(1)
+  const [pageSize,  setPageSize]  = useState(100)
   const [modal,     setModal]     = useState(null)
   const [toggleTarget, setToggleTarget] = useState(null)
   const [delTarget,    setDelTarget]    = useState(null)
@@ -81,6 +84,10 @@ export default function Gateways() {
   const { sorted: sortedGateways, toggle: toggleSort, icon: sortIcon } =
     useSortable(filtered, getGwVal, 'created_at', 'desc')
 
+  const totalPages = Math.max(1, Math.ceil(sortedGateways.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedGateways = sortedGateways.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
   const inv = () => qc.invalidateQueries({ queryKey: ['master-gateways'] })
              + qc.invalidateQueries({ queryKey: ['master-gateways-all'] })
 
@@ -106,15 +113,24 @@ export default function Gateways() {
         </button>
       </div>
 
-      {/* Search bar */}
-      <div className="card py-3 px-4">
-        <div className="relative max-w-xs">
+      {/* Search + Pagination bar */}
+      <div className="card py-4 px-4 flex items-center justify-between gap-3">
+        <div className="relative w-[320px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             className="input pl-9"
             placeholder="Search gateway name…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          />
+        </div>
+        <div className="shrink-0">
+          <Pagination
+            current={currentPage}
+            total={totalPages}
+            onPage={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(v) => { setPageSize(v); setPage(1) }}
           />
         </div>
       </div>
@@ -138,7 +154,7 @@ export default function Gateways() {
                 </td>
               </tr>
             )}
-            {sortedGateways.map((gw) => (
+            {pagedGateways.map((gw) => (
               <tr key={gw.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">
