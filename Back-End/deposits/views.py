@@ -58,12 +58,20 @@ class DepositLogViewSet(
     def list(self, request, *args, **kwargs):
         from django.db.models import Q
         queryset = self.filter_queryset(self.get_queryset())
+
+        # Deposit History requests ?status=completed — show completed AND added (slip confirmed).
         is_history = request.query_params.get('status') == DepositLog.STATUS_COMPLETED
 
-        # Default list excludes completed deposits (those live in Deposit History).
-        # History page explicitly requests ?status=completed to see them.
+        # Default list excludes completed and added deposits (those live in Deposit History).
         if 'status' not in request.query_params:
             queryset = queryset.exclude(status=DepositLog.STATUS_COMPLETED)
+            queryset = queryset.exclude(slip_status=DepositLog.SLIP_ADDED)
+
+        # History page: include both completed AND added
+        if is_history:
+            queryset = self.filter_queryset(self.get_queryset()).filter(
+                Q(status=DepositLog.STATUS_COMPLETED) | Q(slip_status=DepositLog.SLIP_ADDED)
+            )
 
         # History view: scope to records the user is personally tied to (admin keeps full visibility).
         user      = request.user

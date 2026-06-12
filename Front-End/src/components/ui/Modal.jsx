@@ -2,7 +2,7 @@ import { X } from 'lucide-react'
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-export default function Modal({ open, onClose, title, children, size = 'md' }) {
+export default function Modal({ open, onClose, title, children, size = 'md', variant = 'default' }) {
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
     if (open) window.addEventListener('keydown', handler)
@@ -12,6 +12,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
   if (!open) return null
 
   const sizeMap = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
+  const headerBg = variant === 'danger' ? 'bg-red-600' : 'bg-accent'
 
   return createPortal(
     <div
@@ -24,7 +25,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 rounded-t-2xl bg-accent">
+        <div className={`flex items-center justify-between px-6 py-4 rounded-t-2xl ${headerBg}`}>
           <h2 className="text-base font-semibold text-white">{title}</h2>
           <button
             onClick={onClose}

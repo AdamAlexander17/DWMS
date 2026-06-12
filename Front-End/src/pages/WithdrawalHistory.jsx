@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
   Search, Eye, Trash2, IndianRupee, Calendar, CheckCircle2, XCircle, Clock,
   FileText, AlertTriangle, Mail, History as HistoryIcon, MessageSquare, Download,
@@ -120,22 +120,30 @@ export default function WithdrawalHistory() {
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [search, setSearch]     = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusF, setStatusF]   = useState('')
   const [sortBy, setSortBy]     = useState('updated_at')
   const [sortDir, setSortDir]   = useState('desc')
   const [viewTarget, setView]   = useState(null)
   const [delTarget, setDel]     = useState(null)
 
+  // Debounce search — wait 400ms after last keystroke before firing API
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['withdrawal-history', page, pageSize, search, statusF, sortBy, sortDir],
+    queryKey: ['withdrawal-history', page, pageSize, debouncedSearch, statusF, sortBy, sortDir],
     queryFn:  () => getWithdrawals({
       page,
       page_size: pageSize,
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       history: 'true',
       status: statusF || undefined,
       ordering: sortBy ? `${sortDir === 'desc' ? '-' : ''}${sortBy}` : undefined,
     }),
+    placeholderData: keepPreviousData,
   })
 
   const records    = data?.data?.data?.results ?? []
@@ -206,8 +214,8 @@ export default function WithdrawalHistory() {
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[320px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input className="input pl-9" placeholder="Search client name, ARC ID…" value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+            <input className="input pl-9" placeholder="Search client, ARK ID, amount…" value={search}
+              onChange={(e) => setSearch(e.target.value)} />
           </div>
           <select className="input max-w-[200px]" value={statusF} onChange={(e) => { setStatusF(e.target.value); setPage(1) }}>
             <option value="">All Statuses</option>
