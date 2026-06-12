@@ -122,7 +122,9 @@ class WithdrawalViewSet(ModelViewSet):
         if search:
             from django.db.models import Q
             qs = qs.filter(
-                Q(client_name__icontains=search) | Q(client_arc_id__icontains=search)
+                Q(client_name__icontains=search)
+                | Q(client_arc_id__icontains=search)
+                | Q(amount__icontains=search)
             )
 
         # History view: BO sees only tickets they personally touched (admin keeps full visibility, RM is already submitted_by-scoped).

@@ -873,6 +873,7 @@ export default function Withdrawals() {
   const [page, setPage]           = useState(1)
   const [pageSize, setPageSize]   = useState(25)
   const [search, setSearch]       = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatus] = useState('')
   const [sortBy, setSortBy]       = useState('created_at')
   const [sortDir, setSortDir]     = useState('desc')
@@ -909,12 +910,18 @@ export default function Withdrawals() {
     return () => { cancelled = true }
   }, [searchParams, setSearchParams])
 
+  // Debounce search — wait 400ms after last keystroke before firing API
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['withdrawals', page, pageSize, search, statusFilter, sortBy, sortDir],
+    queryKey: ['withdrawals', page, pageSize, debouncedSearch, statusFilter, sortBy, sortDir],
     queryFn:  () => getWithdrawals({
       page,
       page_size: pageSize,
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       status: statusFilter || undefined,
       history: 'false',
       ordering: sortBy ? `${sortDir === 'desc' ? '-' : ''}${sortBy}` : undefined,
@@ -1025,8 +1032,8 @@ export default function Withdrawals() {
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[320px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input className="input pl-9" placeholder="Search client name, ARC ID…" value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+            <input className="input pl-9" placeholder="Search client, ARK ID, amount…" value={search}
+              onChange={(e) => setSearch(e.target.value)} />
           </div>
           <select className="input max-w-[200px]" value={statusFilter} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
             <option value="">All Status</option>
