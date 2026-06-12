@@ -95,7 +95,7 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
   const options = useChannelOptions(channelType)
 
   return (
-    <>
+    <div className="space-y-3">
       {/* Channel Type */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Channel</label>
@@ -105,19 +105,19 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
               key={value}
               type="button"
               onClick={() => onTypeChange(value)}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-semibold transition-all ${
+              className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-xs font-semibold transition-all ${
                 channelType === value
                   ? 'border-accent bg-accent/10 text-accent-dark'
                   : 'border-gray-200 text-gray-500 hover:border-gray-300'
               }`}
             >
-              <Icon size={17} />{label}
+              <Icon size={15} />{label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Channel Item */}
+      {/* Channel Item — only when type is selected */}
       {channelType && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -138,7 +138,7 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
           )}
         </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -200,7 +200,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {/* Channel Type + Channel Item */}
       <ChannelSelector
         channelType={form.channel_type}
@@ -208,75 +208,75 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
         onTypeChange={(v) => { setForm((p) => ({ ...p, channel_type: v, channel_id: '' })); if (local.channel_type) setLocal((p) => ({ ...p, channel_type: undefined })); if (local.channel_id) setLocal((p) => ({ ...p, channel_id: undefined })) }}
         onIdChange={f('channel_id')}
       />
-      {errors.channel_id && <p className="text-xs text-red-600 -mt-2">{errors.channel_id}</p>}
+      {errors.channel_id && <p className="text-xs text-red-600 -mt-3">{errors.channel_id}</p>}
 
-      {/* ARK ID */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">ARK ID <span className="text-red-500">*</span></label>
-        <input
-          className={`input ${errors.ark_id ? 'border-red-300' : ''}`}
-          placeholder="Enter ARK ID"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={100}
-          value={form.ark_id}
-          onChange={(e) => f('ark_id')(e.target.value.replace(/\D/g, ''))}
-        />
-        {errors.ark_id && <p className="mt-1 text-xs text-red-600">{errors.ark_id}</p>}
-      </div>
-
-      {/* Gateway Name */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name <span className="text-red-500">*</span></label>
-        <select
-          className={`input ${errors.gateway ? 'border-red-300' : ''}`}
-          value={form.gateway}
-          onChange={(e) => f('gateway')(e.target.value)}
-        >
-          <option value="">Select gateway…</option>
-          {gateways.map((gw) => (
-            <option key={gw.id} value={gw.id}>{gw.name}</option>
-          ))}
-        </select>
-        {errors.gateway && <p className="mt-1 text-xs text-red-600">{errors.gateway}</p>}
-      </div>
-
-      {/* Slip upload */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip{form.rm_status === 'completed' && <span className="text-red-500"> *</span>}</label>
-        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
-          <Paperclip size={15} className="text-gray-400 shrink-0" />
-          <span className="text-sm text-gray-500 truncate">
-            {form.slip ? form.slip.name : 'Click to attach slip (image / PDF, max 8 MB)'}
-          </span>
+      {/* ARK ID + Gateway — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">ARK ID <span className="text-red-500">*</span></label>
           <input
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
-            className="hidden"
-            onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
+            className={`input ${errors.ark_id ? 'border-red-300' : ''}`}
+            placeholder="Enter ARK ID"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={100}
+            value={form.ark_id}
+            onChange={(e) => f('ark_id')(e.target.value.replace(/\D/g, ''))}
           />
-        </label>
-        {errors.slip && <p className="mt-1 text-xs text-red-600">{errors.slip}</p>}
+          {errors.ark_id && <p className="mt-1 text-xs text-red-600">{errors.ark_id}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name <span className="text-red-500">*</span></label>
+          <select
+            className={`input ${errors.gateway ? 'border-red-300' : ''}`}
+            value={form.gateway}
+            onChange={(e) => f('gateway')(e.target.value)}
+          >
+            <option value="">Select gateway…</option>
+            {gateways.map((gw) => (
+              <option key={gw.id} value={gw.id}>{gw.name}</option>
+            ))}
+          </select>
+          {errors.gateway && <p className="mt-1 text-xs text-red-600">{errors.gateway}</p>}
+        </div>
       </div>
 
-      {/* Status */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Status *</label>
-        <div className="grid grid-cols-2 gap-2">
-          {RM_STATUS_OPTS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => f('rm_status')(value)}
-              className={`py-2 rounded-lg border-2 text-xs font-semibold transition-all ${
-                form.rm_status === value
-                  ? 'border-accent bg-accent/10 text-accent-dark'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      {/* Slip + Status — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip{form.rm_status === 'completed' && <span className="text-red-500"> *</span>}</label>
+          <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
+            <Paperclip size={14} className="text-gray-400 shrink-0" />
+            <span className="text-xs text-gray-500 truncate">
+              {form.slip ? form.slip.name : 'Attach slip (image / PDF)'}
+            </span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
+              className="hidden"
+              onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          {errors.slip && <p className="mt-1 text-xs text-red-600">{errors.slip}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Status <span className="text-red-500">*</span></label>
+          <div className="grid grid-cols-2 gap-2">
+            {RM_STATUS_OPTS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => f('rm_status')(value)}
+                className={`py-2.5 rounded-lg border-2 text-xs font-semibold transition-all ${
+                  form.rm_status === value
+                    ? 'border-accent bg-accent/10 text-accent-dark'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -285,7 +285,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Comment</label>
         <textarea
           className={`input resize-none ${errors.comment ? 'border-red-300' : ''}`}
-          rows={3}
+          rows={2}
           placeholder="Optional comment…"
           maxLength={2000}
           value={form.comment}
@@ -298,7 +298,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
       <button
         type="submit"
         disabled={loading || (form.channel_type && !form.channel_id)}
-        className="btn-primary w-full justify-center mt-1"
+        className="btn-primary w-full justify-center"
       >
         {loading ? 'Logging…' : 'Log Deposit'}
       </button>
@@ -529,7 +529,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {/* Channel Type + Channel Item */}
       <ChannelSelector
         channelType={form.channel_type}
@@ -537,75 +537,75 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         onTypeChange={(v) => { setForm((p) => ({ ...p, channel_type: v, channel_id: '' })); if (local.channel_id) setLocal((p) => ({ ...p, channel_id: undefined })) }}
         onIdChange={f('channel_id')}
       />
-      {errors.channel_id && <p className="text-xs text-red-600 -mt-2">{errors.channel_id}</p>}
+      {errors.channel_id && <p className="text-xs text-red-600 -mt-3">{errors.channel_id}</p>}
 
-      {/* ARK ID */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">ARK ID <span className="text-red-500">*</span></label>
-        <input
-          className={`input ${errors.ark_id ? 'border-red-300' : ''}`}
-          placeholder="Enter ARK ID"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={100}
-          value={form.ark_id}
-          onChange={(e) => f('ark_id')(e.target.value.replace(/\D/g, ''))}
-        />
-        {errors.ark_id && <p className="mt-1 text-xs text-red-600">{errors.ark_id}</p>}
-      </div>
-
-      {/* Gateway Name */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name <span className="text-red-500">*</span></label>
-        <select
-          className={`input ${errors.gateway ? 'border-red-300' : ''}`}
-          value={form.gateway}
-          onChange={(e) => f('gateway')(e.target.value)}
-        >
-          <option value="">Select gateway…</option>
-          {gateways.map((gw) => (
-            <option key={gw.id} value={gw.id}>{gw.name}</option>
-          ))}
-        </select>
-        {errors.gateway && <p className="mt-1 text-xs text-red-600">{errors.gateway}</p>}
-      </div>
-
-      {/* Slip upload */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
-        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
-          <Paperclip size={15} className="text-gray-400 shrink-0" />
-          <span className="text-sm text-gray-500 truncate">
-            {form.slip ? form.slip.name : (initial?.slip ? 'Replace existing slip…' : 'Click to attach slip (image / PDF, max 8 MB)')}
-          </span>
+      {/* ARK ID + Gateway — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">ARK ID <span className="text-red-500">*</span></label>
           <input
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
-            className="hidden"
-            onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
+            className={`input ${errors.ark_id ? 'border-red-300' : ''}`}
+            placeholder="Enter ARK ID"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={100}
+            value={form.ark_id}
+            onChange={(e) => f('ark_id')(e.target.value.replace(/\D/g, ''))}
           />
-        </label>
-        {errors.slip && <p className="mt-1 text-xs text-red-600">{errors.slip}</p>}
+          {errors.ark_id && <p className="mt-1 text-xs text-red-600">{errors.ark_id}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name <span className="text-red-500">*</span></label>
+          <select
+            className={`input ${errors.gateway ? 'border-red-300' : ''}`}
+            value={form.gateway}
+            onChange={(e) => f('gateway')(e.target.value)}
+          >
+            <option value="">Select gateway…</option>
+            {gateways.map((gw) => (
+              <option key={gw.id} value={gw.id}>{gw.name}</option>
+            ))}
+          </select>
+          {errors.gateway && <p className="mt-1 text-xs text-red-600">{errors.gateway}</p>}
+        </div>
       </div>
 
-      {/* Status */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Status *</label>
-        <div className="grid grid-cols-2 gap-2">
-          {RM_STATUS_OPTS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => f('rm_status')(value)}
-              className={`py-2 rounded-lg border-2 text-xs font-semibold transition-all ${
-                form.rm_status === value
-                  ? 'border-accent bg-accent/10 text-accent-dark'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      {/* Slip + Status — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
+          <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
+            <Paperclip size={14} className="text-gray-400 shrink-0" />
+            <span className="text-xs text-gray-500 truncate">
+              {form.slip ? form.slip.name : (initial?.slip ? 'Replace existing slip…' : 'Attach slip (image / PDF)')}
+            </span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
+              className="hidden"
+              onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          {errors.slip && <p className="mt-1 text-xs text-red-600">{errors.slip}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Status <span className="text-red-500">*</span></label>
+          <div className="grid grid-cols-2 gap-2">
+            {RM_STATUS_OPTS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => f('rm_status')(value)}
+                className={`py-2.5 rounded-lg border-2 text-xs font-semibold transition-all ${
+                  form.rm_status === value
+                    ? 'border-accent bg-accent/10 text-accent-dark'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -614,7 +614,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Comment</label>
         <textarea
           className={`input resize-none ${errors.comment ? 'border-red-300' : ''}`}
-          rows={3}
+          rows={2}
           placeholder="Optional comment…"
           maxLength={2000}
           value={form.comment}
@@ -624,7 +624,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       </div>
 
       {(error || errors.non_field) && <p className="text-red-500 text-sm">{errors.non_field || error}</p>}
-      <button type="submit" disabled={loading} className="btn-primary w-full justify-center mt-1">
+      <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
         {loading ? 'Saving…' : 'Save Changes'}
       </button>
     </form>

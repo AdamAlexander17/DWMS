@@ -118,6 +118,17 @@ DATABASES = {
     }
 }
 
+# Bypass Django 6.0 minimum MySQL/MariaDB version check for older servers.
+# Django 6.0 enforces MariaDB 10.6+ / MySQL 8.0.11+; we run MariaDB 10.4
+# which doesn't support INSERT ... RETURNING (added in MariaDB 10.5).
+from django.db.backends.mysql.features import DatabaseFeatures as _MySQLFeatures
+_MySQLFeatures.minimum_database_version = property(
+    lambda self: (10, 4) if self.connection.mysql_is_mariadb else (5, 7)
+)
+# MariaDB 10.4 doesn't support RETURNING — disable the feature.
+_MySQLFeatures.can_return_columns_from_insert = False
+_MySQLFeatures.can_return_rows_from_bulk_insert = False
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
