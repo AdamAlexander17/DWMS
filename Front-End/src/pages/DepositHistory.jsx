@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Search, Paperclip, QrCode, Wallet, Building2, BadgeCheck, Trash2, ExternalLink, FileCheck2 } from 'lucide-react'
 import { getDeposits, deleteDeposit } from '../api/deposits'
 import { getGateways } from '../api/master'
@@ -43,22 +43,30 @@ export default function DepositHistory() {
   const [page,          setPage]          = useState(1)
   const [pageSize,      setPageSize]      = useState(25)
   const [search,        setSearch]        = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [gatewayFilter, setGatewayFilter] = useState('')
   const [channelFilter, setChannelFilter] = useState('')
   const [delTarget,     setDelTarget]     = useState(null)
 
   const gateways = useGateways()
 
+  // Debounce search — wait 400ms after last keystroke before firing API
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['deposit-history', page, pageSize, search, gatewayFilter, channelFilter],
+    queryKey: ['deposit-history', page, pageSize, debouncedSearch, gatewayFilter, channelFilter],
     queryFn:  () => getDeposits({
       page,
       page_size: pageSize,
-      search,
+      search: debouncedSearch || undefined,
       status:       'completed',
       gateway:      gatewayFilter || undefined,
       channel_type: channelFilter || undefined,
     }),
+    placeholderData: keepPreviousData,
   })
 
   const records    = data?.data?.data?.results ?? []
@@ -115,9 +123,9 @@ export default function DepositHistory() {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               className="input pl-9"
-              placeholder="Search comment…"
+              placeholder="Search gateway, channel, channel detail…"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <select className="input max-w-[160px]" value={gatewayFilter}
