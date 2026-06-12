@@ -10,7 +10,7 @@ let refreshPromise = null
 
 const shouldSkipRefresh = (url = '') => (
   url.includes('/auth/login/')
-  || url.includes('/auth/token/refresh/')
+  || url.includes('/auth/refresh/')
   || url.includes('/auth/logout/')
 )
 
@@ -23,7 +23,7 @@ async function refreshAccessToken() {
 
   if (!refreshPromise) {
     refreshPromise = axios.post(
-      `${api.defaults.baseURL}/auth/token/refresh/`,
+      `${api.defaults.baseURL}/auth/refresh/`,
       { refresh: refreshToken },
       { headers: { 'Content-Type': 'application/json' } },
     )
