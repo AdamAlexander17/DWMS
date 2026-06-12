@@ -314,11 +314,7 @@ export default function NotificationBell() {
               )}
               {(tab === 'withdrawals' || tab === 'messages') && wdAll.length > 0 && (
                 <button
-                  onClick={() => {
-                    if (confirm('Clear all withdrawal notifications? This cannot be undone.')) {
-                      wdClearAllM.mutate()
-                    }
-                  }}
+                  onClick={() => wdClearAllM.mutate()}
                   title="Clear all notifications"
                   className="flex items-center gap-1 text-[11px] text-red-500 hover:text-red-700 font-medium transition-colors px-1.5 py-0.5 rounded hover:bg-red-50"
                 >
@@ -327,11 +323,7 @@ export default function NotificationBell() {
               )}
               {tab === 'deposits' && depNotifs.length > 0 && (
                 <button
-                  onClick={() => {
-                    if (confirm('Clear all deposit notifications? This cannot be undone.')) {
-                      depClearAllM.mutate()
-                    }
-                  }}
+                  onClick={() => depClearAllM.mutate()}
                   title="Clear all notifications"
                   className="flex items-center gap-1 text-[11px] text-red-500 hover:text-red-700 font-medium transition-colors px-1.5 py-0.5 rounded hover:bg-red-50"
                 >
