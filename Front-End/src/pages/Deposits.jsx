@@ -1,5 +1,5 @@
-﻿import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2 } from 'lucide-react'
 import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit } from '../api/deposits'
 import { getGateways }     from '../api/master'
@@ -160,7 +160,6 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
 
   const validate = () => {
     const errs = {}
-    if (!form.gateway) errs.gateway = 'Gateway is required.'
     if (form.channel_type && !form.channel_id) errs.channel_id = 'Please select a channel item.'
     if (!form.ark_id) errs.ark_id = 'ARK ID is required.'
     if (form.ark_id && !/^\d+$/.test(form.ark_id)) errs.ark_id = 'ARK ID must contain only integers.'
@@ -179,7 +178,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
     e.preventDefault()
     if (!validate()) return
     const fd = new FormData()
-    fd.append('gateway', form.gateway)
+    if (form.gateway) fd.append('gateway', form.gateway)
     if (form.channel_type) fd.append('channel_type', form.channel_type)
     if (form.channel_id) {
       const fkKey = form.channel_type === 'qr' ? 'qr_code'
@@ -226,7 +225,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
           {errors.ark_id && <p className="mt-1 text-xs text-red-600">{errors.ark_id}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name</label>
           <select
             className={`input ${errors.gateway ? 'border-red-300' : ''}`}
             value={form.gateway}
@@ -487,7 +486,6 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
 
   const validate = () => {
     const errs = {}
-    if (!form.gateway) errs.gateway = 'Gateway is required.'
     if (form.channel_type && !form.channel_id) errs.channel_id = 'Please select a channel item.'
     if (!form.ark_id) errs.ark_id = 'ARK ID is required.'
     if (form.ark_id && !/^\d+$/.test(form.ark_id)) errs.ark_id = 'ARK ID must contain only integers.'
@@ -508,7 +506,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
     e.preventDefault()
     if (!validate()) return
     const fd = new FormData()
-    fd.append('gateway', form.gateway)
+    if (form.gateway) fd.append('gateway', form.gateway)
     fd.append('channel_type', form.channel_type ?? '')
     if (form.channel_type && form.channel_id) {
       const fkKey = form.channel_type === 'qr' ? 'qr_code'
@@ -555,7 +553,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
           {errors.ark_id && <p className="mt-1 text-xs text-red-600">{errors.ark_id}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Gateway Name</label>
           <select
             className={`input ${errors.gateway ? 'border-red-300' : ''}`}
             value={form.gateway}
@@ -644,6 +642,7 @@ export default function Deposits() {
   const [page,            setPage]            = useState(1)
   const [pageSize,        setPageSize]        = useState(25)
   const [search,          setSearch]          = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [gatewayFilter,   setGatewayFilter]   = useState('')
   const [channelFilter,   setChannelFilter]   = useState('')
   const [modal,           setModal]           = useState(null)
@@ -652,9 +651,16 @@ export default function Deposits() {
     ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '—'
 
+  // Debounce search — wait 400ms after last keystroke before firing API
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['deposits', page, pageSize, search, gatewayFilter, channelFilter],
-    queryFn:  () => getDeposits({ page, page_size: pageSize, search, gateway: gatewayFilter || undefined, channel_type: channelFilter || undefined }),
+    queryKey: ['deposits', page, pageSize, debouncedSearch, gatewayFilter, channelFilter],
+    queryFn:  () => getDeposits({ page, page_size: pageSize, search: debouncedSearch || undefined, gateway: gatewayFilter || undefined, channel_type: channelFilter || undefined }),
+    placeholderData: keepPreviousData,
     refetchInterval: 15_000,
   })
 
@@ -709,8 +715,8 @@ export default function Deposits() {
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[320px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input className="input pl-9" placeholder="Search comment…" value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+            <input className="input pl-9" placeholder="Search gateway, channel, ARK ID…" value={search}
+              onChange={(e) => setSearch(e.target.value)} />
           </div>
           <select className="input max-w-[160px]" value={gatewayFilter}
             onChange={(e) => { setGatewayFilter(e.target.value); setPage(1) }}>

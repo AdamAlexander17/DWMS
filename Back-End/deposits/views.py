@@ -36,7 +36,9 @@ class DepositLogViewSet(
     pagination_class = StandardResultsPagination
     filterset_class  = DepositLogFilter
     ordering_fields  = ['created_at', 'gateway', 'slip_status', 'status']
-    search_fields    = ['comment', 'ark_id']
+    search_fields    = ['comment', 'ark_id', 'gateway__name', 'channel_type',
+                        'qr_code__qr_name', 'upi_source__upi_id',
+                        'bank_account__bank_name', 'bank_account__account_number']
 
     def get_permissions(self):
         if self.action == 'create':
