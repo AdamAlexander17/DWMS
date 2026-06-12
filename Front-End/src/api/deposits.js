@@ -7,6 +7,7 @@ export const createDeposit  = (data) => api.post('/deposits/', data)
 export const updateDeposit  = (id, data) => api.patch(`/deposits/${id}/`, data)
 export const deleteDeposit  = (id) => api.delete(`/deposits/${id}/`)
 export const reviewDeposit  = (id, data) => api.post(`/deposits/${id}/review/`, data)
+export const getDepositActivities = (id) => api.get(`/deposits/${id}/activities/`)
 
 // Notifications
 export const getNotifications     = (params) => api.get('/deposits/notifications/', { params })

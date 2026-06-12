@@ -160,7 +160,7 @@ export default function DepositHistory() {
               <SortableTh label="Comment"         sortKey="comment"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Logged By"       sortKey="logged_by"      toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Reviewed By"     sortKey="reviewed_by"    toggle={toggleSort} icon={sortIcon} />
-              <SortableTh label="BO Receipt"      sortKey="bo_receipt"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Backoffice Receipt"      sortKey="bo_receipt"     toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Created At"      sortKey="created_at"     toggle={toggleSort} icon={sortIcon} />
               {canDelete && (
                 <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>

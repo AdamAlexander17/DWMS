@@ -125,6 +125,47 @@ class DepositLog(models.Model):
         return f'{gw} – {self.slip_status} ({self.created_at:%Y-%m-%d})'
 
 
+class DepositActivity(models.Model):
+    """Immutable timeline entry for a deposit ticket — tracks every change."""
+
+    ACTION_CREATED   = 'created'
+    ACTION_UPDATED   = 'updated'
+    ACTION_REVIEWED  = 'reviewed'
+    ACTION_SLIP_UP   = 'slip_uploaded'
+    ACTION_STATUS    = 'status_change'
+    ACTION_CHOICES = [
+        (ACTION_CREATED,  'Created'),
+        (ACTION_UPDATED,  'Updated'),
+        (ACTION_REVIEWED, 'Reviewed'),
+        (ACTION_SLIP_UP,  'Slip Uploaded'),
+        (ACTION_STATUS,   'Status Change'),
+    ]
+
+    deposit = models.ForeignKey(
+        DepositLog,
+        on_delete=models.CASCADE,
+        related_name='activities',
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='deposit_activities',
+    )
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES)
+    message = models.TextField(blank=True, default='')
+    slip_url = models.URLField(blank=True, default='')
+    extra = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'deposit_activities'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f'{self.get_action_display()} by {self.actor} on deposit #{self.deposit_id}'
+
+
 class DepositNotification(models.Model):
     """Notification for a deposit log recipient (e.g. review approved/rejected)."""
 

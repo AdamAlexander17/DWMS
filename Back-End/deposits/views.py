@@ -15,8 +15,8 @@ from common.permissions import IsAdminOrBackOffice, IsRM
 from common.responses import success_response
 
 from .filters import DepositLogFilter
-from .models import DepositLog, DepositNotification
-from .serializers import DepositLogSerializer, DepositNotificationSerializer
+from .models import DepositLog, DepositNotification, DepositActivity
+from .serializers import DepositLogSerializer, DepositNotificationSerializer, DepositActivitySerializer
 from .services import push_deposit_event
 
 
@@ -59,18 +59,17 @@ class DepositLogViewSet(
         from django.db.models import Q
         queryset = self.filter_queryset(self.get_queryset())
 
-        # Deposit History requests ?status=completed — show completed AND added (slip confirmed).
+        # Deposit History requests ?status=completed — show completed deposits.
         is_history = request.query_params.get('status') == DepositLog.STATUS_COMPLETED
 
-        # Default list excludes completed and added deposits (those live in Deposit History).
+        # Default list excludes completed deposits (those live in Deposit History).
         if 'status' not in request.query_params:
             queryset = queryset.exclude(status=DepositLog.STATUS_COMPLETED)
-            queryset = queryset.exclude(slip_status=DepositLog.SLIP_ADDED)
 
-        # History page: include both completed AND added
+        # History page: show completed
         if is_history:
             queryset = self.filter_queryset(self.get_queryset()).filter(
-                Q(status=DepositLog.STATUS_COMPLETED) | Q(slip_status=DepositLog.SLIP_ADDED)
+                status=DepositLog.STATUS_COMPLETED
             )
 
         # History view: scope to records the user is personally tied to (admin keeps full visibility).
@@ -102,6 +101,16 @@ class DepositLogViewSet(
             push_deposit_event(instance, request.user, 'created')
         except Exception:
             pass
+
+        # Log activity
+        DepositActivity.objects.create(
+            deposit=instance,
+            actor=request.user,
+            action=DepositActivity.ACTION_CREATED,
+            message=f'Deposit created. Slip status: {instance.get_slip_status_display()}.',
+            slip_url=instance.slip.url if instance.slip else '',
+        )
+
         return success_response(
             'Deposit logged successfully',
             self.get_serializer(instance).data,
@@ -118,6 +127,16 @@ class DepositLogViewSet(
             push_deposit_event(instance, request.user, 'updated')
         except Exception:
             pass
+
+        # Log activity
+        DepositActivity.objects.create(
+            deposit=instance,
+            actor=request.user,
+            action=DepositActivity.ACTION_UPDATED,
+            message=f'Deposit updated. Slip status: {instance.get_slip_status_display()}.',
+            slip_url=instance.slip.url if instance.slip else '',
+        )
+
         return success_response('Deposit updated successfully', self.get_serializer(instance).data)
 
     def destroy(self, request, *args, **kwargs):
@@ -146,17 +165,24 @@ class DepositLogViewSet(
             DepositLog.STATUS_COMPLETED,
             DepositLog.STATUS_APPROVED,
             DepositLog.STATUS_REJECTED,
+            'added',  # special: sets slip_status to 'added', keeps status as in_progress
         )
         if action_val not in VALID:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'action': f'Must be one of: {", ".join(VALID)}.'})
 
-        deposit.status         = action_val
+        # 'added' is a slip_status shorthand, not a real status value
+        if action_val == 'added':
+            deposit.status     = DepositLog.STATUS_IN_PROGRESS
+            deposit.slip_status = DepositLog.SLIP_ADDED
+        else:
+            deposit.status = action_val
+
         deposit.review_message = message
         deposit.reviewed_by    = request.user
         deposit.reviewed_at    = timezone.now()
 
-        update_fields = ['status', 'review_message', 'reviewed_by', 'reviewed_at', 'updated_at']
+        update_fields = ['status', 'slip_status', 'review_message', 'reviewed_by', 'reviewed_at', 'updated_at']
 
         # Handle back-office receipt upload
         review_slip = request.FILES.get('review_slip')
@@ -172,9 +198,32 @@ class DepositLogViewSet(
         except Exception:
             pass
 
+        # Log activity
+        DepositActivity.objects.create(
+            deposit=deposit,
+            actor=request.user,
+            action=DepositActivity.ACTION_REVIEWED,
+            message=f'Reviewed as "{action_val}". {message}'.strip(),
+            slip_url=deposit.review_slip.url if deposit.review_slip else '',
+        )
+
         return success_response(
             f'Deposit marked as {action_val}.',
             self.get_serializer(deposit).data,
+        )
+
+    # ------------------------------------------------------------------
+    # Activity timeline
+    # ------------------------------------------------------------------
+
+    @extend_schema(summary='Get deposit activity timeline', tags=['Deposits'])
+    @action(detail=True, methods=['get'], url_path='activities')
+    def activities(self, request, pk=None):
+        deposit = self.get_object()
+        activities = deposit.activities.select_related('actor').all()
+        return success_response(
+            'Activities fetched',
+            DepositActivitySerializer(activities, many=True).data,
         )
 
 

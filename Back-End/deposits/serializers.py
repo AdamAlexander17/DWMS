@@ -4,7 +4,7 @@ from common.file_validators import validate_slip
 from common.validators import validate_text
 
 from master.serializers import GatewaySerializer
-from .models import DepositLog, DepositNotification
+from .models import DepositLog, DepositNotification, DepositActivity
 
 
 class DepositLogSerializer(serializers.ModelSerializer):
@@ -142,3 +142,15 @@ class DepositNotificationSerializer(serializers.ModelSerializer):
             'deposit_log',
         ]
         read_only_fields = fields
+
+
+class DepositActivitySerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DepositActivity
+        fields = ['id', 'action', 'message', 'slip_url', 'extra', 'actor', 'actor_name', 'created_at']
+        read_only_fields = fields
+
+    def get_actor_name(self, obj) -> str | None:
+        return obj.actor.username if obj.actor else None

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2 } from 'lucide-react'
-import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit } from '../api/deposits'
+import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2, Eye, User, Calendar } from 'lucide-react'
+import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit, getDepositActivities } from '../api/deposits'
 import { getGateways }     from '../api/master'
 import { getQRCodes }      from '../api/payments'
 import { getUPISources }   from '../api/payments'
@@ -59,10 +59,11 @@ function deriveTicketStatus(r) {
   return 'pending'
 }
 
-// Back Office review options — Completed is RM-only
+// Back Office review options
 const REVIEW_DECISION_OPTS = [
   { value: 'in_progress', label: 'In Progress', hint: 'Reviewing — no receipt yet'   },
   { value: 'added',       label: 'Added',       hint: 'Receipt uploaded, confirming' },
+  { value: 'completed',   label: 'Completed',   hint: 'Fully verified and done'      },
 ]
 
 // ── Shared hook: fetches active gateways from master module ─────────────
@@ -328,8 +329,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
     e.preventDefault()
     if (!validate()) return
     const fd = new FormData()
-    // 'added' is a display-only state: submit in_progress with a receipt
-    fd.append('action',  'in_progress')
+    fd.append('action',  decision)
     fd.append('message', message)
     if (reviewSlip) fd.append('review_slip', reviewSlip)
     onSubmit(fd)
@@ -519,6 +519,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       fd.append('status',      'completed')
     } else {
       fd.append('slip_status', 'not_received')
+      fd.append('status',      'pending')
     }
     fd.append('ark_id',      form.ark_id)
     fd.append('comment',     form.comment)
@@ -626,6 +627,129 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         {loading ? 'Saving…' : 'Save Changes'}
       </button>
     </form>
+  )
+}
+
+// ── Deposit Timeline (View modal content) ──────────────────────────────────
+function DepositTimeline({ deposit }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['deposit-activities', deposit.id],
+    queryFn:  () => getDepositActivities(deposit.id),
+  })
+
+  const activities = data?.data?.data ?? []
+
+  const fmtDt = (d) => d
+    ? new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+    : '—'
+
+  const ACTION_ICON = {
+    created:       { Icon: Plus,         bg: 'bg-green-100',  text: 'text-green-600'  },
+    updated:       { Icon: SquarePen,    bg: 'bg-blue-100',   text: 'text-blue-600'   },
+    reviewed:      { Icon: CheckCircle2, bg: 'bg-purple-100', text: 'text-purple-600' },
+    slip_uploaded: { Icon: Paperclip,    bg: 'bg-teal-100',   text: 'text-teal-600'   },
+    status_change: { Icon: Clock,        bg: 'bg-amber-100',  text: 'text-amber-600'  },
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Deposit summary */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Gateway</span>
+          <span className="font-semibold text-gray-800">{deposit.gateway_detail?.name ?? '—'}</span>
+        </div>
+        {deposit.channel_type && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Channel</span>
+            <span className="text-gray-800">{CHANNEL_LABEL[deposit.channel_type]} — {deposit.channel_label ?? ''}</span>
+          </div>
+        )}
+        {deposit.ark_id && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">ARK ID</span>
+            <span className="font-mono text-gray-800">{deposit.ark_id}</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span className="text-gray-500">Submitted by</span>
+          <span className="text-gray-800">{deposit.submitted_by_name ?? '—'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Created at</span>
+          <span className="text-gray-800">{fmtDt(deposit.created_at)}</span>
+        </div>
+        {deposit.slip && (
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">RM Slip</span>
+            <a href={deposit.slip} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-medium">
+              <ExternalLink size={11} /> View
+            </a>
+          </div>
+        )}
+        {deposit.review_slip && (
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">Backoffice Receipt</span>
+            <a href={deposit.review_slip} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline font-medium">
+              <ExternalLink size={11} /> View
+            </a>
+          </div>
+        )}
+        {deposit.comment && (
+          <div className="pt-2 border-t border-gray-200">
+            <p className="text-[11px] text-gray-400 mb-0.5">Comment</p>
+            <p className="text-gray-700">{deposit.comment}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Activity timeline */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Activity Timeline</h3>
+        {isLoading && <p className="text-xs text-gray-400">Loading…</p>}
+        {!isLoading && activities.length === 0 && (
+          <p className="text-xs text-gray-400">No activity recorded yet.</p>
+        )}
+        <div className="relative pl-6 space-y-4">
+          {/* Vertical line */}
+          {activities.length > 1 && (
+            <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gray-200" />
+          )}
+          {activities.map((a) => {
+            const cfg = ACTION_ICON[a.action] ?? ACTION_ICON.status_change
+            const Icon = cfg.Icon
+            return (
+              <div key={a.id} className="relative flex gap-3">
+                {/* Dot / icon */}
+                <div className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center ${cfg.bg}`}>
+                  <Icon size={11} className={cfg.text} />
+                </div>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-700 leading-relaxed">{a.message}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                      <User size={9} /> {a.actor_name ?? 'System'}
+                    </span>
+                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                      <Calendar size={9} /> {fmtDt(a.created_at)}
+                    </span>
+                  </div>
+                  {a.slip_url && (
+                    <a href={a.slip_url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline mt-1">
+                      <Paperclip size={10} /> View slip
+                    </a>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -826,6 +950,11 @@ export default function Deposits() {
                 {(canWrite || canReview) && (
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 justify-end">
+                      {/* View timeline */}
+                      <button onClick={() => setModal({ mode: 'view', data: r })}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors" title="View Timeline">
+                        <Eye size={12} />
+                      </button>
                       {canReview && r.status !== 'completed' && (
                         <button onClick={() => setModal({ mode: 'review', data: r })}
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-green-50 text-green-500 hover:bg-green-100 transition-colors" title="Review">
@@ -852,6 +981,13 @@ export default function Deposits() {
           </tbody>
         </table>
       </div>
+
+      {/* View / Timeline Modal */}
+      <Modal open={modal?.mode === 'view'} onClose={() => setModal(null)} title="Deposit Timeline" size="lg">
+        {modal?.mode === 'view' && modal?.data && (
+          <DepositTimeline deposit={modal.data} />
+        )}
+      </Modal>
 
       {/* Create Modal */}
       {isRM && (
