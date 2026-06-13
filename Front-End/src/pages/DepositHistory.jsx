@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { Search, Paperclip, QrCode, Wallet, Building2, BadgeCheck, Trash2, ExternalLink, FileCheck2 } from 'lucide-react'
-import { getDeposits, deleteDeposit } from '../api/deposits'
+import { Search, Paperclip, QrCode, Wallet, Building2, BadgeCheck, Trash2, ExternalLink, FileCheck2, Eye, User, Calendar, Plus, SquarePen, CheckCircle2, Clock } from 'lucide-react'
+import { getDeposits, deleteDeposit, getDepositActivities } from '../api/deposits'
 import { getGateways } from '../api/master'
+import Modal         from '../components/ui/Modal'
 import Pagination    from '../components/ui/Pagination'
 import SortableTh    from '../components/ui/SortableTh'
 import { useSortable } from '../hooks/useSortable'
@@ -47,6 +48,7 @@ export default function DepositHistory() {
   const [gatewayFilter, setGatewayFilter] = useState('')
   const [channelFilter, setChannelFilter] = useState('')
   const [delTarget,     setDelTarget]     = useState(null)
+  const [viewTarget,   setViewTarget]   = useState(null)
 
   const gateways = useGateways()
 
@@ -162,15 +164,13 @@ export default function DepositHistory() {
               <SortableTh label="Reviewed By"     sortKey="reviewed_by"    toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Backoffice Receipt"      sortKey="bo_receipt"     toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Created At"      sortKey="created_at"     toggle={toggleSort} icon={sortIcon} />
-              {canDelete && (
-                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
-              )}
+              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
               <tr>
-                <td colSpan={9 + (canDelete ? 1 : 0)} className="px-4 py-10 text-center text-gray-400 text-sm">
+                <td colSpan={10} className="px-4 py-10 text-center text-gray-400 text-sm">
                   No completed deposits yet.
                 </td>
               </tr>
@@ -239,9 +239,16 @@ export default function DepositHistory() {
                 <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{fmtDate(r.created_at)}</td>
 
                 {/* Actions */}
-                {canDelete && (
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1.5 justify-end">
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <button
+                      onClick={() => setViewTarget(r)}
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors"
+                      title="View Timeline"
+                    >
+                      <Eye size={12} />
+                    </button>
+                    {canDelete && (
                       <button
                         onClick={() => setDelTarget(r)}
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
@@ -249,9 +256,9 @@ export default function DepositHistory() {
                       >
                         <Trash2 size={12} />
                       </button>
-                    </div>
-                  </td>
-                )}
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -267,6 +274,129 @@ export default function DepositHistory() {
         title="Delete Deposit Record"
         message={`Permanently delete this completed deposit (${delTarget?.gateway_detail?.name ?? ''})? This cannot be undone.`}
       />
+
+      {/* Timeline Modal */}
+      <Modal open={!!viewTarget} onClose={() => setViewTarget(null)} title="Deposit Timeline" size="lg">
+        {viewTarget && <HistoryTimeline deposit={viewTarget} />}
+      </Modal>
+    </div>
+  )
+}
+
+// ── Timeline component for Deposit History ─────────────────────────────────
+function HistoryTimeline({ deposit }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['deposit-activities', deposit.id],
+    queryFn:  () => getDepositActivities(deposit.id),
+  })
+
+  const activities = data?.data?.data ?? []
+
+  const fmtDt = (d) => d
+    ? new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+    : '—'
+
+  const ACTION_ICON = {
+    created:       { Icon: Plus,         bg: 'bg-green-100',  text: 'text-green-600'  },
+    updated:       { Icon: SquarePen,    bg: 'bg-blue-100',   text: 'text-blue-600'   },
+    reviewed:      { Icon: CheckCircle2, bg: 'bg-purple-100', text: 'text-purple-600' },
+    slip_uploaded: { Icon: Paperclip,    bg: 'bg-teal-100',   text: 'text-teal-600'   },
+    status_change: { Icon: Clock,        bg: 'bg-amber-100',  text: 'text-amber-600'  },
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Deposit summary */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Gateway</span>
+          <span className="font-semibold text-gray-800">{deposit.gateway_detail?.name ?? '—'}</span>
+        </div>
+        {deposit.channel_type && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Channel</span>
+            <span className="text-gray-800">{CHANNEL_LABEL[deposit.channel_type]} — {deposit.channel_label ?? ''}</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span className="text-gray-500">Submitted by</span>
+          <span className="text-gray-800">{deposit.submitted_by_name ?? '—'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Reviewed by</span>
+          <span className="text-gray-800">{deposit.reviewed_by_name ?? '—'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Created at</span>
+          <span className="text-gray-800">{fmtDt(deposit.created_at)}</span>
+        </div>
+        {deposit.slip && (
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">RM Slip</span>
+            <a href={deposit.slip} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-medium">
+              <ExternalLink size={11} /> View
+            </a>
+          </div>
+        )}
+        {deposit.review_slip && (
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">Backoffice Receipt</span>
+            <a href={deposit.review_slip} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline font-medium">
+              <ExternalLink size={11} /> View
+            </a>
+          </div>
+        )}
+        {deposit.comment && (
+          <div className="pt-2 border-t border-gray-200">
+            <p className="text-[11px] text-gray-400 mb-0.5">Comment</p>
+            <p className="text-gray-700">{deposit.comment}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Activity timeline */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Activity Timeline</h3>
+        {isLoading && <p className="text-xs text-gray-400">Loading…</p>}
+        {!isLoading && activities.length === 0 && (
+          <p className="text-xs text-gray-400">No activity recorded yet.</p>
+        )}
+        <div className="relative pl-6 space-y-4">
+          {activities.length > 1 && (
+            <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gray-200" />
+          )}
+          {activities.map((a) => {
+            const cfg = ACTION_ICON[a.action] ?? ACTION_ICON.status_change
+            const Icon = cfg.Icon
+            return (
+              <div key={a.id} className="relative flex gap-3">
+                <div className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center ${cfg.bg}`}>
+                  <Icon size={11} className={cfg.text} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-700 leading-relaxed">{a.message}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                      <User size={9} /> {a.actor_name ?? 'System'}
+                    </span>
+                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                      <Calendar size={9} /> {fmtDt(a.created_at)}
+                    </span>
+                  </div>
+                  {a.slip_url && (
+                    <a href={a.slip_url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline mt-1">
+                      <Paperclip size={10} /> View slip
+                    </a>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
