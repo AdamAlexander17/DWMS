@@ -5,7 +5,7 @@ from rest_framework.viewsets import ModelViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from audit_logs.services import AuditLogService
-from common.permissions import IsAdminOrBackOfficeOrRMReadOnly
+from common.permissions import ModulePermission, has_module_permission, has_module_write_permission, is_admin_user
 from common.responses import error_response, success_response
 from common.utils import get_client_ip
 
@@ -26,6 +26,20 @@ class _PaymentSourceMixin:
     """
 
     log_module: str = 'PaymentSource'
+    permission_module: str = ''
+
+    def get_permissions(self):
+        action_map = {
+            'list': 'view',
+            'retrieve': 'view',
+            'create': 'create',
+            'update': 'edit',
+            'partial_update': 'edit',
+            'destroy': 'delete',
+            'activate': 'activate',
+            'deactivate': 'activate',
+        }
+        return [IsAuthenticated(), ModulePermission(self.permission_module, action_map.get(self.action, 'view'))()]
 
     # ------------------------------------------------------------------
     # Queryset filtering: RM can only see active records for their brand
@@ -33,14 +47,15 @@ class _PaymentSourceMixin:
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        role_name = getattr(user.role, 'name', None) if getattr(user, 'role', None) else None
-        if role_name == 'rm':
-            # RM: only active channels belonging to their assigned brands
-            qs = qs.filter(brand__in=user.brands.all(), is_active=True)
-        elif role_name == 'back_office':
-            # Back office: all channels (active + inactive) for their assigned brands
-            qs = qs.filter(brand__in=user.brands.all())
-        # admin: no brand restriction — sees everything
+        if is_admin_user(user):
+            return qs
+
+        brand_scope = user.brands.all()
+        if has_module_write_permission(user, self.permission_module):
+            return qs.filter(brand__in=brand_scope)
+        if has_module_permission(user, self.permission_module, 'view'):
+            return qs.filter(brand__in=brand_scope, is_active=True)
+        qs = qs.none()
         return qs
 
     # ------------------------------------------------------------------
@@ -157,13 +172,13 @@ class _PaymentSourceMixin:
     deactivate=extend_schema(summary='Deactivate QR code', tags=['QR Codes'], request=None),
 )
 class QRCodeViewSet(_PaymentSourceMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated, IsAdminOrBackOfficeOrRMReadOnly]
     queryset = QRCode.objects.select_related('brand', 'created_by').all()
     serializer_class = QRCodeSerializer
     filterset_class = QRCodeFilter
     search_fields = ['qr_name']
     ordering_fields = ['created_at', 'qr_name', 'range_from', 'range_to', 'is_active']
     log_module = 'QR Code'
+    permission_module = 'qr_codes'
 
 
 @extend_schema_view(
@@ -177,13 +192,13 @@ class QRCodeViewSet(_PaymentSourceMixin, ModelViewSet):
     deactivate=extend_schema(summary='Deactivate UPI source', tags=['UPI Sources'], request=None),
 )
 class UPISourceViewSet(_PaymentSourceMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated, IsAdminOrBackOfficeOrRMReadOnly]
     queryset = UPISource.objects.select_related('brand', 'created_by').all()
     serializer_class = UPISourceSerializer
     filterset_class = UPISourceFilter
     search_fields = ['upi_id']
     ordering_fields = ['created_at', 'upi_id', 'range_from', 'range_to', 'is_active']
     log_module = 'UPI'
+    permission_module = 'upi_sources'
 
 
 @extend_schema_view(
@@ -197,10 +212,10 @@ class UPISourceViewSet(_PaymentSourceMixin, ModelViewSet):
     deactivate=extend_schema(summary='Deactivate bank account', tags=['Bank Accounts'], request=None),
 )
 class BankAccountViewSet(_PaymentSourceMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated, IsAdminOrBackOfficeOrRMReadOnly]
     queryset = BankAccount.objects.select_related('brand', 'created_by').all()
     serializer_class = BankAccountSerializer
     filterset_class = BankAccountFilter
     search_fields = ['bank_name', 'account_holder_name', 'ifsc_code']
     ordering_fields = ['created_at', 'bank_name', 'range_from', 'range_to', 'is_active']
     log_module = 'Bank Account'
+    permission_module = 'bank_accounts'

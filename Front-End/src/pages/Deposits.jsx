@@ -756,10 +756,14 @@ function DepositTimeline({ deposit }) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function Deposits() {
   const qc   = useQueryClient()
-  const { user } = useAuthStore()
-  const isRM      = user?.role === 'rm'
-  const canWrite  = ['admin', 'rm'].includes(user?.role)
-  const canReview  = ['admin', 'back_office'].includes(user?.role)
+  const { user, hasPermission } = useAuthStore()
+  const canCreate = hasPermission('deposits', 'create')
+  const canEdit   = hasPermission('deposits', 'edit')
+  const canDelete = hasPermission('deposits', 'delete')
+  const canActivate = hasPermission('deposits', 'activate')
+  const canWrite  = canCreate || canEdit || canDelete
+  const canReview = canActivate && !canCreate  // BO-only: has activate but doesn't create tickets
+  const isRM      = canCreate && !canActivate
 
   const gateways = useGateways()
 
@@ -827,7 +831,7 @@ export default function Deposits() {
           <h1 className="page-title">Deposits</h1>
           <p className="page-subtitle">{total} deposit log{total !== 1 ? 's' : ''}</p>
         </div>
-        {isRM && (
+        {canCreate && (
           <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
             <Plus size={16} /> Log Deposit
           </button>
@@ -884,7 +888,7 @@ export default function Deposits() {
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 && (
               <tr><td colSpan={canWrite || canReview ? 10 : 9} className="px-4 py-10 text-center text-gray-400 text-sm">
-                {isRM ? 'No deposits logged yet. Use "Log Deposit" to record a deposit.' : 'No deposit logs found.'}
+                {canCreate ? 'No deposits logged yet. Use "Log Deposit" to record a deposit.' : 'No deposit logs found.'}
               </td></tr>
             )}
             {sortedRecords.map((r) => (
@@ -990,7 +994,7 @@ export default function Deposits() {
       </Modal>
 
       {/* Create Modal */}
-      {isRM && (
+      {canCreate && (
         <Modal open={modal?.mode === 'create'} onClose={() => setModal(null)} title="Log Client Deposit">
           <CreateForm
             loading={createM.isPending}

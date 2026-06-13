@@ -2,16 +2,35 @@ from django.db import models
 
 
 class Module(models.TextChoices):
-    ROLES         = 'roles',         'Roles'
-    USERS         = 'users',         'Users'
-    BRANDS        = 'brands',        'Brands'
-    GATEWAYS      = 'gateways',      'Gateways'
-    QR_CODES      = 'qr_codes',      'QR Codes'
-    UPI_SOURCES   = 'upi_sources',   'UPI Sources'
-    BANK_ACCOUNTS = 'bank_accounts', 'Bank Accounts'
-    DEPOSITS      = 'deposits',      'Deposits'
-    WITHDRAWALS   = 'withdrawals',   'Withdrawals'
-    AUDIT_LOGS    = 'audit_logs',    'Audit Logs'
+    ROLES              = 'roles',              'Roles'
+    USERS              = 'users',              'Users'
+    BRANDS             = 'brands',             'Brands'
+    AUDIT_LOGS         = 'audit_logs',         'Audit Logs'
+
+    # Parent modules
+    MASTER             = 'master',             'Master'
+    PAYMENT_METHODS    = 'payment_methods',    'Payment Methods'
+    TRANSACTIONS       = 'transactions',       'Transactions'
+
+    # Master children
+    GATEWAYS           = 'gateways',           'Gateways'
+    QR_CODES           = 'qr_codes',           'QR Codes'
+    UPI_SOURCES        = 'upi_sources',        'UPI Sources'
+    BANK_ACCOUNTS      = 'bank_accounts',      'Bank Accounts'
+
+    # Transactions children
+    DEPOSITS           = 'deposits',           'Deposits'
+    DEPOSIT_HISTORY    = 'deposit_history',    'Deposit History'
+    WITHDRAWALS        = 'withdrawals',        'Withdrawals'
+    WITHDRAWAL_HISTORY = 'withdrawal_history', 'Withdrawal History'
+
+
+# Parent-child module hierarchy
+MODULE_HIERARCHY = {
+    'master': ['gateways', 'qr_codes', 'upi_sources', 'bank_accounts'],
+    'transactions': ['deposits', 'deposit_history', 'withdrawals', 'withdrawal_history'],
+    'payment_methods': [],  # Ready for future children
+}
 
 
 class Role(models.Model):

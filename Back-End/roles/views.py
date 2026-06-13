@@ -6,7 +6,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from django.db.models import Q
 
 from audit_logs.services import AuditLogService
-from common.permissions import IsAdmin
+from common.permissions import ModulePermission
 from common.responses import error_response, success_response
 from common.utils import get_client_ip
 
@@ -26,8 +26,23 @@ from .services import RoleService
 class RoleViewSet(ModelViewSet):
     queryset         = Role.objects.prefetch_related('permissions').order_by('name')
     serializer_class = RoleSerializer
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated]
     http_method_names  = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
+
+    def get_permissions(self):
+        action_map = {
+            'list': 'view',
+            'retrieve': 'view',
+            'permissions_matrix': 'view',
+            'modules': 'view',
+            'create': 'create',
+            'update': 'edit',
+            'partial_update': 'edit',
+            'destroy': 'delete',
+            'activate': 'activate',
+            'deactivate': 'activate',
+        }
+        return [IsAuthenticated(), ModulePermission('roles', action_map.get(self.action, 'view'))()]
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -73,14 +88,6 @@ class RoleViewSet(ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial  = kwargs.pop('partial', False)
         instance = self.get_object()
-        # System roles can still have their permissions changed, but not renamed
-        if instance.is_system and not partial:
-            name_changed = request.data.get('name', instance.name) != instance.name
-            if name_changed:
-                return error_response(
-                    'System role names cannot be changed',
-                    status_code=status.HTTP_403_FORBIDDEN,
-                )
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         if not serializer.is_valid():
             return error_response('Validation failed', errors=serializer.errors,
@@ -154,6 +161,21 @@ class RoleViewSet(ModelViewSet):
     @extend_schema(tags=['Roles'])
     @action(detail=False, methods=['get'], url_path='modules')
     def modules(self, request):
-        """Return the list of all available modules."""
-        data = [{'value': m.value, 'label': m.label} for m in Module]
+        """Return the list of all available modules with hierarchy info."""
+        from .models import MODULE_HIERARCHY
+
+        data = []
+        for m in Module:
+            item = {'value': m.value, 'label': m.label}
+            # Mark parent modules
+            if m.value in MODULE_HIERARCHY:
+                item['is_parent'] = True
+                item['children'] = MODULE_HIERARCHY[m.value]
+            else:
+                # Check if this module is a child
+                for parent, children in MODULE_HIERARCHY.items():
+                    if m.value in children:
+                        item['parent'] = parent
+                        break
+            data.append(item)
         return success_response('Modules fetched', data=data)

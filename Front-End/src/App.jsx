@@ -31,73 +31,73 @@ function AppRoutes() {
       } />
 
       <Route path="/users" element={
-        <ProtectedRoute roles={['admin']}>
+        <ProtectedRoute modules={['users']}>
           <Layout><Users /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/roles" element={
-        <ProtectedRoute roles={['admin']}>
+        <ProtectedRoute modules={['roles']}>
           <Layout><Roles /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/brands" element={
-        <ProtectedRoute roles={['admin']}>
+        <ProtectedRoute modules={['brands']}>
           <Layout><Brands /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/qr-codes" element={
-        <ProtectedRoute>
+        <ProtectedRoute modules={['qr_codes']}>
           <Layout><QRCodes /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/upi-sources" element={
-        <ProtectedRoute>
+        <ProtectedRoute modules={['upi_sources']}>
           <Layout><UPISources /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/bank-accounts" element={
-        <ProtectedRoute>
+        <ProtectedRoute modules={['bank_accounts']}>
           <Layout><BankAccounts /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/deposits" element={
-        <ProtectedRoute>
+        <ProtectedRoute modules={['deposits']}>
           <Layout><Deposits /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/deposit-history" element={
-        <ProtectedRoute>
+        <ProtectedRoute modules={['deposit_history']}>
           <Layout><DepositHistory /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/withdrawals" element={
-        <ProtectedRoute>
+        <ProtectedRoute modules={['withdrawals']}>
           <Layout><Withdrawals /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/withdrawal-history" element={
-        <ProtectedRoute>
+        <ProtectedRoute modules={['withdrawal_history']}>
           <Layout><WithdrawalHistory /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/audit-logs" element={
-        <ProtectedRoute roles={['admin']}>
+        <ProtectedRoute modules={['audit_logs']}>
           <Layout><AuditLogs /></Layout>
         </ProtectedRoute>
       } />
 
       <Route path="/gateways" element={
-        <ProtectedRoute roles={['admin']}>
+        <ProtectedRoute modules={['gateways']}>
           <Layout><Gateways /></Layout>
         </ProtectedRoute>
       } />

@@ -9,10 +9,11 @@ from rest_framework.mixins import (
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import GenericViewSet
+from django.db.models import Q
 
 from common.pagination import StandardResultsPagination
-from common.permissions import IsAdminOrBackOffice, IsRM
-from common.responses import success_response
+from common.permissions import ModulePermission, resolve_module_scope, has_module_permission
+from common.responses import success_response, error_response
 
 from .filters import DepositLogFilter
 from .models import DepositLog, DepositNotification, DepositActivity
@@ -41,22 +42,45 @@ class DepositLogViewSet(
                         'bank_account__bank_name', 'bank_account__account_number']
 
     def get_permissions(self):
-        if self.action == 'create':
-            return [IsAuthenticated(), IsRM()]
-        return [IsAuthenticated()]
+        action_map = {
+            'list': 'view',
+            'retrieve': 'view',
+            'create': 'create',
+            'update': 'edit',
+            'partial_update': 'edit',
+            'destroy': 'create',  # RM can delete own; method enforces ownership
+            'review': 'edit',
+        }
+        return [IsAuthenticated(), ModulePermission('deposits', action_map.get(self.action, 'view'))()]
 
     def get_queryset(self):
-        return DepositLog.objects.select_related(
+        qs = DepositLog.objects.select_related(
             'submitted_by', 'reviewed_by', 'gateway',
             'qr_code', 'upi_source', 'bank_account',
         ).all()
+
+        user = self.request.user
+        scope = resolve_module_scope(user, 'deposits')
+
+        if scope == 'all':
+            return qs
+
+        if scope == 'own':
+            return qs.filter(submitted_by=user)
+
+        if scope == 'brand':
+            brand_scope = user.brands.all()
+            return qs.filter(
+                Q(submitted_by__brands__in=brand_scope)
+            ).distinct()
+
+        return qs.none()
 
     # ------------------------------------------------------------------
     # Standard actions
     # ------------------------------------------------------------------
 
     def list(self, request, *args, **kwargs):
-        from django.db.models import Q
         queryset = self.filter_queryset(self.get_queryset())
 
         # Deposit History requests ?status=completed — show completed deposits.
@@ -71,14 +95,6 @@ class DepositLogViewSet(
             queryset = self.filter_queryset(self.get_queryset()).filter(
                 status=DepositLog.STATUS_COMPLETED
             )
-
-        # History view: scope to records the user is personally tied to (admin keeps full visibility).
-        user      = request.user
-        role_name = (getattr(user.role, 'name', None) or '').lower() if getattr(user, 'role', None) else ''
-        if is_history and role_name == 'rm':
-            queryset = queryset.filter(submitted_by=user)
-        elif is_history and role_name == 'back_office':
-            queryset = queryset.filter(Q(submitted_by=user) | Q(reviewed_by=user))
 
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -140,8 +156,14 @@ class DepositLogViewSet(
         return success_response('Deposit updated successfully', self.get_serializer(instance).data)
 
     def destroy(self, request, *args, **kwargs):
-        self.get_object().delete()
-        return success_response('Deposit deleted successfully', status_code=status.HTTP_204_NO_CONTENT)
+        instance = self.get_object()
+        # Users with delete permission can delete any deposit
+        # Others can only delete their own
+        if not has_module_permission(request.user, 'deposits', 'delete'):
+            if instance.submitted_by_id != request.user.pk:
+                return error_response('You can only delete your own deposits', status_code=status.HTTP_403_FORBIDDEN)
+        instance.delete()
+        return success_response('Deposit deleted successfully')
 
     # ------------------------------------------------------------------
     # Review action — Admin / Back Office only
@@ -151,9 +173,9 @@ class DepositLogViewSet(
     @action(detail=True, methods=['post'], url_path='review',
             parser_classes=[MultiPartParser, FormParser, JSONParser])
     def review(self, request, pk=None):
-        if not IsAdminOrBackOffice().has_permission(request, self):
+        if not has_module_permission(request.user, 'deposits', 'edit'):
             from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('Only admin or back office can review deposits.')
+            raise PermissionDenied('You do not have permission to review deposits.')
 
         deposit    = self.get_object()
         action_val = request.data.get('action', '')

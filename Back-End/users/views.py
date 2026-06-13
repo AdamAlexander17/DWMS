@@ -9,7 +9,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from audit_logs.services import AuditLogService
 from brands.models import Brand
-from common.permissions import IsAdmin
+from common.permissions import ModulePermission
 from common.responses import error_response, success_response
 from common.utils import get_client_ip
 from roles.models import Role
@@ -39,7 +39,7 @@ User = get_user_model()
     ),
 )
 class UserViewSet(ModelViewSet):
-    permission_classes  = [IsAuthenticated, IsAdmin]
+    permission_classes  = [IsAuthenticated]
     queryset            = User.objects.select_related('role').prefetch_related('brands').all()
     search_fields       = ['username', 'role__name']   # 'mobile' removed — field doesn't exist
     ordering_fields     = ['created_at', 'is_active']
@@ -52,6 +52,21 @@ class UserViewSet(ModelViewSet):
         if self.action in ('update', 'partial_update'):
             return UserUpdateSerializer
         return UserListSerializer
+
+    def get_permissions(self):
+        action_map = {
+            'list': 'view',
+            'retrieve': 'view',
+            'create': 'create',
+            'update': 'edit',
+            'partial_update': 'edit',
+            'destroy': 'delete',
+            'activate': 'activate',
+            'deactivate': 'activate',
+            'reset_password': 'edit',
+            'bulk_import': 'create',
+        }
+        return [IsAuthenticated(), ModulePermission('users', action_map.get(self.action, 'view'))()]
 
     # ------------------------------------------------------------------
     # List

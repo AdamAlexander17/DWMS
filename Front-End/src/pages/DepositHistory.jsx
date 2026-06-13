@@ -33,12 +33,10 @@ function useGateways() {
 }
 
 export default function DepositHistory() {
-  const { user } = useAuthStore()
+  const { hasPermission } = useAuthStore()
   const qc = useQueryClient()
 
-  const isAdmin    = user?.role === 'admin'
-  const isBO       = user?.role === 'back_office'
-  const canDelete  = isAdmin || isBO
+  const canDelete  = hasPermission('deposits', 'delete') || hasPermission('deposits', 'edit')
 
   const [page,          setPage]          = useState(1)
   const [pageSize,      setPageSize]      = useState(25)

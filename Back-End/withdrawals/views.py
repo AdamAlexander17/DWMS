@@ -10,6 +10,7 @@ from channels.layers import get_channel_layer
 
 from audit_logs.services import AuditLogService
 from common.pagination import StandardResultsPagination
+from common.permissions import ModulePermission, has_module_permission, resolve_module_scope
 from common.responses import error_response, success_response
 from common.utils import get_client_ip
 
@@ -27,6 +28,14 @@ User = get_user_model()
 
 def _role(user) -> str:
     return (getattr(user.role, 'name', None) or '').lower()
+
+
+def _scope(user) -> str:
+    return resolve_module_scope(user, 'withdrawals')
+
+
+def _can_review(user) -> bool:
+    return has_module_permission(user, 'withdrawals', 'edit') or has_module_permission(user, 'withdrawals', 'activate')
 
 
 def _push(group: str, type_: str, payload: dict):
@@ -86,17 +95,44 @@ class WithdrawalViewSet(ModelViewSet):
         ctx['request'] = self.request
         return ctx
 
+    def get_permissions(self):
+        action_map = {
+            'list': 'view',
+            'retrieve': 'view',
+            'stats': 'view',
+            'messages': 'view',
+            'list_notifications': 'view',
+            'notifications_count': 'view',
+            'notifications_read_all': 'view',
+            'notification_read': 'view',
+            'notification_delete': 'view',
+            'notifications_clear_all': 'view',
+            'create': 'create',
+            'confirm_received': 'create',
+            'not_received': 'create',
+            'update': 'edit',
+            'partial_update': 'edit',
+            'upload_slip': 'edit',
+            'email_sent': 'edit',
+            'manual_close': 'edit',
+            'review': 'edit',
+            'destroy': 'create',  # RM can delete own; method enforces ownership
+        }
+        return [IsAuthenticated(), ModulePermission('withdrawals', action_map.get(self.action, 'view'))()]
+
     def get_queryset(self):
         user = self.request.user
-        role = _role(user)
+        scope = _scope(user)
         qs   = Withdrawal.objects.select_related(
             'brand', 'submitted_by', 'reviewed_by', 'slip_uploaded_by'
         )
-        if role == 'rm':
+        if scope == 'own':
             return qs.filter(submitted_by=user)
-        if role == 'back_office':
+        if scope == 'brand':
             return qs.filter(brand__in=user.brands.all())
-        return qs  # admin
+        if scope == 'all':
+            return qs
+        return qs.none()
 
     # ── List ──────────────────────────────────────────────────────────────
     def list(self, request, *args, **kwargs):
@@ -106,10 +142,8 @@ class WithdrawalViewSet(ModelViewSet):
         history       = request.query_params.get('history')
         ordering      = (request.query_params.get('ordering') or '').strip()
 
-        is_history_view = False
         if history in ('1', 'true', 'True'):
             qs = qs.filter(status__in=['closed', 'approved', 'rejected'])
-            is_history_view = True
         elif history in ('0', 'false', 'False'):
             qs = qs.exclude(status__in=['closed', 'approved', 'rejected'])
 
@@ -117,23 +151,12 @@ class WithdrawalViewSet(ModelViewSet):
             # support comma-separated values: ?status=closed,approved
             statuses = [s.strip() for s in status_filter.split(',') if s.strip()]
             qs = qs.filter(status__in=statuses) if len(statuses) > 1 else qs.filter(status=statuses[0])
-            if all(s in ('closed', 'approved', 'rejected') for s in statuses):
-                is_history_view = True
         if search:
             from django.db.models import Q
             qs = qs.filter(
                 Q(client_name__icontains=search)
                 | Q(client_arc_id__icontains=search)
                 | Q(amount__icontains=search)
-            )
-
-        # History view: BO sees only tickets they personally touched (admin keeps full visibility, RM is already submitted_by-scoped).
-        if is_history_view and _role(request.user) == 'back_office':
-            from django.db.models import Q
-            qs = qs.filter(
-                Q(submitted_by=request.user)
-                | Q(reviewed_by=request.user)
-                | Q(slip_uploaded_by=request.user)
             )
 
         allowed_ordering = {
@@ -193,7 +216,7 @@ class WithdrawalViewSet(ModelViewSet):
     # ── Update ────────────────────────────────────────────────────────────
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        if _role(request.user) == 'rm' and instance.submitted_by_id != request.user.pk:
+        if _scope(request.user) == 'own' and instance.submitted_by_id != request.user.pk:
             return error_response('You can only edit your own tickets', status_code=status.HTTP_403_FORBIDDEN)
 
         partial = kwargs.pop('partial', False)
@@ -214,9 +237,11 @@ class WithdrawalViewSet(ModelViewSet):
     # ── Delete ────────────────────────────────────────────────────────────
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        role = _role(request.user)
-        if role == 'rm' and instance.submitted_by_id != request.user.pk:
-            return error_response('You can only delete your own tickets', status_code=status.HTTP_403_FORBIDDEN)
+        # Users with delete permission can delete any ticket
+        # Others (RM) can only delete their own
+        if not has_module_permission(request.user, 'withdrawals', 'delete'):
+            if instance.submitted_by_id != request.user.pk:
+                return error_response('You can only delete your own tickets', status_code=status.HTTP_403_FORBIDDEN)
         instance.delete()
         AuditLogService.log(
             user=request.user,
@@ -224,12 +249,12 @@ class WithdrawalViewSet(ModelViewSet):
             module='Withdrawal',
             ip_address=get_client_ip(request),
         )
-        return success_response('Withdrawal deleted', status_code=status.HTTP_204_NO_CONTENT)
+        return success_response('Withdrawal deleted')
 
     # ── Upload Slip (Back Office) ─────────────────────────────────────────
     @action(detail=True, methods=['post'], url_path='upload-slip')
     def upload_slip(self, request, pk=None):
-        if _role(request.user) not in ('admin', 'back_office'):
+        if not _can_review(request.user):
             return error_response('Only Back Office or Admin can upload slips', status_code=status.HTTP_403_FORBIDDEN)
         instance = self.get_object()
         if instance.status != 'pending':
@@ -270,7 +295,8 @@ class WithdrawalViewSet(ModelViewSet):
     @action(detail=True, methods=['post'], url_path='confirm-received')
     def confirm_received(self, request, pk=None):
         instance = self.get_object()
-        if _role(request.user) != 'rm' or instance.submitted_by_id != request.user.pk:
+        # Only the submitter or users with activate permission can confirm
+        if instance.submitted_by_id != request.user.pk and not has_module_permission(request.user, 'withdrawals', 'activate'):
             return error_response('Not allowed', status_code=status.HTTP_403_FORBIDDEN)
         if instance.status != 'slip_uploaded':
             return error_response('Can only confirm after slip is uploaded', status_code=status.HTTP_400_BAD_REQUEST)
@@ -300,7 +326,8 @@ class WithdrawalViewSet(ModelViewSet):
     @action(detail=True, methods=['post'], url_path='not-received')
     def not_received(self, request, pk=None):
         instance = self.get_object()
-        if _role(request.user) != 'rm' or instance.submitted_by_id != request.user.pk:
+        # Only the submitter or users with activate permission can flag not-received
+        if instance.submitted_by_id != request.user.pk and not has_module_permission(request.user, 'withdrawals', 'activate'):
             return error_response('Not allowed', status_code=status.HTTP_403_FORBIDDEN)
         if instance.status != 'slip_uploaded':
             return error_response('Can only report after slip is uploaded', status_code=status.HTTP_400_BAD_REQUEST)
@@ -313,10 +340,20 @@ class WithdrawalViewSet(ModelViewSet):
         instance.save(update_fields=['followup_remarks', 'status', 'updated_at'])
         _push_ticket_update(instance, request)
 
-        recipients = list(User.objects.filter(role__name='admin'))
+        recipients = list(
+            User.objects.filter(
+                role__permissions__module='withdrawals'
+            ).filter(
+                role__permissions__can_edit=True,
+            ).distinct()
+        )
         if instance.brand_id:
             recipients += list(
-                User.objects.filter(role__name='back_office', brands=instance.brand)
+                User.objects.filter(
+                    brands=instance.brand,
+                    role__permissions__module='withdrawals',
+                    role__permissions__can_edit=True,
+                ).distinct()
             )
         _notify(
             instance, 'followup_required',
@@ -338,7 +375,7 @@ class WithdrawalViewSet(ModelViewSet):
     # ── Email Sent to Bank (Back Office) ──────────────────────────────────
     @action(detail=True, methods=['post'], url_path='email-sent')
     def email_sent(self, request, pk=None):
-        if _role(request.user) not in ('admin', 'back_office'):
+        if not _can_review(request.user):
             return error_response('Only Back Office or Admin can perform this action', status_code=status.HTTP_403_FORBIDDEN)
         instance = self.get_object()
         if instance.status != 'bank_followup_required':
@@ -373,12 +410,12 @@ class WithdrawalViewSet(ModelViewSet):
     # ── Conversation / Messages ───────────────────────────────────────────
     def _can_participate(self, request, instance):
         """Owner RM, brand back-office, or admin can read/post."""
-        role = _role(request.user)
-        if role == 'admin':
+        scope = _scope(request.user)
+        if scope == 'all':
             return True
-        if role == 'rm' and instance.submitted_by_id == request.user.pk:
+        if scope == 'own' and instance.submitted_by_id == request.user.pk:
             return True
-        if role == 'back_office' and instance.brand_id and \
+        if scope == 'brand' and instance.brand_id and \
                 request.user.brands.filter(pk=instance.brand_id).exists():
             return True
         return False
@@ -386,11 +423,14 @@ class WithdrawalViewSet(ModelViewSet):
     def _message_recipients(self, instance, sender):
         """Everyone party to the ticket EXCEPT the sender."""
         recipients = {instance.submitted_by_id: instance.submitted_by} if instance.submitted_by_id else {}
-        for u in User.objects.filter(role__name='admin'):
-            recipients[u.pk] = u
+        reviewer_qs = User.objects.filter(
+            role__permissions__module='withdrawals',
+            role__permissions__can_edit=True,
+        )
         if instance.brand_id:
-            for u in User.objects.filter(role__name='back_office', brands=instance.brand):
-                recipients[u.pk] = u
+            reviewer_qs = reviewer_qs.filter(brands=instance.brand)
+        for u in reviewer_qs.distinct():
+            recipients[u.pk] = u
         recipients.pop(sender.pk, None)
         return list(recipients.values())
 
@@ -447,7 +487,7 @@ class WithdrawalViewSet(ModelViewSet):
     # ── Manual Close (Back Office / Admin) ────────────────────────────────
     @action(detail=True, methods=['post'], url_path='manual-close')
     def manual_close(self, request, pk=None):
-        if _role(request.user) not in ('admin', 'back_office'):
+        if not _can_review(request.user):
             return error_response('Only Back Office or Admin can close tickets', status_code=status.HTTP_403_FORBIDDEN)
         instance = self.get_object()
         if instance.status == 'closed':
@@ -596,8 +636,7 @@ class WithdrawalViewSet(ModelViewSet):
     # ── Legacy review (approve/reject) ────────────────────────────────────
     @action(detail=True, methods=['post'], url_path='review')
     def review(self, request, pk=None):
-        role = _role(request.user)
-        if role not in ('admin', 'back_office'):
+        if not _can_review(request.user):
             return error_response('Only Back Office or Admin can review withdrawals', status_code=status.HTTP_403_FORBIDDEN)
 
         instance = self.get_object()

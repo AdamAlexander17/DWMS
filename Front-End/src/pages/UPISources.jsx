@@ -99,8 +99,8 @@ function UPIForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
 
 export default function UPISources() {
   const qc = useQueryClient()
-  const { user } = useAuthStore()
-  const canWrite = ['admin', 'back_office'].includes(user?.role)
+  const { user, hasPermission } = useAuthStore()
+  const canWrite = ['create', 'edit', 'delete', 'activate'].some((action) => hasPermission('upi_sources', action))
   const [page, setPage]  = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [search, setSearch] = useState('')

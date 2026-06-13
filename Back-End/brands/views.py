@@ -5,7 +5,7 @@ from rest_framework.viewsets import ModelViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from audit_logs.services import AuditLogService
-from common.permissions import IsAdmin
+from common.permissions import ModulePermission
 from common.responses import error_response, success_response
 from common.utils import get_client_ip
 
@@ -31,7 +31,7 @@ class BrandViewSet(ModelViewSet):
     Read operations: all authenticated users (back office and RM need brand lists for dropdowns).
     """
 
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated]
     queryset = Brand.objects.all()
     filterset_class = BrandFilter
     search_fields = ['name']
@@ -40,7 +40,15 @@ class BrandViewSet(ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated()]
-        return [IsAuthenticated(), IsAdmin()]
+        action_map = {
+            'create': 'create',
+            'update': 'edit',
+            'partial_update': 'edit',
+            'destroy': 'delete',
+            'activate': 'activate',
+            'deactivate': 'activate',
+        }
+        return [IsAuthenticated(), ModulePermission('brands', action_map.get(self.action, 'view'))()]
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):

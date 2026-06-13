@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, SquarePen, Trash2, Power, PowerOff, Search, RefreshCw } from 'lucide-react'
 import { getBrands, createBrand, updateBrand, deleteBrand, activateBrand, deactivateBrand } from '../api/brands'
+import { useAuthStore } from '../store/authStore'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Badge from '../components/ui/Badge'
@@ -52,6 +53,12 @@ function BrandForm({ initial, onSubmit, loading, apiErrors = {} }) {
 
 export default function Brands() {
   const qc = useQueryClient()
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const canCreate   = hasPermission('brands', 'create')
+  const canEdit     = hasPermission('brands', 'edit')
+  const canDelete   = hasPermission('brands', 'delete')
+  const canActivate = hasPermission('brands', 'activate')
+
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [search, setSearch]     = useState('')
@@ -105,9 +112,11 @@ export default function Brands() {
           <h1 className="page-title">Brands</h1>
           <p className="page-subtitle">{total} brand{total !== 1 ? 's' : ''} registered</p>
         </div>
-        <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
-          <Plus size={16} /> New Brand
-        </button>
+        {canCreate && (
+          <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
+            <Plus size={16} /> New Brand
+          </button>
+        )}
       </div>
 
       {/* Filter + Pagination bar */}
@@ -134,7 +143,9 @@ export default function Brands() {
               <SortableTh label="Brand Name" sortKey="name"       toggle={toggleSort} icon={sortIcon} left />
               <SortableTh label="Status"     sortKey="status"     toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Created"    sortKey="created_at" toggle={toggleSort} icon={sortIcon} />
-              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+              {(canEdit || canDelete || canActivate) && (
+                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -155,19 +166,25 @@ export default function Brands() {
                 <td className="px-4 py-2.5 text-gray-500 text-xs text-center">{new Date(b.created_at).toLocaleDateString()}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-1.5 justify-end">
-                    <button
-                      onClick={() => toggleM.mutate({ id: b.id, active: b.is_active })}
-                      title={b.is_active ? 'Deactivate' : 'Activate'}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
-                    >
-                      {b.is_active ? <PowerOff size={13} /> : <Power size={13} />}
-                    </button>
-                    <button onClick={() => setModal({ mode: 'edit', data: b })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                      <SquarePen size={12} />
-                    </button>
-                    <button onClick={() => setDelTarget(b)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
-                      <Trash2 size={12} />
-                    </button>
+                    {canActivate && (
+                      <button
+                        onClick={() => toggleM.mutate({ id: b.id, active: b.is_active })}
+                        title={b.is_active ? 'Deactivate' : 'Activate'}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
+                      >
+                        {b.is_active ? <PowerOff size={13} /> : <Power size={13} />}
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => setModal({ mode: 'edit', data: b })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                        <SquarePen size={12} />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => setDelTarget(b)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

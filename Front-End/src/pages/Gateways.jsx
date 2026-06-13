@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, SquarePen, Trash2, Power, PowerOff, Search } from 'lucide-react'
 import { getGateways, createGateway, updateGateway, activateGateway, deactivateGateway, deleteGateway } from '../api/master'
+import { useAuthStore } from '../store/authStore'
 import Modal         from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Pagination    from '../components/ui/Pagination'
@@ -56,6 +57,12 @@ function GatewayForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function Gateways() {
   const qc = useQueryClient()
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const canCreate   = hasPermission('gateways', 'create')
+  const canEdit     = hasPermission('gateways', 'edit')
+  const canDelete   = hasPermission('gateways', 'delete')
+  const canActivate = hasPermission('gateways', 'activate')
+
   const [page,      setPage]      = useState(1)
   const [pageSize,  setPageSize]  = useState(100)
   const [modal,     setModal]     = useState(null)
@@ -118,9 +125,11 @@ export default function Gateways() {
           <h1 className="page-title">Gateways</h1>
           <p className="page-subtitle">{gateways.length} gateway{gateways.length !== 1 ? 's' : ''} configured</p>
         </div>
-        <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
-          <Plus size={16} /> Add Gateway
-        </button>
+        {canCreate && (
+          <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
+            <Plus size={16} /> Add Gateway
+          </button>
+        )}
       </div>
 
       {/* Search + Pagination bar */}
@@ -153,7 +162,9 @@ export default function Gateways() {
               <SortableTh label="Name"    sortKey="name"       toggle={toggleSort} icon={sortIcon} left />
               <SortableTh label="Status"  sortKey="status"     toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Created" sortKey="created_at" toggle={toggleSort} icon={sortIcon} />
-              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+              {(canEdit || canDelete || canActivate) && (
+                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -185,27 +196,33 @@ export default function Gateways() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5 justify-end">
-                    <button
-                      onClick={() => setModal({ mode: 'edit', data: gw })}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                      title="Edit"
-                    >
-                      <SquarePen size={12} />
-                    </button>
-                    <button
-                      onClick={() => setToggleTarget(gw)}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
-                      title={gw.is_active ? 'Deactivate' : 'Activate'}
-                    >
-                      {gw.is_active ? <PowerOff size={12} /> : <Power size={12} />}
-                    </button>
-                    <button
-                      onClick={() => setDelTarget(gw)}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => setModal({ mode: 'edit', data: gw })}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        title="Edit"
+                      >
+                        <SquarePen size={12} />
+                      </button>
+                    )}
+                    {canActivate && (
+                      <button
+                        onClick={() => setToggleTarget(gw)}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
+                        title={gw.is_active ? 'Deactivate' : 'Activate'}
+                      >
+                        {gw.is_active ? <PowerOff size={12} /> : <Power size={12} />}
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => setDelTarget(gw)}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

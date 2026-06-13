@@ -39,12 +39,14 @@ def _validate_daily_limit(attrs, instance=None):
 
 
 def _validate_brand_scope(brand, request):
-    """Non-admin users may only create/update records for brands they are assigned to."""
+    """Users with 'all' scope or superusers can use any brand. Others must be assigned."""
     if brand is None or request is None:
         return
+    from common.permissions import is_admin_user, resolve_module_scope
     user = getattr(request, 'user', None)
-    role_name = getattr(user.role, 'name', None) if getattr(user, 'role', None) else None
-    if role_name == 'admin':
+    if is_admin_user(user):
+        return
+    if resolve_module_scope(user) == 'all':
         return
     allowed_ids = set(user.brands.values_list('id', flat=True))
     if brand.id not in allowed_ids:

@@ -279,8 +279,8 @@ function QRForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function QRCodes() {
   const qc = useQueryClient()
-  const { user } = useAuthStore()
-  const canWrite = ['admin', 'back_office'].includes(user?.role)
+  const { user, hasPermission } = useAuthStore()
+  const canWrite = ['create', 'edit', 'delete', 'activate'].some((action) => hasPermission('qr_codes', action))
   const [page,      setPage]      = useState(1)
   const [pageSize,  setPageSize]  = useState(100)
   const [search,    setSearch]    = useState('')

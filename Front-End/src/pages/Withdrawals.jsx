@@ -863,12 +863,15 @@ function ManualCloseModal({ withdrawal, onSubmit, onClose, loading, apiErrors = 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Withdrawals() {
   const qc = useQueryClient()
-  const { user } = useAuthStore()
+  const { user, hasPermission } = useAuthStore()
   const role = user?.role
 
-  const isRM         = role === 'rm'
-  const isBackOffice = role === 'back_office'
-  const canReview    = role === 'admin' || isBackOffice
+  const canCreate    = hasPermission('withdrawals', 'create')
+  const canEdit      = hasPermission('withdrawals', 'edit')
+  const canDelete    = hasPermission('withdrawals', 'delete')
+  const canActivate  = hasPermission('withdrawals', 'activate')
+  const canReview    = canActivate && !canCreate  // BO-only: has activate but doesn't create tickets
+  const isRM         = canCreate && !canActivate
 
   const [page, setPage]           = useState(1)
   const [pageSize, setPageSize]   = useState(25)
@@ -1002,9 +1005,11 @@ export default function Withdrawals() {
           <h1 className="page-title">Withdrawals</h1>
           <p className="page-subtitle">{total} ticket{total !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary">
-          <Plus size={16} /> New Request
-        </button>
+        {canCreate && (
+          <button onClick={() => setShowForm(true)} className="btn-primary">
+            <Plus size={16} /> New Request
+          </button>
+        )}
       </div>
 
       {/* Bank follow-up alert banner (back office / admin) */}
@@ -1072,7 +1077,6 @@ export default function Withdrawals() {
               </td></tr>
             )}
             {records.map((r) => {
-              const isOwnTicket  = isRM && r.submitted_by === user?.id
               const needsAttention = r.status === 'bank_followup_required'
               return (
                 <tr key={r.id} className={`transition-colors ${needsAttention && canReview ? 'bg-red-50/30 hover:bg-red-50/60' : 'hover:bg-blue-50/20'}`}>
@@ -1106,7 +1110,7 @@ export default function Withdrawals() {
                       </button>
 
                       {/* Edit */}
-                      {(canReview || isOwnTicket) && (
+                      {(canEdit || (canCreate && r.submitted_by === user?.id)) && (
                         <button onClick={() => setEdit(r)} title="Edit"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
                           <SquarePen size={13} />
@@ -1127,32 +1131,32 @@ export default function Withdrawals() {
                         </button>
                       )}
 
-                      {/* RM: Confirm received (slip_uploaded) */}
-                      {isOwnTicket && r.status === 'slip_uploaded' && (
+                      {/* RM: Confirm received (slip_uploaded) — only ticket submitter */}
+                      {r.submitted_by === user?.id && r.status === 'slip_uploaded' && (
                         <button onClick={() => setCfm(r)} title="Client Received Amount"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-green-100 text-green-600 hover:bg-green-200 transition-colors">
                           <CheckCircle2 size={13} />
                         </button>
                       )}
 
-                      {/* RM: Not received (slip_uploaded) */}
-                      {isOwnTicket && r.status === 'slip_uploaded' && (
+                      {/* RM: Not received (slip_uploaded) — only ticket submitter */}
+                      {r.submitted_by === user?.id && r.status === 'slip_uploaded' && (
                         <button onClick={() => setNotR(r)} title="Client Did Not Receive Amount"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-100 text-red-600 hover:bg-red-200 transition-colors">
                           <PhoneOff size={13} />
                         </button>
                       )}
 
-                      {/* Back Office: Mark email sent (bank_followup_required) */}
-                      {canReview && r.status === 'bank_followup_required' && (
+                      {/* Back Office: Mark email sent (bank_followup_required) — only reviewers, not submitter */}
+                      {canReview && r.submitted_by !== user?.id && r.status === 'bank_followup_required' && (
                         <button onClick={() => setEmail(r)} title="Mark Email Sent to Bank"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-500 text-white hover:bg-red-600 transition-colors animate-pulse">
                           <Mail size={13} />
                         </button>
                       )}
 
-                      {/* Delete: admin always; RM only on own (any status) */}
-                      {(role === 'admin' || isOwnTicket) && (
+                      {/* Delete: only ticket submitter can delete their own */}
+                      {(canDelete || (canCreate && r.submitted_by === user?.id)) && (
                         <button onClick={() => setDel(r)} title="Delete"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
                           <Trash2 size={13} />

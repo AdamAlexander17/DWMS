@@ -4,6 +4,7 @@ import { Plus, SquarePen, Trash2, Search, LockKeyhole, X, Clock, Calendar, Uploa
 import { getUsers, createUser, updateUser, deleteUser, activateUser, deactivateUser, resetPassword, bulkImportUsers } from '../api/users'
 import { getBrands } from '../api/brands'
 import { getRoles } from '../api/roles'
+import { useAuthStore } from '../store/authStore'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Badge from '../components/ui/Badge'
@@ -379,6 +380,12 @@ function ResetPwForm({ onSubmit, loading, apiErrors = {} }) {
 
 export default function Users() {
   const qc = useQueryClient()
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const canCreate   = hasPermission('users', 'create')
+  const canEdit     = hasPermission('users', 'edit')
+  const canDelete   = hasPermission('users', 'delete')
+  const canActivate = hasPermission('users', 'activate')
+
   const [page, setPage]     = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [search, setSearch] = useState('')
@@ -458,12 +465,16 @@ export default function Users() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowImport(true)} className="btn-secondary flex items-center gap-1.5">
-            <Upload size={15} /> Import
-          </button>
-          <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
-            <Plus size={16} /> New User
-          </button>
+          {canCreate && (
+            <button onClick={() => setShowImport(true)} className="btn-secondary flex items-center gap-1.5">
+              <Upload size={15} /> Import
+            </button>
+          )}
+          {canCreate && (
+            <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
+              <Plus size={16} /> New User
+            </button>
+          )}
         </div>
       </div>
 
@@ -507,12 +518,14 @@ export default function Users() {
               <SortableTh label="Status"     sortKey="status"     toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Last Login" sortKey="last_login" toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Created"    sortKey="created_at" toggle={toggleSort} icon={sortIcon} />
-              <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+              {(canEdit || canDelete) && (
+                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {users.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400 text-sm">No users found</td></tr>
+              <tr><td colSpan={(canEdit || canDelete) ? 7 : 6} className="px-6 py-10 text-center text-gray-400 text-sm">No users found</td></tr>
             )}
             {sortedUsers.map((u) => (
               <tr key={u.id} className="hover:bg-blue-50/20 transition-colors">
@@ -540,13 +553,19 @@ export default function Users() {
 
                 {/* Status — toggle switch */}
                 <td className="px-4 py-2.5 text-center">
-                  <button
-                    onClick={() => toggleM.mutate({ id: u.id, active: u.is_active })}
-                    title={u.is_active ? 'Deactivate' : 'Activate'}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${u.is_active ? 'bg-accent' : 'bg-gray-200'}`}
-                  >
-                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${u.is_active ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
-                  </button>
+                  {canActivate ? (
+                    <button
+                      onClick={() => toggleM.mutate({ id: u.id, active: u.is_active })}
+                      title={u.is_active ? 'Deactivate' : 'Activate'}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${u.is_active ? 'bg-accent' : 'bg-gray-200'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${u.is_active ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                    </button>
+                  ) : (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${u.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {u.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  )}
                 </td>
 
                 {/* Last Login */}
@@ -566,13 +585,21 @@ export default function Users() {
                 </td>
 
                 {/* Actions */}
+                {(canEdit || canDelete) && (
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => setResetTarget(u)} title="Reset Password" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><LockKeyhole size={13} /></button>
-                    <button onClick={() => setModal({ mode: 'edit', data: u })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><SquarePen size={13} /></button>
-                    <button onClick={() => setDelTarget(u)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
+                    {canEdit && (
+                      <button onClick={() => setResetTarget(u)} title="Reset Password" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><LockKeyhole size={13} /></button>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => setModal({ mode: 'edit', data: u })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><SquarePen size={13} /></button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => setDelTarget(u)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
+                    )}
                   </div>
                 </td>
+                )}
               </tr>
             ))}
           </tbody>

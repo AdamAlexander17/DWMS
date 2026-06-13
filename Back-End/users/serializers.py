@@ -74,11 +74,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        role      = attrs.get('role')
-        role_name = role.name.lower() if role else None
-        if role_name == 'rm' and not attrs.get('brands'):
+        role = attrs.get('role')
+        # Roles with 'brand' scope require at least one brand assigned
+        if role and getattr(role, 'scope', 'own') == 'brand' and not attrs.get('brands'):
             raise serializers.ValidationError(
-                {'brands': 'RM users must be assigned to at least one brand'}
+                {'brands': 'Users with this role must be assigned to at least one brand.'}
             )
         return attrs
 
@@ -111,12 +111,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         fields = ['role', 'brands']
 
     def validate(self, attrs):
-        role      = attrs.get('role', self.instance.role if self.instance else None)
-        brands    = attrs.get('brands', list(self.instance.brands.all()) if self.instance else [])
-        role_name = role.name.lower() if role else None
-        if role_name == 'rm' and not brands:
+        role   = attrs.get('role', self.instance.role if self.instance else None)
+        brands = attrs.get('brands', list(self.instance.brands.all()) if self.instance else [])
+        # Roles with 'brand' scope require at least one brand assigned
+        if role and getattr(role, 'scope', 'own') == 'brand' and not brands:
             raise serializers.ValidationError(
-                {'brands': 'RM users must be assigned to at least one brand'}
+                {'brands': 'Users with this role must be assigned to at least one brand.'}
             )
         # Prevent admins from removing their own admin role / deactivating themselves
         request = self.context.get('request') if hasattr(self, 'context') else None
