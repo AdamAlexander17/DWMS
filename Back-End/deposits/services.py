@@ -17,13 +17,20 @@ def push_deposit_event(deposit, actor, event_type: str):
 
     event_type: 'created' | 'updated' | 'reviewed'
 
-    Routing rules:
-      - RM creates / edits  → notify Admin + all Back-Office users
-      - BO / Admin reviews  → notify the RM who submitted the deposit
+    Routing rules (fully dynamic — no hardcoded role names):
+      - User with 'create' creates/edits → notify users with 'activate' permission
+      - User with 'activate' reviews → notify the submitter
     """
     from auth.models import User  # local import to avoid circular
 
-    actor_role = (getattr(actor.role, 'name', None) or '').lower()
+    # Resolve deposit brand through selected channel (if available)
+    deposit_brand_id = None
+    if deposit.qr_code_id and getattr(deposit, 'qr_code', None) and deposit.qr_code.brand_id:
+        deposit_brand_id = deposit.qr_code.brand_id
+    elif deposit.upi_source_id and getattr(deposit, 'upi_source', None) and deposit.upi_source.brand_id:
+        deposit_brand_id = deposit.upi_source.brand_id
+    elif deposit.bank_account_id and getattr(deposit, 'bank_account', None) and deposit.bank_account.brand_id:
+        deposit_brand_id = deposit.bank_account.brand_id
 
     # Compute channel detail label
     if deposit.channel_type == DepositLog.CHANNEL_QR and deposit.qr_code_id:
@@ -36,14 +43,28 @@ def push_deposit_event(deposit, actor, event_type: str):
         channel_label = ''
 
     gw_name = deposit.gateway.name if deposit.gateway_id else ''
-    submitter = deposit.submitted_by.username if deposit.submitted_by_id else 'someone'
 
     if event_type in ('created', 'updated'):
-        # RM did something → tell back-office + admins
-        recipients = list(
-            User.objects.filter(role__name__in=['admin', 'back_office'])
-                        .exclude(pk=actor.pk)
-        )
+        # Submitter did something → notify all users who have 'activate' permission on deposits
+        # (these are the reviewers/BO-type users)
+        reviewers_qs = User.objects.filter(
+            role__permissions__module='deposits',
+            role__permissions__can_activate=True,
+            is_active=True,
+        ).distinct()
+
+        # If deposit has a brand, also include users assigned to that brand with view permission
+        if deposit_brand_id:
+            brand_viewers = User.objects.filter(
+                brands__id=deposit_brand_id,
+                role__permissions__module='deposits',
+                role__permissions__can_view=True,
+                is_active=True,
+            ).distinct()
+            recipients = list((reviewers_qs | brand_viewers).exclude(pk=actor.pk).distinct())
+        else:
+            recipients = list(reviewers_qs.exclude(pk=actor.pk).distinct())
+
         action_verb = 'logged a new deposit' if event_type == 'created' else 'updated an existing deposit'
         status_label = deposit.get_status_display()
         details = []
@@ -52,7 +73,7 @@ def push_deposit_event(deposit, actor, event_type: str):
         details.append(f'Status: {status_label}')
         message = f'{actor.username} {action_verb} — ' + ', '.join(details) + '.'
     else:
-        # BO reviewed → tell the RM who submitted
+        # Reviewer reviewed → notify the submitter
         recipients = []
         if deposit.submitted_by_id and deposit.submitted_by_id != actor.pk:
             try:

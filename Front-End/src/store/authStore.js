@@ -36,6 +36,18 @@ export const useAuthStore = create(
 
       logout: () => set({ user: null, accessToken: null, refreshToken: null, profileDrawerOpen: false, profileForceChange: false }),
 
+      isAdmin: () => {
+        const { user } = get()
+        return String(user?.role ?? '').toLowerCase() === 'admin'
+      },
+
+      hasAnyModulePermission: (modules, action = 'view') => {
+        const { user } = get()
+        if (!user || !Array.isArray(modules) || modules.length === 0) return false
+        const perms = user.permissions ?? {}
+        return modules.some((module) => !!perms[module]?.[action])
+      },
+
       /**
        * Check if the current user's role has the given permission.
        * @param {string} module  - e.g. 'brands', 'qr_codes'
@@ -44,7 +56,6 @@ export const useAuthStore = create(
       hasPermission: (module, action = 'view') => {
         const { user } = get()
         if (!user) return false
-        if (user.role === 'admin') return true   // admin always has full access
         const perms = user.permissions ?? {}
         return !!perms[module]?.[action]
       },

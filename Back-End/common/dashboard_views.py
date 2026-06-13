@@ -50,6 +50,8 @@ from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 
+from common.permissions import has_any_module_permission, has_module_permission, is_admin_user, resolve_module_scope
+
 from brands.models import Brand
 from deposits.models import DepositLog
 from master.models import Gateway
@@ -142,9 +144,8 @@ def dashboard_summary(request):
 
     # ── Resolve caller's role ─────────────────────────────────────────────
     user       = request.user
-    role_name  = (user.role.name if user.role else '').lower()
-    is_rm      = role_name == 'rm'
-    # Admin and Back-Office see all data; RM sees only their own submissions.
+    dep_scope  = resolve_module_scope(user, 'deposits')
+    wd_scope   = resolve_module_scope(user, 'withdrawals')
 
     # ── Base querysets, scoped to the period ──────────────────────────────
     dep_qs = DepositLog.objects.filter(created_at__gte=start, created_at__lte=end)
@@ -154,11 +155,25 @@ def dashboard_summary(request):
     wd_prev_qs  = Withdrawal.objects.filter(created_at__gte=prev_start, created_at__lt=prev_end)
 
     # ── Scope to own submissions for RM users ─────────────────────────────
-    if is_rm:
+    if dep_scope == 'own':
         dep_qs      = dep_qs.filter(submitted_by=user)
-        wd_qs       = wd_qs.filter(submitted_by=user)
         dep_prev_qs = dep_prev_qs.filter(submitted_by=user)
+    elif dep_scope == 'brand':
+        brand_scope = user.brands.all()
+        dep_qs = dep_qs.filter(
+            Q(submitted_by__brands__in=brand_scope)
+        ).distinct()
+        dep_prev_qs = dep_prev_qs.filter(
+            Q(submitted_by__brands__in=brand_scope)
+        ).distinct()
+
+    if wd_scope == 'own':
+        wd_qs       = wd_qs.filter(submitted_by=user)
         wd_prev_qs  = wd_prev_qs.filter(submitted_by=user)
+    elif wd_scope == 'brand':
+        brand_scope = user.brands.all()
+        wd_qs = wd_qs.filter(brand__in=brand_scope)
+        wd_prev_qs = wd_prev_qs.filter(brand__in=brand_scope)
 
     # ── KPI numbers ───────────────────────────────────────────────────────
     deposits_count    = dep_qs.count()
@@ -175,16 +190,22 @@ def dashboard_summary(request):
         + wd_qs.filter(status__in=CLOSED_WITHDRAWAL_STATUSES).count()
     )
 
-    active_channels = (
-        QRCode.objects.filter(is_active=True).count()
-        + UPISource.objects.filter(is_active=True).count()
-        + BankAccount.objects.filter(is_active=True).count()
-    ) if not is_rm else (
-        # RM: only channels belonging to their assigned brands
-        QRCode.objects.filter(is_active=True, brand__in=user.brands.all()).count()
-        + UPISource.objects.filter(is_active=True, brand__in=user.brands.all()).count()
-        + BankAccount.objects.filter(is_active=True, brand__in=user.brands.all()).count()
-    )
+    # ── Active channels count (scoped by brand) ─────────────────────────────
+    if is_admin_user(user):
+        active_channels = (
+            QRCode.objects.filter(is_active=True).count()
+            + UPISource.objects.filter(is_active=True).count()
+            + BankAccount.objects.filter(is_active=True).count()
+        )
+    elif user.brands.exists():
+        brand_scope = user.brands.all()
+        active_channels = (
+            QRCode.objects.filter(is_active=True, brand__in=brand_scope).count()
+            + UPISource.objects.filter(is_active=True, brand__in=brand_scope).count()
+            + BankAccount.objects.filter(is_active=True, brand__in=brand_scope).count()
+        )
+    else:
+        active_channels = 0
 
     dep_delta = _percent_delta(deposits_count, dep_prev_qs.count())
     wd_delta  = _percent_delta(

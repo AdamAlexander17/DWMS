@@ -62,16 +62,19 @@ class TicketConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _can_access(self, user, ticket_id):
+        from common.permissions import is_admin_user, resolve_module_scope
         try:
             wd = Withdrawal.objects.select_related('brand').get(pk=ticket_id)
         except Withdrawal.DoesNotExist:
             return False
-        role = (getattr(user.role, 'name', None) or '').lower()
-        if role == 'admin':
+        if is_admin_user(user):
             return True
-        if role == 'rm' and wd.submitted_by_id == user.pk:
+        scope = resolve_module_scope(user, 'withdrawals')
+        if scope == 'all':
             return True
-        if role == 'back_office' and wd.brand_id and \
+        if scope == 'own' and wd.submitted_by_id == user.pk:
+            return True
+        if scope == 'brand' and wd.brand_id and \
                 user.brands.filter(pk=wd.brand_id).exists():
             return True
         return False

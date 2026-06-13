@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
-from common.permissions import IsAdminOrBackOffice
+from common.permissions import ModulePermission
 from common.responses import success_response, error_response
 
 from .models import Gateway
@@ -24,9 +24,16 @@ class GatewayViewSet(ViewSet):
     """
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve'):
-            return [IsAuthenticated()]
-        return [IsAuthenticated(), IsAdminOrBackOffice()]
+        action_map = {
+            'list': 'view',
+            'retrieve': 'view',
+            'create': 'create',
+            'partial_update': 'edit',
+            'destroy': 'delete',
+            'activate': 'activate',
+            'deactivate': 'activate',
+        }
+        return [IsAuthenticated(), ModulePermission('gateways', action_map.get(self.action, 'view'))()]
 
     def list(self, request):
         qs = Gateway.objects.filter(is_active=True)

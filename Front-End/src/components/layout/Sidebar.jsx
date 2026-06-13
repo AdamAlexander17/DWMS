@@ -23,37 +23,76 @@ const PAYMENT_TABS = [
 ]
 
 const TXN_TABS = [
-  { to: '/deposits',           label: 'Deposits',           icon: ArrowDownCircle },
-  { to: '/withdrawals',        label: 'Withdrawals',        icon: ArrowUpCircle },
-  { to: '/deposit-history',    label: 'Deposit History',    icon: ClipboardList },
-  { to: '/withdrawal-history', label: 'Withdrawal History', icon: ClipboardList },
+  { to: '/deposits',           label: 'Deposits',           icon: ArrowDownCircle, module: 'deposits' },
+  { to: '/withdrawals',        label: 'Withdrawals',        icon: ArrowUpCircle,   module: 'withdrawals' },
+  { to: '/deposit-history',    label: 'Deposit History',    icon: ClipboardList,   module: 'deposit_history' },
+  { to: '/withdrawal-history', label: 'Withdrawal History', icon: ClipboardList,   module: 'withdrawal_history' },
 ]
 
 const allNavItems = [
-  { to: '/',           label: 'Dashboard',        icon: LayoutDashboard, roles: ['admin', 'back_office', 'rm'] },
-  { to: '/users',      label: 'Users',            icon: Users,            roles: ['admin'] },
-  { to: '/roles',      label: 'Master',           icon: Database,         roles: ['admin'],                      master:  true },
-  { to: '/qr-codes',   label: 'Payment Methods',  icon: Wallet,           roles: ['admin', 'back_office', 'rm'], payment: true },
-  { to: '/deposits',   label: 'Transactions',     icon: ArrowLeftRight,   roles: ['admin', 'back_office', 'rm'], txn:     true },
-  { to: '/audit-logs', label: 'Audit Logs',       icon: ScrollText,       roles: ['admin'] },
+  { to: '/',           label: 'Dashboard',        icon: LayoutDashboard, modules: [] },
+  { to: '/users',      label: 'Users',            icon: Users,           modules: ['users'] },
+  { to: '/roles',      label: 'Master',           icon: Database,        modules: ['master'], master:  true },
+  { to: '/qr-codes',   label: 'Payment Methods',  icon: Wallet,          modules: ['payment_methods'], payment: true },
+  { to: '/deposits',   label: 'Transactions',     icon: ArrowLeftRight,  modules: ['transactions'], txn:     true },
+  { to: '/audit-logs', label: 'Audit Logs',       icon: ScrollText,      modules: ['audit_logs'] },
 ]
 
 const roleLabel = { admin: 'Administrator', back_office: 'Back Office', rm: 'Relationship Manager' }
 
 export default function Sidebar() {
-  const { user, refreshToken, logout, openProfile } = useAuthStore()
+  const { user, refreshToken, logout, openProfile, hasAnyModulePermission } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
 
-  const navItems      = allNavItems.filter(i => i.roles.includes(user?.role))
+  // Determine the first accessible sub-tab for each group
+  const firstMasterTab  = MASTER_TABS.find(t => {
+    if (t.to === '/roles') return hasAnyModulePermission(['roles'])
+    if (t.to === '/brands') return hasAnyModulePermission(['brands'])
+    if (t.to === '/gateways') return hasAnyModulePermission(['gateways'])
+    return false
+  })
+  const firstPaymentTab = PAYMENT_TABS.find(t => {
+    if (t.to === '/qr-codes') return hasAnyModulePermission(['qr_codes'])
+    if (t.to === '/upi-sources') return hasAnyModulePermission(['upi_sources'])
+    if (t.to === '/bank-accounts') return hasAnyModulePermission(['bank_accounts'])
+    return false
+  })
+  const firstTxnTab = TXN_TABS.find(t => {
+    if (t.to === '/deposits') return hasAnyModulePermission(['deposits'])
+    if (t.to === '/withdrawals') return hasAnyModulePermission(['withdrawals'])
+    if (t.to === '/deposit-history') return hasAnyModulePermission(['deposit_history'])
+    if (t.to === '/withdrawal-history') return hasAnyModulePermission(['withdrawal_history'])
+    return false
+  })
+
+  const navItems = allNavItems.filter((item) => item.modules.length === 0 || hasAnyModulePermission(item.modules)).map(item => {
+    // Override the `to` path to point to the first accessible sub-tab
+    if (item.master && firstMasterTab) return { ...item, to: firstMasterTab.to }
+    if (item.payment && firstPaymentTab) return { ...item, to: firstPaymentTab.to }
+    if (item.txn && firstTxnTab) return { ...item, to: firstTxnTab.to }
+    return item
+  })
   const masterActive  = MASTER_PATHS.some(p => location.pathname.startsWith(p))
   const paymentActive = PAYMENT_PATHS.some(p => location.pathname.startsWith(p))
   const txnActive     = TXN_PATHS.some(p => location.pathname.startsWith(p))
   const activeGroup   = masterActive ? 'master' : paymentActive ? 'payment' : txnActive ? 'txn' : null
-  const subTabs       = activeGroup === 'master' ? MASTER_TABS
+  const subTabs       = (activeGroup === 'master' ? MASTER_TABS
                       : activeGroup === 'payment' ? PAYMENT_TABS
                       : activeGroup === 'txn'     ? TXN_TABS
-                      : []
+                      : []).filter((tab) => {
+                        if (tab.to === '/roles') return hasAnyModulePermission(['roles'])
+                        if (tab.to === '/brands') return hasAnyModulePermission(['brands'])
+                        if (tab.to === '/gateways') return hasAnyModulePermission(['gateways'])
+                        if (tab.to === '/qr-codes') return hasAnyModulePermission(['qr_codes'])
+                        if (tab.to === '/upi-sources') return hasAnyModulePermission(['upi_sources'])
+                        if (tab.to === '/bank-accounts') return hasAnyModulePermission(['bank_accounts'])
+                        if (tab.to === '/deposits') return hasAnyModulePermission(['deposits'])
+                        if (tab.to === '/deposit-history') return hasAnyModulePermission(['deposit_history'])
+                        if (tab.to === '/withdrawals') return hasAnyModulePermission(['withdrawals'])
+                        if (tab.to === '/withdrawal-history') return hasAnyModulePermission(['withdrawal_history'])
+                        return true
+                      })
 
   // Auto-open profile drawer in force mode when user must change password
   useEffect(() => {

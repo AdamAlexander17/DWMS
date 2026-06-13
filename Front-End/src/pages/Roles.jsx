@@ -4,6 +4,7 @@ import {
   getRoles, getRole, createRole, updateRole, deleteRole,
   activateRole, deactivateRole, getModules,
 } from '../api/roles';
+import { useAuthStore } from '../store/authStore';
 import SortableTh    from '../components/ui/SortableTh';
 import { useSortable } from '../hooks/useSortable';
 import Pagination from '../components/ui/Pagination';
@@ -105,7 +106,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
             <div key={mod.value} className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50">
                 <span className="text-xs font-bold tracking-widest text-gray-700 uppercase">
-                  {mod.label.replace(/ /g, ' ')}
+                  {mod.label}
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-gray-400">{selectedCount}/{ACTIONS.length}</span>
@@ -268,17 +269,10 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
                     name="name"
                     value={form.name}
                     onChange={handleField}
-                    disabled={isEdit && role?.is_system}
                     placeholder="e.g. Marketing Manager"
                     className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40
-                      ${errors.name ? 'border-red-400' : 'border-gray-300'}
-                      ${isEdit && role?.is_system ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`}
+                      ${errors.name ? 'border-red-400' : 'border-gray-300'}`}
                   />
-                  {isEdit && role?.is_system && (
-                    <p className="text-xs text-accent mt-1 flex items-center gap-1">
-                      <Lock size={11} /> System role — name locked
-                    </p>
-                  )}
                   {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                 </div>
 
@@ -369,6 +363,12 @@ function PermissionBadges({ role }) {
 // Main Page
 // ---------------------------------------------------------------------------
 export default function Roles() {
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canCreate   = hasPermission('roles', 'create');
+  const canEdit     = hasPermission('roles', 'edit');
+  const canDelete   = hasPermission('roles', 'delete');
+  const canActivate = hasPermission('roles', 'activate');
+
   const [roles,   setRoles]   = useState([]);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -459,9 +459,11 @@ export default function Roles() {
           <h1 className="page-title">Roles</h1>
           <p className="page-subtitle">{roles.length} role{roles.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
-          <Plus size={16} /> Add Role
-        </button>
+        {canCreate && (
+          <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
+            <Plus size={16} /> Add Role
+          </button>
+        )}
       </div>
 
       {/* Filter + Pagination bar */}
@@ -499,7 +501,9 @@ export default function Roles() {
                 <SortableTh label="Permissions" sortKey="permissions" toggle={toggleSort} icon={sortIcon} />
                 <SortableTh label="Status"      sortKey="status"      toggle={toggleSort} icon={sortIcon} />
                 <SortableTh label="System"      sortKey="system"      toggle={toggleSort} icon={sortIcon} />
-                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+                {(canEdit || canDelete || canActivate) && (
+                  <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -537,21 +541,27 @@ export default function Roles() {
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-1.5">
-                      <button onClick={() => handleToggleActive(role)}
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
-                        title={role.is_active ? 'Deactivate' : 'Activate'}>
-                        {role.is_active ? <PowerOff size={13} /> : <Power size={13} />}
-                      </button>
-                      <button onClick={() => setModal({ mode: 'edit', role })}
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                        title="Edit role">
-                        <SquarePen size={12} />
-                      </button>
-                      <button onClick={() => setDelConfirm(role)}
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
-                        title="Delete role">
-                        <Trash2 size={12} />
-                      </button>
+                      {canActivate && (
+                        <button onClick={() => handleToggleActive(role)}
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
+                          title={role.is_active ? 'Deactivate' : 'Activate'}>
+                          {role.is_active ? <PowerOff size={13} /> : <Power size={13} />}
+                        </button>
+                      )}
+                      {canEdit && (
+                        <button onClick={() => setModal({ mode: 'edit', role })}
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          title="Edit role">
+                          <SquarePen size={12} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => setDelConfirm(role)}
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                          title="Delete role">
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

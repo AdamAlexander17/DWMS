@@ -29,9 +29,6 @@ class RoleSerializer(serializers.ModelSerializer):
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError('A role with this name already exists.')
-        # Prevent renaming reserved/system role names
-        if self.instance and self.instance.is_system and value.lower() != self.instance.name.lower():
-            raise serializers.ValidationError('System roles cannot be renamed.')
         return value
 
     def validate_description(self, value):

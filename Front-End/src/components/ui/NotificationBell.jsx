@@ -88,7 +88,7 @@ export default function NotificationBell() {
   const { data: depCount } = useQuery({
     queryKey: ['notifications-unread'],
     queryFn:  getUnreadCount,
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
     refetchOnWindowFocus: true,
   })
   const depUnread = depCount?.data?.data?.count ?? 0
@@ -102,9 +102,8 @@ export default function NotificationBell() {
   const { data: depList } = useQuery({
     queryKey: ['notifications-list'],
     queryFn:  () => getNotifications({ page_size: 50 }),
-    enabled:  open && tab === 'deposits',
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 10_000,
+    refetchInterval: 15_000,
   })
   const depNotifs = depList?.data?.data?.results ?? []
 
@@ -112,7 +111,7 @@ export default function NotificationBell() {
   const { data: wdCount } = useQuery({
     queryKey: ['wd-notifications-unread'],
     queryFn:  getWdUnreadCount,
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
     refetchOnWindowFocus: true,
   })
   const wdUnread = wdCount?.data?.data?.count ?? 0
@@ -126,7 +125,8 @@ export default function NotificationBell() {
   const { data: wdList } = useQuery({
     queryKey: ['wd-notifications-list'],
     queryFn:  getWdNotifications,
-    enabled:  open && (tab === 'withdrawals' || tab === 'messages'),
+    staleTime: 10_000,
+    refetchInterval: 15_000,
   })
   const wdAll     = wdList?.data?.data ?? []
   const wdNotifs  = wdAll.filter(n => n.notif_type !== 'new_message')
@@ -266,7 +266,12 @@ export default function NotificationBell() {
   const handleDepClick = (n) => {
     if (!n.is_read) depReadM.mutate(n.id)
     setOpen(false)
-    navigate('/deposits')
+    // Navigate to deposit page — if notification has a deposit_id, open that specific deposit
+    if (n.deposit_id) {
+      navigate(`/deposits?highlight=${n.deposit_id}`)
+    } else {
+      navigate('/deposits')
+    }
   }
 
   return (

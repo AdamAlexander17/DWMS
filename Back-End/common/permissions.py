@@ -2,98 +2,68 @@ from rest_framework.permissions import BasePermission
 
 
 # ---------------------------------------------------------------------------
-# Helper
+# Helpers — fully dynamic, no hardcoded role names
 # ---------------------------------------------------------------------------
 
-def _role_name(user) -> str | None:
-    """Return the user's role name as a lowercase string, or None."""
-    role = getattr(user, 'role', None)
-    if role is None:
-        return None
-    # FK object (normal path after migration)
-    name = getattr(role, 'name', None)
-    if name is not None:
-        return str(name).lower()
-    # Legacy: raw string value (safety fallback)
-    return str(role).lower()
+def is_admin_user(user) -> bool:
+    """True if user is a superuser (Django level)."""
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return bool(getattr(user, 'is_superuser', False))
 
 
 def has_module_permission(user, module: str, action: str = 'view') -> bool:
     """
-    Standalone helper — True if the user's role grants `action` on `module`.
+    True if the user's role grants `action` on `module`.
+    Superusers always pass.
     action: 'view' | 'create' | 'edit' | 'delete' | 'activate'
     """
     if not getattr(user, 'is_authenticated', False):
         return False
+    if is_admin_user(user):
+        return True
     has_perm_for = getattr(user, 'has_perm_for', None)
     if callable(has_perm_for):
         return has_perm_for(module, action)
     return False
 
 
+def has_any_module_permission(user, modules, action: str = 'view') -> bool:
+    """Check if user has permission for ANY of the given modules.
+
+    Also respects module hierarchy — if checking a child module,
+    the parent module must also have view permission.
+    """
+    from roles.models import MODULE_HIERARCHY
+
+    for module in (modules or []):
+        if has_module_permission(user, module, action):
+            # If this is a child module, also check parent has view
+            for parent, children in MODULE_HIERARCHY.items():
+                if module in children:
+                    if has_module_permission(user, parent, 'view'):
+                        return True
+                    else:
+                        break  # Parent denied, skip this module
+            else:
+                # Not a child module (or is a parent/standalone) — direct permission is enough
+                return True
+    return False
+
+
+def has_module_write_permission(user, module: str) -> bool:
+    return any(has_module_permission(user, module, action) for action in ('create', 'edit', 'delete', 'activate'))
+
+
 # ---------------------------------------------------------------------------
-# Role-based permission classes
+# Permission classes — fully dynamic
 # ---------------------------------------------------------------------------
 
 class IsAdmin(BasePermission):
-    """Allow access only to users with the 'admin' role."""
+    """Allow access only to superusers."""
 
     def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and _role_name(request.user) == 'admin'
-        )
-
-
-class IsBackOffice(BasePermission):
-    """Allow access only to Back Office users."""
-
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and _role_name(request.user) == 'back_office'
-        )
-
-
-class IsRM(BasePermission):
-    """Allow access only to RM users."""
-
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and _role_name(request.user) == 'rm'
-        )
-
-
-class IsAdminOrBackOffice(BasePermission):
-    """Allow access to Admin and Back Office users."""
-
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and _role_name(request.user) in ('admin', 'back_office')
-        )
-
-
-class IsAdminOrBackOfficeOrRMReadOnly(BasePermission):
-    """
-    Admin and Back Office: full access.
-    RM: read-only (GET / HEAD / OPTIONS).
-    """
-
-    def has_permission(self, request, view):
-        if not (request.user and request.user.is_authenticated):
-            return False
-        role = _role_name(request.user)
-        if role in ('admin', 'back_office'):
-            return True
-        if role == 'rm':
-            return request.method in ('GET', 'HEAD', 'OPTIONS')
-        return False
+        return bool(request.user and is_admin_user(request.user))
 
 
 # ---------------------------------------------------------------------------
@@ -114,3 +84,34 @@ def ModulePermission(module: str, action: str = 'view'):
 
     _DynamicPerm.__name__ = f'ModulePermission[{module}:{action}]'
     return _DynamicPerm
+
+
+
+# ---------------------------------------------------------------------------
+# Scope resolver — determines data visibility
+# ---------------------------------------------------------------------------
+
+def resolve_module_scope(user, module: str = None) -> str:
+    """
+    Return the user's data scope: 'all', 'brand', or 'own'.
+
+    Logic:
+    - Superusers → 'all'
+    - Users with brands assigned → 'brand'
+    - All others → 'own'
+    """
+    if not getattr(user, 'is_authenticated', False):
+        return 'none'
+
+    if is_admin_user(user):
+        return 'all'
+
+    role = getattr(user, 'role', None)
+    if role is None:
+        return 'none'
+
+    # If user has brands assigned, scope is brand-level
+    if hasattr(user, 'brands') and user.brands.exists():
+        return 'brand'
+
+    return 'own'
