@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { keepPreviousData } from '@tanstack/react-query'
-import { Plus, SquarePen, Trash2, Power, PowerOff, Search, QrCode as QrIcon, MoreVertical, X, Download, Maximize2 } from 'lucide-react'
+import { Plus, SquarePen, Trash2, Power, PowerOff, Search, QrCode as QrIcon, MoreVertical, X, Download, Maximize2, Copy, Check } from 'lucide-react'
 import { getQRCodes, createQRCode, updateQRCode, deleteQRCode, activateQRCode, deactivateQRCode } from '../api/payments'
 import { getBrands } from '../api/brands'
 import Modal         from '../components/ui/Modal'
@@ -33,7 +33,7 @@ async function downloadQR(imageUrl, fileName) {
 }
 
 // ── Three-dot dropdown menu ────────────────────────────────────────────────
-function CardMenu({ record, onEdit, onDelete, onToggle }) {
+function CardMenu({ record, onEdit, onDelete, onToggle, canEdit = true, canDelete = true, canActivate = true }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -53,26 +53,34 @@ function CardMenu({ record, onEdit, onDelete, onToggle }) {
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl border border-gray-200 shadow-lg z-20 overflow-hidden py-1">
-          <button
-            onClick={() => { onToggle(record); setOpen(false) }}
-            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-amber-50 text-amber-600`}
-          >
-            {record.is_active ? <PowerOff size={14} /> : <Power size={14} />}
-            {record.is_active ? 'Deactivate' : 'Activate'}
-          </button>
-          <button
-            onClick={() => { onEdit(record); setOpen(false) }}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <SquarePen size={14} className="text-teal-600" /> Edit
-          </button>
-          <div className="border-t border-gray-100 my-1" />
-          <button
-            onClick={() => { onDelete(record); setOpen(false) }}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
-          >
-            <Trash2 size={14} /> Delete
-          </button>
+          {canActivate && (
+            <button
+              onClick={() => { onToggle(record); setOpen(false) }}
+              className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-amber-50 text-amber-600`}
+            >
+              {record.is_active ? <PowerOff size={14} /> : <Power size={14} />}
+              {record.is_active ? 'Deactivate' : 'Activate'}
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => { onEdit(record); setOpen(false) }}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <SquarePen size={14} className="text-teal-600" /> Edit
+            </button>
+          )}
+          {canDelete && (
+            <>
+              <div className="border-t border-gray-100 my-1" />
+              <button
+                onClick={() => { onDelete(record); setOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -109,8 +117,26 @@ function ImageLightbox({ src, name, onClose }) {
 }
 
 // ── Single QR card ─────────────────────────────────────────────────────────
-function QRCard({ r, canWrite, onEdit, onDelete, onToggle }) {
+function QRCard({ r, canEdit, canDelete, canActivate, onEdit, onDelete, onToggle }) {
   const [preview, setPreview] = useState(false)
+  const [copied, setCopied]   = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      const res = await fetch(r.qr_image)
+      const blob = await res.blob()
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ])
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback: copy the URL
+      await navigator.clipboard.writeText(r.qr_image)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
   return (
     <>
     {preview && <ImageLightbox src={r.qr_image} name={r.qr_name} onClose={() => setPreview(false)} />}
@@ -145,7 +171,7 @@ function QRCard({ r, canWrite, onEdit, onDelete, onToggle }) {
               {r.brand_name}
             </span>
           </div>
-          {canWrite && <CardMenu record={r} onEdit={onEdit} onDelete={onDelete} onToggle={onToggle} />}
+          {(canEdit || canDelete || canActivate) && <CardMenu record={r} onEdit={onEdit} onDelete={onDelete} onToggle={onToggle} canEdit={canEdit} canDelete={canDelete} canActivate={canActivate} />}
         </div>
 
         {/* Range */}
@@ -158,18 +184,34 @@ function QRCard({ r, canWrite, onEdit, onDelete, onToggle }) {
 
         {/* Daily capacity */}
         <div>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Daily Capacity</p>
-          <CapacityBar capacity={r.capacity} />
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Daily Capacity</p>
+          {r.daily_limit
+            ? <p className="text-xs text-gray-600 font-medium">₹{Number(r.daily_limit).toLocaleString('en-IN')}</p>
+            : <span className="text-[11px] text-gray-300 italic">No limit</span>
+          }
         </div>
 
-        {/* Download button */}
+        {/* Action buttons */}
         {r.qr_image ? (
-          <button
-            onClick={() => downloadQR(r.qr_image, r.qr_name)}
-            className="mt-auto w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:border-accent hover:text-accent hover:bg-accent/5 transition-all duration-150"
-          >
-            <Download size={14} /> Download QR
-          </button>
+          <div className="mt-auto grid grid-cols-2 gap-2">
+            <button
+              onClick={handleCopy}
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-medium transition-all duration-150 ${
+                copied
+                  ? 'border-green-300 text-green-600 bg-green-50'
+                  : 'border-gray-200 text-gray-600 hover:border-accent hover:text-accent hover:bg-accent/5'
+              }`}
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? 'Copied!' : 'Copy QR'}
+            </button>
+            <button
+              onClick={() => downloadQR(r.qr_image, r.qr_name)}
+              className="flex items-center justify-center gap-1.5 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:border-accent hover:text-accent hover:bg-accent/5 transition-all duration-150"
+            >
+              <Download size={13} /> Download
+            </button>
+          </div>
         ) : (
           <div className="mt-auto w-full py-2 rounded-lg border border-dashed border-gray-200 text-xs text-center text-gray-300">
             No image uploaded
@@ -280,7 +322,11 @@ function QRForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
 export default function QRCodes() {
   const qc = useQueryClient()
   const { user, hasPermission } = useAuthStore()
-  const canWrite = ['create', 'edit', 'delete', 'activate'].some((action) => hasPermission('qr_codes', action))
+  const canCreate   = hasPermission('qr_codes', 'create')
+  const canEdit     = hasPermission('qr_codes', 'edit')
+  const canDelete   = hasPermission('qr_codes', 'delete')
+  const canActivate = hasPermission('qr_codes', 'activate')
+  const canWrite    = canCreate || canEdit || canDelete || canActivate
   const [page,      setPage]      = useState(1)
   const [pageSize,  setPageSize]  = useState(100)
   const [search,    setSearch]    = useState('')
@@ -327,7 +373,7 @@ export default function QRCodes() {
           <h1 className="page-title">QR Codes</h1>
           <p className="page-subtitle">{total} QR code{total !== 1 ? 's' : ''}</p>
         </div>
-        {canWrite && (
+        {canCreate && (
           <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
             <Plus size={16} /> Upload QR
           </button>
@@ -359,7 +405,9 @@ export default function QRCodes() {
             <QRCard
               key={r.id}
               r={r}
-              canWrite={canWrite}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              canActivate={canActivate}
               onEdit={(rec) => setModal({ mode: 'edit', data: rec })}
               onDelete={(rec) => setDelTarget(rec)}
               onToggle={(rec) => toggleM.mutate({ id: rec.id, a: rec.is_active })}
@@ -369,7 +417,7 @@ export default function QRCodes() {
       )}
 
       {/* Create / Edit Modal */}
-      {canWrite && (
+      {(canCreate || canEdit) && (
         <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Edit QR Code' : 'Upload QR Code'}>
           <QRForm
             initial={modal?.data}

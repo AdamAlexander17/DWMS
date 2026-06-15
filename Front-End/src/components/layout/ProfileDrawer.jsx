@@ -130,10 +130,10 @@ export default function ProfileDrawer() {
           {!profileForceChange && (
             <button
               onClick={closeProfile}
-              className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors"
+              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors cursor-pointer"
               title="Close (Esc)"
             >
-              <X size={14} />
+              <X size={16} />
             </button>
           )}
 

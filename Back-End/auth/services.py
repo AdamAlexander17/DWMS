@@ -1,3 +1,4 @@
+from django.contrib.auth.models import update_last_login
 from django.db import transaction
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
@@ -12,6 +13,10 @@ class AuthService:
     def login(user: User) -> dict:
         """Generate JWT token pair and return user payload."""
         refresh = RefreshToken.for_user(user)
+
+        # Update last_login timestamp
+        update_last_login(None, user)
+
         role_name = user.role.name if user.role_id else None
         permissions = user.role.get_permissions_map() if user.role_id else {}
         return {

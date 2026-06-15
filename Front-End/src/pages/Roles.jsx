@@ -8,11 +8,18 @@ import { useAuthStore } from '../store/authStore';
 import SortableTh    from '../components/ui/SortableTh';
 import { useSortable } from '../hooks/useSortable';
 import Pagination from '../components/ui/Pagination';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 const ACTIONS = ['view', 'create', 'edit', 'delete', 'activate'];
+
+// Modules that should NOT show the "Activate / Deactivate" permission
+const NO_ACTIVATE_MODULES = ['payment_methods', 'master', 'audit_logs', 'deposit_history', 'withdrawal_history'];
+
+// Modules that should NOT show the "Create" permission
+const NO_CREATE_MODULES = ['deposit_history', 'withdrawal_history'];
 
 const EMPTY_PERMISSION = (module) => ({
   module,
@@ -98,9 +105,14 @@ function PermissionSelector({ modules, permissions, onChange }) {
 
       <div className="space-y-2">
         {modules.map((mod) => {
+          const moduleActions = ACTIONS.filter((a) => {
+            if (a === 'activate' && NO_ACTIVATE_MODULES.includes(mod.value)) return false;
+            if (a === 'create' && NO_CREATE_MODULES.includes(mod.value)) return false;
+            return true;
+          });
           const perm         = permMap[mod.value] || EMPTY_PERMISSION(mod.value);
-          const selectedCount = ACTIONS.filter((a) => perm[`can_${a}`]).length;
-          const allModOn     = selectedCount === ACTIONS.length;
+          const selectedCount = moduleActions.filter((a) => perm[`can_${a}`]).length;
+          const allModOn     = selectedCount === moduleActions.length;
 
           return (
             <div key={mod.value} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -109,7 +121,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
                   {mod.label}
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400">{selectedCount}/{ACTIONS.length}</span>
+                  <span className="text-xs text-gray-400">{selectedCount}/{moduleActions.length}</span>
                   <input
                     type="checkbox"
                     checked={allModOn}
@@ -119,7 +131,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
                 </div>
               </div>
               <div className="px-4 py-3 space-y-2.5 bg-white">
-                {ACTIONS.map((action) => {
+                {moduleActions.map((action) => {
                   const key     = `can_${action}`;
                   const checked = !!perm[key];
                   return (
@@ -582,32 +594,13 @@ export default function Roles() {
       )}
 
       {/* Delete confirmation */}
-      {delConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/30">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Delete Role</h3>
-            <p className="text-sm text-gray-600 mb-5">
-              Are you sure you want to delete{' '}
-              <strong className="capitalize">{delConfirm.name.replace(/_/g, ' ')}</strong>?
-              This cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDelConfirm(null)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(delConfirm)}
-                className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!delConfirm}
+        onClose={() => setDelConfirm(null)}
+        onConfirm={() => handleDelete(delConfirm)}
+        title="Delete Role"
+        message={`Delete "${delConfirm?.name?.replace(/_/g, ' ')}"? This cannot be undone.`}
+      />
     </div>
   );
 }

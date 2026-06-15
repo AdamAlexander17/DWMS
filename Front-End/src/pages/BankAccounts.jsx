@@ -150,7 +150,11 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
 export default function BankAccounts() {
   const qc = useQueryClient()
   const { user, hasPermission } = useAuthStore()
-  const canWrite = ['create', 'edit', 'delete', 'activate'].some((action) => hasPermission('bank_accounts', action))
+  const canCreate   = hasPermission('bank_accounts', 'create')
+  const canEdit     = hasPermission('bank_accounts', 'edit')
+  const canDelete   = hasPermission('bank_accounts', 'delete')
+  const canActivate = hasPermission('bank_accounts', 'activate')
+  const canWrite    = canCreate || canEdit || canDelete || canActivate
   const [page, setPage]  = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [search, setSearch] = useState('')
@@ -185,7 +189,7 @@ export default function BankAccounts() {
     if (key === 'ifsc')       return (r.ifsc_code ?? '').toLowerCase()
     if (key === 'brand')      return (r.brand_name ?? '').toLowerCase()
     if (key === 'range')      return Number(r.range_from ?? 0)
-    if (key === 'capacity')   return Number(r.capacity?.used_today ?? 0)
+    if (key === 'capacity')   return Number(r.daily_limit ?? 0)
     if (key === 'status')     return r.is_active ? 1 : 0
     return ''
   }
@@ -208,7 +212,7 @@ export default function BankAccounts() {
           <h1 className="page-title">Bank Accounts</h1>
           <p className="page-subtitle">{total} account{total !== 1 ? 's' : ''}</p>
         </div>
-        {canWrite && <button onClick={() => setModal({ mode: 'create' })} className="btn-primary"><Plus size={16} /> Add Bank Account</button>}
+        {canCreate && <button onClick={() => setModal({ mode: 'create' })} className="btn-primary"><Plus size={16} /> Add Bank Account</button>}
       </div>
 
       <div className="card py-4 flex items-center justify-between gap-3">
@@ -231,7 +235,7 @@ export default function BankAccounts() {
               <SortableTh label="IFSC"           sortKey="ifsc"     toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Brand"          sortKey="brand"    toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Range"          sortKey="range"    toggle={toggleSort} icon={sortIcon} />
-              <SortableTh label="Daily Capacity" sortKey="capacity" toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Daily Limit"    sortKey="capacity" toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Status"         sortKey="status"   toggle={toggleSort} icon={sortIcon} />
               {canWrite && <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>}
             </tr>
@@ -248,16 +252,27 @@ export default function BankAccounts() {
                   <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
                 </td>
                 <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap text-center">₹{r.range_from} – ₹{r.range_to}</td>
-                <td className="px-4 py-2.5 text-center"><CapacityBar capacity={r.capacity} /></td>
+                <td className="px-4 py-2.5 text-center">
+                  {r.daily_limit
+                    ? <span className="text-xs text-gray-600 font-medium">₹{Number(r.daily_limit).toLocaleString('en-IN')}</span>
+                    : <span className="text-[11px] text-gray-300 italic">No limit</span>
+                  }
+                </td>
                 <td className="px-4 py-2.5 text-center"><Badge variant={r.is_active ? 'active' : 'inactive'} /></td>
                 {canWrite && (
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 justify-end">
-                      <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} title={r.is_active ? 'Deactivate' : 'Activate'} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors">
-                        {r.is_active ? <PowerOff size={13} /> : <Power size={13} />}
-                      </button>
-                      <button onClick={() => setModal({ mode: 'edit', data: r })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><SquarePen size={12} /></button>
-                      <button onClick={() => setDelTarget(r)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"><Trash2 size={12} /></button>
+                      {canActivate && (
+                        <button onClick={() => toggleM.mutate({ id: r.id, a: r.is_active })} title={r.is_active ? 'Deactivate' : 'Activate'} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors">
+                          {r.is_active ? <PowerOff size={13} /> : <Power size={13} />}
+                        </button>
+                      )}
+                      {canEdit && (
+                        <button onClick={() => setModal({ mode: 'edit', data: r })} title="Edit" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><SquarePen size={12} /></button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => setDelTarget(r)} title="Delete" className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"><Trash2 size={12} /></button>
+                      )}
                     </div>
                   </td>
                 )}
@@ -267,7 +282,7 @@ export default function BankAccounts() {
         </table>
       </div>
 
-      {canWrite && (
+      {(canCreate || canEdit) && (
         <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Edit Bank Account' : 'Add Bank Account'} size="lg">
           <BankForm
             initial={modal?.data}
