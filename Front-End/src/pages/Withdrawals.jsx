@@ -14,6 +14,7 @@ import {
   getWithdrawals, getWithdrawal, createWithdrawal, updateWithdrawal, deleteWithdrawal,
   uploadSlip, confirmReceived, notReceived, markEmailSent,
   getMessages, postMessage, manualClose,
+  markWdNotifRead, getWdNotifications,
 } from '../api/withdrawals'
 import { connectWS } from '../api/ws'
 import Modal from '../components/ui/Modal'
@@ -1125,9 +1126,33 @@ export default function Withdrawals() {
 
                       {/* Conversation */}
                       {canChat && (
-                      <button onClick={() => { setView({ ...r, __openChat: true }) }} title="Open Conversation"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors">
+                      <button onClick={() => {
+                        // Optimistically clear the unread badge
+                        qc.setQueryData(['withdrawals', page, pageSize, search, statusFilter, sortBy, sortDir], (prev) => {
+                          if (!prev) return prev
+                          const results = prev?.data?.data?.results ?? []
+                          const updated = results.map(item => item.id === r.id ? { ...item, message_count: 0 } : item)
+                          return { ...prev, data: { ...prev.data, data: { ...prev.data.data, results: updated } } }
+                        })
+                        // Mark message notifications as read for this ticket in bell icon
+                        getWdNotifications().then((res) => {
+                          const notifs = res?.data?.data ?? []
+                          const ticketMsgNotifs = notifs.filter(n => n.withdrawal_id === r.id && n.notif_type === 'new_message' && !n.is_read)
+                          ticketMsgNotifs.forEach(n => markWdNotifRead(n.id))
+                          if (ticketMsgNotifs.length > 0) {
+                            qc.invalidateQueries({ queryKey: ['wd-notifications-unread'] })
+                            qc.invalidateQueries({ queryKey: ['wd-notifications-list'] })
+                          }
+                        }).catch(() => {})
+                        setView({ ...r, __openChat: true })
+                      }} title="Open Conversation"
+                        className="relative inline-flex items-center justify-center w-7 h-7 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors">
                         <MessageSquare size={13} />
+                        {(r.message_count ?? 0) > 0 && (
+                          <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] text-[9px] font-bold bg-red-500 text-white rounded-full flex items-center justify-center px-0.5 leading-none">
+                            {r.message_count > 99 ? '99+' : r.message_count}
+                          </span>
+                        )}
                       </button>
                       )}
 
