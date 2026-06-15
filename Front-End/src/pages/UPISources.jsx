@@ -166,7 +166,7 @@ export default function UPISources() {
       if (ctx?.prev) qc.setQueryData(['upi-sources', page, pageSize, debouncedSearch], ctx.prev)
     },
     onSettled: inv,
-  })
+  })  
 
   if (isLoading) return <PageSpinner />
 
