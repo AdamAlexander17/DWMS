@@ -84,8 +84,6 @@ class DepositLogSerializer(serializers.ModelSerializer):
         return value
 
     def validate_gateway(self, value):
-        if value is not None and not value.is_active:
-            raise serializers.ValidationError('Selected gateway is inactive.')
         return value
 
     def validate(self, attrs):
@@ -104,11 +102,6 @@ class DepositLogSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'upi_source': 'A UPI Source must be selected for channel type "upi".'})
         if channel_type == DepositLog.CHANNEL_BANK and not bank_account:
             raise serializers.ValidationError({'bank_account': 'A Bank Account must be selected for channel type "bank".'})
-
-        # Selected channel must be active
-        for src, label in ((qr_code, 'QR Code'), (upi_source, 'UPI source'), (bank_account, 'Bank account')):
-            if src is not None and hasattr(src, 'is_active') and not src.is_active:
-                raise serializers.ValidationError(f'Selected {label} is inactive.')
 
         # Slip status consistency
         slip        = attrs.get('slip',        getattr(self.instance, 'slip',        None))
