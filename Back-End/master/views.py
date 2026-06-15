@@ -36,7 +36,9 @@ class GatewayViewSet(ViewSet):
         return [IsAuthenticated(), ModulePermission('gateways', action_map.get(self.action, 'view'))()]
 
     def list(self, request):
-        qs = Gateway.objects.filter(is_active=True)
+        # Management page passes ?all=true to see inactive gateways too
+        show_all = request.query_params.get('all', '').lower() in ('true', '1')
+        qs = Gateway.objects.all() if show_all else Gateway.objects.filter(is_active=True)
         search = (request.query_params.get('search') or '').strip()
         if search:
             qs = qs.filter(name__icontains=search)

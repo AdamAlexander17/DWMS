@@ -1,7 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 import Modal from './Modal'
 
-export default function ConfirmDialog({ open, onClose, onConfirm, title = 'Confirm', message, loading }) {
+export default function ConfirmDialog({ open, onClose, onConfirm, title = 'Confirm', message, loading, confirmLabel = 'Delete', loadingLabel }) {
   return (
     <Modal open={open} onClose={onClose} title={title} size="sm" variant="danger">
       <div className="flex flex-col items-center text-center gap-4">
@@ -14,7 +14,7 @@ export default function ConfirmDialog({ open, onClose, onConfirm, title = 'Confi
             Cancel
           </button>
           <button onClick={onConfirm} className="btn-danger flex-1 justify-center" disabled={loading}>
-            {loading ? 'Deleting...' : 'Delete'}
+            {loading ? (loadingLabel || `${confirmLabel}…`) : confirmLabel}
           </button>
         </div>
       </div>

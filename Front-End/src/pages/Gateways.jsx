@@ -81,7 +81,7 @@ export default function Gateways() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['master-gateways-all'],
-    queryFn:  () => getGateways(debouncedSearch ? { search: debouncedSearch } : undefined),
+    queryFn:  () => getGateways({ all: true, ...(debouncedSearch ? { search: debouncedSearch } : {}) }),
   })
 
   useEffect(() => {
@@ -278,6 +278,7 @@ export default function Gateways() {
             ? `Deactivate "${toggleTarget?.name}"? It will no longer appear in the deposit gateway dropdown.`
             : `Activate "${toggleTarget?.name}"? It will become available in the deposit gateway dropdown.`
         }
+        confirmLabel={toggleTarget?.is_active ? 'Deactivate' : 'Activate'}
       />
     </div>
   )
