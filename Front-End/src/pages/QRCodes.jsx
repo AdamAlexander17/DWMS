@@ -343,7 +343,7 @@ export default function QRCodes() {
     queryKey: ['qr-codes', page, pageSize, debouncedSearch],
     queryFn:  () => getQRCodes({ page, page_size: pageSize, search: debouncedSearch }),
     placeholderData: keepPreviousData,
-    refetchInterval: 10_000,
+    refetchInterval: 3_000,
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 
