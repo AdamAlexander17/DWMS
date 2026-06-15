@@ -124,7 +124,7 @@ class DepositLogViewSet(
             actor=request.user,
             action=DepositActivity.ACTION_CREATED,
             message=f'Deposit created. Slip status: {instance.get_slip_status_display()}.',
-            slip_url=instance.slip.url if instance.slip else '',
+            slip_url=request.build_absolute_uri(instance.slip.url) if instance.slip else '',
         )
 
         return success_response(
@@ -150,7 +150,7 @@ class DepositLogViewSet(
             actor=request.user,
             action=DepositActivity.ACTION_UPDATED,
             message=f'Deposit updated. Slip status: {instance.get_slip_status_display()}.',
-            slip_url=instance.slip.url if instance.slip else '',
+            slip_url=request.build_absolute_uri(instance.slip.url) if instance.slip else '',
         )
 
         return success_response('Deposit updated successfully', self.get_serializer(instance).data)
@@ -226,7 +226,7 @@ class DepositLogViewSet(
             actor=request.user,
             action=DepositActivity.ACTION_REVIEWED,
             message=f'Reviewed as "{action_val}". {message}'.strip(),
-            slip_url=deposit.review_slip.url if deposit.review_slip else '',
+            slip_url=request.build_absolute_uri(deposit.review_slip.url) if deposit.review_slip else '',
         )
 
         return success_response(

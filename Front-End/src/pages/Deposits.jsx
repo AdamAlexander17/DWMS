@@ -743,7 +743,7 @@ function DepositTimeline({ deposit }) {
                     </span>
                   </div>
                   {a.slip_url && (
-                    <a href={a.slip_url} target="_blank" rel="noopener noreferrer"
+                    <a href={a.slip_url.startsWith('http') ? a.slip_url : `http://127.0.0.1:8000${a.slip_url}`} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline mt-1">
                       <Paperclip size={10} /> View slip
                     </a>
