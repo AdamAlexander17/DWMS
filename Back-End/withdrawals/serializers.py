@@ -17,6 +17,7 @@ class WithdrawalSerializer(serializers.ModelSerializer):
     slip_uploaded_by_name = serializers.SerializerMethodField()
     brand_name            = serializers.SerializerMethodField()
     slip_url              = serializers.SerializerMethodField()
+    message_count         = serializers.SerializerMethodField()
 
     def get_submitted_by_name(self, obj):
         return obj.submitted_by.username if obj.submitted_by_id else None
@@ -36,6 +37,19 @@ class WithdrawalSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.slip.url) if request else obj.slip.url
 
+    def get_message_count(self, obj):
+        """Count unread message notifications for the current user on this ticket."""
+        request = self.context.get('request')
+        if not request or not request.user:
+            return 0
+        from .models import WithdrawalNotification
+        return WithdrawalNotification.objects.filter(
+            recipient=request.user,
+            withdrawal=obj,
+            notif_type='new_message',
+            is_read=False,
+        ).count()
+
     class Meta:
         model  = Withdrawal
         fields = [
@@ -49,6 +63,7 @@ class WithdrawalSerializer(serializers.ModelSerializer):
             'brand', 'brand_name',
             'submitted_by', 'submitted_by_name',
             'reviewed_by', 'reviewed_by_name', 'reviewed_at',
+            'message_count',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
