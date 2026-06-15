@@ -66,7 +66,6 @@ export default function Gateways() {
   const [page,      setPage]      = useState(1)
   const [pageSize,  setPageSize]  = useState(100)
   const [modal,     setModal]     = useState(null)
-  const [toggleTarget, setToggleTarget] = useState(null)
   const [delTarget,    setDelTarget]    = useState(null)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -110,8 +109,8 @@ export default function Gateways() {
 
   const createM     = useMutation({ mutationFn: createGateway,                               onSuccess: () => { inv(); setModal(null) } })
   const updateM     = useMutation({ mutationFn: ({ id, d }) => updateGateway(id, d),         onSuccess: () => { inv(); setModal(null) } })
-  const activateM   = useMutation({ mutationFn: activateGateway,                             onSuccess: () => { inv(); setToggleTarget(null) } })
-  const deactivateM = useMutation({ mutationFn: deactivateGateway,                           onSuccess: () => { inv(); setToggleTarget(null) } })
+  const activateM   = useMutation({ mutationFn: activateGateway,                             onSuccess: inv })
+  const deactivateM = useMutation({ mutationFn: deactivateGateway,                           onSuccess: inv })
   const deleteM     = useMutation({ mutationFn: deleteGateway,                                onSuccess: () => { inv(); setDelTarget(null) } })
 
   const createErr = createM.error?.response?.data?.message || (createM.isError ? 'Failed to create gateway.' : null)
@@ -207,7 +206,7 @@ export default function Gateways() {
                     )}
                     {canActivate && (
                       <button
-                        onClick={() => setToggleTarget(gw)}
+                        onClick={() => gw.is_active ? deactivateM.mutate(gw.id) : activateM.mutate(gw.id)}
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-500 hover:bg-amber-100 transition-colors"
                         title={gw.is_active ? 'Deactivate' : 'Activate'}
                       >
@@ -260,25 +259,6 @@ export default function Gateways() {
         loading={deleteM.isPending}
         title="Delete Gateway"
         message={`Delete "${delTarget?.name}"? This action cannot be undone.`}
-      />
-
-      {/* Activate / Deactivate Confirm */}
-      <ConfirmDialog
-        open={!!toggleTarget}
-        onClose={() => setToggleTarget(null)}
-        onConfirm={() =>
-          toggleTarget?.is_active
-            ? deactivateM.mutate(toggleTarget.id)
-            : activateM.mutate(toggleTarget.id)
-        }
-        loading={activateM.isPending || deactivateM.isPending}
-        title={toggleTarget?.is_active ? 'Deactivate Gateway' : 'Activate Gateway'}
-        message={
-          toggleTarget?.is_active
-            ? `Deactivate "${toggleTarget?.name}"? It will no longer appear in the deposit gateway dropdown.`
-            : `Activate "${toggleTarget?.name}"? It will become available in the deposit gateway dropdown.`
-        }
-        confirmLabel={toggleTarget?.is_active ? 'Deactivate' : 'Activate'}
       />
     </div>
   )
