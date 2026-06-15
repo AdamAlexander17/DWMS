@@ -45,25 +45,29 @@ def push_deposit_event(deposit, actor, event_type: str):
     gw_name = deposit.gateway.name if deposit.gateway_id else ''
 
     if event_type in ('created', 'updated'):
-        # Submitter did something → notify all users who have 'activate' permission on deposits
-        # (these are the reviewers/BO-type users)
+        # Submitter did something → notify only users who:
+        # 1. Have 'activate' permission on deposits AND
+        # 2. Share at least one brand with the submitter
+        submitter_brands = actor.brands.all()
+
         reviewers_qs = User.objects.filter(
             role__permissions__module='deposits',
             role__permissions__can_activate=True,
             is_active=True,
         ).distinct()
 
-        # If deposit has a brand, also include users assigned to that brand with view permission
-        if deposit_brand_id:
-            brand_viewers = User.objects.filter(
-                brands__id=deposit_brand_id,
-                role__permissions__module='deposits',
-                role__permissions__can_view=True,
-                is_active=True,
-            ).distinct()
-            recipients = list((reviewers_qs | brand_viewers).exclude(pk=actor.pk).distinct())
+        # Filter reviewers to only those sharing the submitter's brand(s)
+        if submitter_brands.exists():
+            recipients = list(
+                reviewers_qs.filter(brands__in=submitter_brands)
+                .exclude(pk=actor.pk).distinct()
+            )
         else:
-            recipients = list(reviewers_qs.exclude(pk=actor.pk).distinct())
+            # No brand on submitter — only notify superusers
+            recipients = list(
+                reviewers_qs.filter(is_superuser=True)
+                .exclude(pk=actor.pk).distinct()
+            )
 
         action_verb = 'logged a new deposit' if event_type == 'created' else 'updated an existing deposit'
         status_label = deposit.get_status_display()
@@ -107,23 +111,27 @@ def push_deposit_event(deposit, actor, event_type: str):
             recipient=recipient, is_read=False
         ).count()
 
-        # Push over WS
-        async_to_sync(channel_layer.group_send)(
-            _notif_group(recipient.pk),
-            {
-                'type': 'notify',
-                'payload': {
-                    'type':         'deposit_update',
-                    'event':        event_type,
-                    'deposit_id':   deposit.pk,
-                    'message':      message,
-                    'unread_count': unread_count,
-                    'notification': {
-                        'id':          notif.pk,
-                        'message':     message,
-                        'is_read':     False,
-                        'created_at':  notif.created_at.isoformat(),
+        # Push over WS (silently skip if Redis is down)
+        try:
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    _notif_group(recipient.pk),
+                    {
+                        'type': 'notify',
+                        'payload': {
+                            'type':         'deposit_update',
+                            'event':        event_type,
+                            'deposit_id':   deposit.pk,
+                            'message':      message,
+                            'unread_count': unread_count,
+                            'notification': {
+                                'id':          notif.pk,
+                                'message':     message,
+                                'is_read':     False,
+                                'created_at':  notif.created_at.isoformat(),
+                            },
+                        },
                     },
-                },
-            },
-        )
+                )
+        except Exception:
+            pass  # Redis down — notification saved to DB, WS push skipped

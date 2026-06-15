@@ -173,6 +173,19 @@ export default function NotificationBell() {
             return { ...prev, data: { ...prev.data, data: { count: data.unread_count ?? 0 } } }
           })
         }
+        if (data?.type === 'permissions_updated') {
+          // Admin updated this user's role permissions — refetch and update store
+          import('../../api/auth').then(({ getPermissions }) => {
+            getPermissions().then((res) => {
+              const payload = res?.data?.data
+              if (payload) {
+                useAuthStore.getState().updatePermissions(payload)
+                // Refresh queries that depend on permissions
+                qc.invalidateQueries()
+              }
+            }).catch(() => {})
+          })
+        }
       },
     })
     return () => conn.close()
@@ -376,7 +389,7 @@ export default function NotificationBell() {
           </div>
 
           {/* List */}
-          <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-50">
+          <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-200">
 
             {/* Withdrawal notifications (status events, no chat messages) */}
             {tab === 'withdrawals' && (

@@ -166,7 +166,7 @@ export default function Gateways() {
               )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-200">
             {!isLoading && gateways.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-sm">

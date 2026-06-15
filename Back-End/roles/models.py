@@ -52,13 +52,19 @@ class Role(models.Model):
         """Return {module: {action: bool}} for fast lookup."""
         return {
             p.module: {
-                'view':     p.can_view,
-                'create':   p.can_create,
-                'edit':     p.can_edit,
-                'delete':   p.can_delete,
-                'activate': p.can_activate,
-                'review':   p.can_review,
-                'complete': p.can_complete,
+                'view':             p.can_view,
+                'create':           p.can_create,
+                'edit':             p.can_edit,
+                'delete':           p.can_delete,
+                'activate':         p.can_activate,
+                'review':           p.can_review,
+                'complete':         p.can_complete,
+                'upload_slip':      p.can_upload_slip,
+                'confirm_received': p.can_confirm_received,
+                'not_received':     p.can_not_received,
+                'email_bank':       p.can_email_bank,
+                'close_ticket':     p.can_close_ticket,
+                'chat':             p.can_chat,
             }
             for p in self.permissions.all()
         }
@@ -74,6 +80,13 @@ class RolePermission(models.Model):
     can_activate = models.BooleanField(default=False)
     can_review = models.BooleanField(default=False)
     can_complete = models.BooleanField(default=False)
+    # Withdrawal/Deposit specific actions
+    can_upload_slip      = models.BooleanField(default=False)
+    can_confirm_received = models.BooleanField(default=False)
+    can_not_received     = models.BooleanField(default=False)
+    can_email_bank       = models.BooleanField(default=False)
+    can_close_ticket     = models.BooleanField(default=False)
+    can_chat             = models.BooleanField(default=False)
 
     class Meta:
         db_table        = 'role_permissions'

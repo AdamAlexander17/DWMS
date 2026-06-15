@@ -148,7 +148,7 @@ export default function Brands() {
               )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-200">
             {brands.length === 0 && (
               <tr><td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-sm">No brands found</td></tr>
             )}

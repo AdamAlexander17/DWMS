@@ -133,3 +133,22 @@ class ProfileView(APIView):
         serializer = ProfileSerializer(request.user)
         return success_response('Profile fetched successfully', serializer.data)
 
+
+@extend_schema(tags=['Auth'])
+class PermissionsView(APIView):
+    """Return the current user's permissions in the same format as login response.
+    Used to refresh permissions in the frontend without re-logging in."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        role_name = user.role.name if user.role_id else None
+        permissions = user.role.get_permissions_map() if user.role_id else {}
+        data = {
+            'role':        role_name,
+            'role_id':     user.role_id,
+            'permissions': permissions,
+            'brand_ids':   list(user.brands.values_list('id', flat=True)),
+        }
+        return success_response('Permissions refreshed', data)
+

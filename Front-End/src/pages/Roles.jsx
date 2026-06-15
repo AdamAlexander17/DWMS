@@ -15,6 +15,10 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 // ---------------------------------------------------------------------------
 const ACTIONS = ['view', 'create', 'edit', 'delete', 'activate', 'review', 'complete'];
 
+// Extra actions only shown for Withdrawals module
+const EXTRA_ACTIONS = ['upload_slip', 'confirm_received', 'not_received', 'email_bank', 'close_ticket', 'chat'];
+const EXTRA_ACTION_MODULES = ['withdrawals'];
+
 // Modules that should NOT show the "Activate / Deactivate" permission
 const NO_ACTIVATE_MODULES = ['payment_methods', 'master', 'audit_logs', 'deposit_history', 'withdrawal_history'];
 
@@ -29,27 +33,39 @@ const COMPLETE_MODULES = ['deposits'];
 
 const EMPTY_PERMISSION = (module) => ({
   module,
-  can_view:     false,
-  can_create:   false,
-  can_edit:     false,
-  can_delete:   false,
-  can_activate: false,
-  can_review:   false,
-  can_complete: false,
+  can_view:             false,
+  can_create:           false,
+  can_edit:             false,
+  can_delete:           false,
+  can_activate:         false,
+  can_review:           false,
+  can_complete:         false,
+  can_upload_slip:      false,
+  can_confirm_received: false,
+  can_not_received:     false,
+  can_email_bank:       false,
+  can_close_ticket:     false,
+  can_chat:             false,
 });
 
 // Human-readable label for each action within a module
 function actionLabel(action, moduleLabel) {
   const m = moduleLabel || '';
   switch (action) {
-    case 'view':     return `View ${m}`;
-    case 'create':   return `Create ${m}`;
-    case 'edit':     return `Edit ${m}`;
-    case 'delete':   return `Delete ${m}`;
-    case 'activate': return `Activate / Deactivate ${m}`;
-    case 'review':   return `Review ${m}`;
-    case 'complete': return `Completed Status`;
-    default:         return action;
+    case 'view':             return `View ${m}`;
+    case 'create':           return `Create ${m}`;
+    case 'edit':             return `Edit ${m}`;
+    case 'delete':           return `Delete ${m}`;
+    case 'activate':         return `Activate / Deactivate ${m}`;
+    case 'review':           return `Review ${m}`;
+    case 'complete':         return `Completed Status`;
+    case 'upload_slip':      return `Upload Slip`;
+    case 'confirm_received': return `Confirm Received`;
+    case 'not_received':     return `Not Received`;
+    case 'email_bank':       return `Email to Bank`;
+    case 'close_ticket':     return `Close Ticket`;
+    case 'chat':             return `Chat / Message`;
+    default:                 return action;
   }
 }
 
@@ -65,23 +81,38 @@ function PermissionSelector({ modules, permissions, onChange }) {
     const key = `can_${action}`;
     const updated = { ...existing, [key]: !existing[key] };
     if (action === 'view' && !updated.can_view) {
-      updated.can_create = updated.can_edit = updated.can_delete = updated.can_activate = updated.can_review = updated.can_complete = false;
+      // Turn off all when view is unchecked
+      ACTIONS.concat(EXTRA_ACTIONS).forEach((a) => { updated[`can_${a}`] = false; });
     }
     if (action !== 'view' && updated[key]) updated.can_view = true;
     onChange(permissions.filter((p) => p.module !== modValue).concat(updated));
   };
 
+  const getModuleActions = (modValue) => {
+    const base = ACTIONS.filter((a) => {
+      if (a === 'activate' && NO_ACTIVATE_MODULES.includes(modValue)) return false;
+      if (a === 'create' && NO_CREATE_MODULES.includes(modValue)) return false;
+      if (a === 'review' && !REVIEW_MODULES.includes(modValue)) return false;
+      if (a === 'complete' && !COMPLETE_MODULES.includes(modValue)) return false;
+      return true;
+    });
+    return EXTRA_ACTION_MODULES.includes(modValue) ? [...base, ...EXTRA_ACTIONS] : base;
+  };
+
   const toggleModule = (modValue) => {
     const existing = permMap[modValue] || EMPTY_PERMISSION(modValue);
-    const allOn = ACTIONS.every((a) => existing[`can_${a}`]);
+    const modActions = getModuleActions(modValue);
+    const allOn = modActions.every((a) => existing[`can_${a}`]);
     const updated = { ...EMPTY_PERMISSION(modValue) };
-    if (!allOn) ACTIONS.forEach((a) => { updated[`can_${a}`] = true; });
+    if (!allOn) modActions.forEach((a) => { updated[`can_${a}`] = true; });
     onChange(permissions.filter((p) => p.module !== modValue).concat(updated));
   };
 
-  const totalActions    = modules.length * ACTIONS.length;
-  const selectedActions = permissions.reduce((sum, p) =>
-    sum + ACTIONS.filter((a) => p[`can_${a}`]).length, 0);
+  const totalActions    = modules.reduce((sum, mod) => sum + getModuleActions(mod.value).length, 0);
+  const selectedActions = permissions.reduce((sum, p) => {
+    const modActions = getModuleActions(p.module);
+    return sum + modActions.filter((a) => p[`can_${a}`]).length;
+  }, 0);
 
   const toggleAll = () => {
     if (selectedActions === totalActions) {
@@ -89,7 +120,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
     } else {
       onChange(modules.map((mod) => {
         const p = { ...EMPTY_PERMISSION(mod.value) };
-        ACTIONS.forEach((a) => { p[`can_${a}`] = true; });
+        getModuleActions(mod.value).forEach((a) => { p[`can_${a}`] = true; });
         return p;
       }));
     }
@@ -115,13 +146,16 @@ function PermissionSelector({ modules, permissions, onChange }) {
 
       <div className="space-y-2">
         {modules.map((mod) => {
-          const moduleActions = ACTIONS.filter((a) => {
-            if (a === 'activate' && NO_ACTIVATE_MODULES.includes(mod.value)) return false;
-            if (a === 'create' && NO_CREATE_MODULES.includes(mod.value)) return false;
-            if (a === 'review' && !REVIEW_MODULES.includes(mod.value)) return false;
-            if (a === 'complete' && !COMPLETE_MODULES.includes(mod.value)) return false;
-            return true;
-          });
+          const moduleActions = [
+            ...ACTIONS.filter((a) => {
+              if (a === 'activate' && NO_ACTIVATE_MODULES.includes(mod.value)) return false;
+              if (a === 'create' && NO_CREATE_MODULES.includes(mod.value)) return false;
+              if (a === 'review' && !REVIEW_MODULES.includes(mod.value)) return false;
+              if (a === 'complete' && !COMPLETE_MODULES.includes(mod.value)) return false;
+              return true;
+            }),
+            ...(EXTRA_ACTION_MODULES.includes(mod.value) ? EXTRA_ACTIONS : []),
+          ];
           const perm         = permMap[mod.value] || EMPTY_PERMISSION(mod.value);
           const selectedCount = moduleActions.filter((a) => perm[`can_${a}`]).length;
           const allModOn     = selectedCount === moduleActions.length;
@@ -530,7 +564,7 @@ export default function Roles() {
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-200">
             {filteredRoles.length === 0 && (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-sm">No roles found</td></tr>
             )}

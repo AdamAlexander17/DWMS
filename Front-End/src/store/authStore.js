@@ -21,6 +21,18 @@ export const useAuthStore = create(
           refreshToken: refresh ?? s.refreshToken,
         })),
 
+      // Update user permissions in-place (called when admin changes role permissions)
+      updatePermissions: ({ permissions, role, role_id, brand_ids }) =>
+        set((s) => ({
+          user: s.user ? {
+            ...s.user,
+            permissions: permissions ?? s.user.permissions,
+            role: role ?? s.user.role,
+            role_id: role_id ?? s.user.role_id,
+            brand_ids: brand_ids ?? s.user.brand_ids,
+          } : s.user,
+        })),
+
       clearMustChangePassword: () =>
         set((s) => ({
           user: s.user ? { ...s.user, must_change_password: false } : s.user,

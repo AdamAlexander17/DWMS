@@ -870,8 +870,14 @@ export default function Withdrawals() {
   const canEdit      = hasPermission('withdrawals', 'edit')
   const canDelete    = hasPermission('withdrawals', 'delete')
   const canActivate  = hasPermission('withdrawals', 'activate')
-  const canReview    = canActivate && !canCreate  // BO-only: has activate but doesn't create tickets
-  const isRM         = canCreate && !canActivate
+  const canUploadSlip     = hasPermission('withdrawals', 'upload_slip')
+  const canConfirmReceived = hasPermission('withdrawals', 'confirm_received')
+  const canNotReceived    = hasPermission('withdrawals', 'not_received')
+  const canEmailBank      = hasPermission('withdrawals', 'email_bank')
+  const canCloseTicket    = hasPermission('withdrawals', 'close_ticket')
+  const canChat           = hasPermission('withdrawals', 'chat')
+  const canReview    = canUploadSlip || canEmailBank || canCloseTicket
+  const isRM         = canCreate && !canReview
 
   const [page, setPage]           = useState(1)
   const [pageSize, setPageSize]   = useState(25)
@@ -1013,7 +1019,7 @@ export default function Withdrawals() {
       </div>
 
       {/* Bank follow-up alert banner (back office / admin) */}
-      {canReview && followupCount > 0 && (
+      {canEmailBank && followupCount > 0 && (
         <div className="flex items-start gap-4 rounded-xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm">
           <div className="w-10 h-10 rounded-lg bg-red-500 flex items-center justify-center shrink-0 animate-pulse">
             <AlertTriangle size={18} className="text-white" />
@@ -1070,7 +1076,7 @@ export default function Withdrawals() {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-200">
             {records.length === 0 && (
               <tr><td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400 text-sm">
                 {isRM ? 'No withdrawal tickets yet. Use "New Request" to raise one.' : 'No withdrawal tickets found.'}
@@ -1118,13 +1124,15 @@ export default function Withdrawals() {
                       )}
 
                       {/* Conversation */}
+                      {canChat && (
                       <button onClick={() => { setView({ ...r, __openChat: true }) }} title="Open Conversation"
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors">
                         <MessageSquare size={13} />
                       </button>
+                      )}
 
                       {/* Back Office: Upload Slip (pending) */}
-                      {canReview && r.status === 'pending' && (
+                      {canUploadSlip && r.status === 'pending' && (
                         <button onClick={() => setSlip(r)} title="Upload Slip"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors">
                           <Upload size={13} />
@@ -1132,7 +1140,7 @@ export default function Withdrawals() {
                       )}
 
                       {/* RM: Confirm received (slip_uploaded) — only ticket submitter */}
-                      {r.submitted_by === user?.id && r.status === 'slip_uploaded' && (
+                      {canConfirmReceived && r.submitted_by === user?.id && r.status === 'slip_uploaded' && (
                         <button onClick={() => setCfm(r)} title="Client Received Amount"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-green-100 text-green-600 hover:bg-green-200 transition-colors">
                           <CheckCircle2 size={13} />
@@ -1140,7 +1148,7 @@ export default function Withdrawals() {
                       )}
 
                       {/* RM: Not received (slip_uploaded) — only ticket submitter */}
-                      {r.submitted_by === user?.id && r.status === 'slip_uploaded' && (
+                      {canNotReceived && r.submitted_by === user?.id && r.status === 'slip_uploaded' && (
                         <button onClick={() => setNotR(r)} title="Client Did Not Receive Amount"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-100 text-red-600 hover:bg-red-200 transition-colors">
                           <PhoneOff size={13} />
@@ -1148,7 +1156,7 @@ export default function Withdrawals() {
                       )}
 
                       {/* Back Office: Mark email sent (bank_followup_required) — only reviewers, not submitter */}
-                      {canReview && r.submitted_by !== user?.id && r.status === 'bank_followup_required' && (
+                      {canEmailBank && r.submitted_by !== user?.id && r.status === 'bank_followup_required' && (
                         <button onClick={() => setEmail(r)} title="Mark Email Sent to Bank"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-500 text-white hover:bg-red-600 transition-colors animate-pulse">
                           <Mail size={13} />

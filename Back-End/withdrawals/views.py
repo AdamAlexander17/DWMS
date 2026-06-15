@@ -39,11 +39,14 @@ def _can_review(user) -> bool:
 
 
 def _push(group: str, type_: str, payload: dict):
-    """Broadcast to a channels group; silently no-op if layer is missing."""
-    layer = get_channel_layer()
-    if not layer:
-        return
-    async_to_sync(layer.group_send)(group, {'type': type_, **payload})
+    """Broadcast to a channels group; silently no-op if layer is missing or Redis is down."""
+    try:
+        layer = get_channel_layer()
+        if not layer:
+            return
+        async_to_sync(layer.group_send)(group, {'type': type_, **payload})
+    except Exception:
+        pass  # Redis down or channel layer unavailable — don't crash the request
 
 
 def _push_notif(user_id: int, notif_dict: dict, unread_count: int):
@@ -122,17 +125,22 @@ class WithdrawalViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        scope = _scope(user)
         qs   = Withdrawal.objects.select_related(
             'brand', 'submitted_by', 'reviewed_by', 'slip_uploaded_by'
         )
-        if scope == 'own':
-            return qs.filter(submitted_by=user)
-        if scope == 'brand':
-            return qs.filter(brand__in=user.brands.all())
-        if scope == 'all':
+
+        # Superuser sees everything
+        if user.is_superuser:
             return qs
-        return qs.none()
+
+        # Users with 'activate' permission see all data from their brands
+        # Users without 'activate' see only their own data
+        if has_module_permission(user, 'withdrawals', 'activate'):
+            if user.brands.exists():
+                return qs.filter(brand__in=user.brands.all())
+            return qs  # activate permission + no brands = see all
+        else:
+            return qs.filter(submitted_by=user)
 
     # ── List ──────────────────────────────────────────────────────────────
     def list(self, request, *args, **kwargs):
@@ -216,8 +224,10 @@ class WithdrawalViewSet(ModelViewSet):
     # ── Update ────────────────────────────────────────────────────────────
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        if _scope(request.user) == 'own' and instance.submitted_by_id != request.user.pk:
-            return error_response('You can only edit your own tickets', status_code=status.HTTP_403_FORBIDDEN)
+        # Users without activate can only edit their own tickets
+        if not has_module_permission(request.user, 'withdrawals', 'activate'):
+            if instance.submitted_by_id != request.user.pk:
+                return error_response('You can only edit your own tickets', status_code=status.HTTP_403_FORBIDDEN)
 
         partial = kwargs.pop('partial', False)
         serializer = WithdrawalSerializer(instance, data=request.data, partial=partial, context={'request': request})
@@ -340,20 +350,24 @@ class WithdrawalViewSet(ModelViewSet):
         instance.save(update_fields=['followup_remarks', 'status', 'updated_at'])
         _push_ticket_update(instance, request)
 
-        recipients = list(
-            User.objects.filter(
-                role__permissions__module='withdrawals'
-            ).filter(
-                role__permissions__can_edit=True,
-            ).distinct()
-        )
+        # Only notify users who have activate permission AND share the ticket's brand
         if instance.brand_id:
-            recipients += list(
+            recipients = list(
                 User.objects.filter(
                     brands=instance.brand,
                     role__permissions__module='withdrawals',
-                    role__permissions__can_edit=True,
-                ).distinct()
+                    role__permissions__can_activate=True,
+                    is_active=True,
+                ).exclude(pk=request.user.pk).distinct()
+            )
+        else:
+            recipients = list(
+                User.objects.filter(
+                    role__permissions__module='withdrawals',
+                    role__permissions__can_activate=True,
+                    is_superuser=True,
+                    is_active=True,
+                ).exclude(pk=request.user.pk).distinct()
             )
         _notify(
             instance, 'followup_required',
@@ -410,14 +424,18 @@ class WithdrawalViewSet(ModelViewSet):
     # ── Conversation / Messages ───────────────────────────────────────────
     def _can_participate(self, request, instance):
         """Owner RM, brand back-office, or admin can read/post."""
-        scope = _scope(request.user)
-        if scope == 'all':
+        user = request.user
+        if user.is_superuser:
             return True
-        if scope == 'own' and instance.submitted_by_id == request.user.pk:
+        # Ticket submitter can always participate
+        if instance.submitted_by_id == user.pk:
             return True
-        if scope == 'brand' and instance.brand_id and \
-                request.user.brands.filter(pk=instance.brand_id).exists():
-            return True
+        # Users with activate permission can participate if they share the brand
+        if has_module_permission(user, 'withdrawals', 'activate'):
+            if not instance.brand_id:
+                return True
+            if user.brands.filter(pk=instance.brand_id).exists():
+                return True
         return False
 
     def _message_recipients(self, instance, sender):

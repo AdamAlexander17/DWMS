@@ -144,8 +144,6 @@ def dashboard_summary(request):
 
     # ── Resolve caller's role ─────────────────────────────────────────────
     user       = request.user
-    dep_scope  = resolve_module_scope(user, 'deposits')
-    wd_scope   = resolve_module_scope(user, 'withdrawals')
 
     # ── Base querysets, scoped to the period ──────────────────────────────
     dep_qs = DepositLog.objects.filter(created_at__gte=start, created_at__lte=end)
@@ -154,26 +152,29 @@ def dashboard_summary(request):
     dep_prev_qs = DepositLog.objects.filter(created_at__gte=prev_start, created_at__lt=prev_end)
     wd_prev_qs  = Withdrawal.objects.filter(created_at__gte=prev_start, created_at__lt=prev_end)
 
-    # ── Scope to own submissions for RM users ─────────────────────────────
-    if dep_scope == 'own':
-        dep_qs      = dep_qs.filter(submitted_by=user)
-        dep_prev_qs = dep_prev_qs.filter(submitted_by=user)
-    elif dep_scope == 'brand':
-        brand_scope = user.brands.all()
-        dep_qs = dep_qs.filter(
-            Q(submitted_by__brands__in=brand_scope)
-        ).distinct()
-        dep_prev_qs = dep_prev_qs.filter(
-            Q(submitted_by__brands__in=brand_scope)
-        ).distinct()
+    # ── Scope to user's data ─────────────────────────────────────────────
+    if not is_admin_user(user):
+        if has_module_permission(user, 'deposits', 'activate'):
+            # BO-type: sees brand-level deposits
+            if user.brands.exists():
+                brand_scope = user.brands.all()
+                dep_qs = dep_qs.filter(Q(submitted_by__brands__in=brand_scope)).distinct()
+                dep_prev_qs = dep_prev_qs.filter(Q(submitted_by__brands__in=brand_scope)).distinct()
+        else:
+            # RM-type: sees only own deposits
+            dep_qs = dep_qs.filter(submitted_by=user)
+            dep_prev_qs = dep_prev_qs.filter(submitted_by=user)
 
-    if wd_scope == 'own':
-        wd_qs       = wd_qs.filter(submitted_by=user)
-        wd_prev_qs  = wd_prev_qs.filter(submitted_by=user)
-    elif wd_scope == 'brand':
-        brand_scope = user.brands.all()
-        wd_qs = wd_qs.filter(brand__in=brand_scope)
-        wd_prev_qs = wd_prev_qs.filter(brand__in=brand_scope)
+        if has_module_permission(user, 'withdrawals', 'activate'):
+            # BO-type: sees brand-level withdrawals
+            if user.brands.exists():
+                brand_scope = user.brands.all()
+                wd_qs = wd_qs.filter(brand__in=brand_scope)
+                wd_prev_qs = wd_prev_qs.filter(brand__in=brand_scope)
+        else:
+            # RM-type: sees only own withdrawals
+            wd_qs = wd_qs.filter(submitted_by=user)
+            wd_prev_qs = wd_prev_qs.filter(submitted_by=user)
 
     # ── KPI numbers ───────────────────────────────────────────────────────
     deposits_count    = dep_qs.count()

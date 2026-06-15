@@ -247,7 +247,7 @@ export default function WithdrawalHistory() {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-200">
             {records.length === 0 && (
               <tr><td colSpan={COLUMNS.length} className="px-4 py-12 text-center text-gray-400 text-sm">
                 <HistoryIcon size={28} className="mx-auto mb-2 text-gray-300" />

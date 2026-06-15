@@ -202,7 +202,7 @@ export default function UPISources() {
               {canWrite && <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-200">
             {records.length === 0 && <tr><td colSpan={canWrite ? 6 : 5} className="px-4 py-10 text-center text-gray-400 text-sm">No UPI sources found</td></tr>}
             {sortedRecords.map((r, i) => (
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">

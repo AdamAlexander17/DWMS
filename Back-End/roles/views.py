@@ -5,6 +5,9 @@ from rest_framework.viewsets import ModelViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from django.db.models import Q
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 from audit_logs.services import AuditLogService
 from common.permissions import ModulePermission
 from common.responses import error_response, success_response
@@ -13,6 +16,28 @@ from common.utils import get_client_ip
 from .models import Module, Role
 from .serializers import RoleListSerializer, RoleSerializer
 from .services import RoleService
+
+
+def _push_permissions_update(role):
+    """Push WebSocket event to all users with this role so they can refetch permissions."""
+    try:
+        layer = get_channel_layer()
+        if not layer:
+            return
+        user_ids = list(role.users.values_list('id', flat=True))
+        for user_id in user_ids:
+            async_to_sync(layer.group_send)(
+                f'user_notif_{user_id}',
+                {
+                    'type': 'notify',
+                    'payload': {
+                        'type': 'permissions_updated',
+                        'role_id': role.pk,
+                    },
+                },
+            )
+    except Exception:
+        pass  # Redis down — silently skip
 
 
 @extend_schema_view(
@@ -97,6 +122,8 @@ class RoleViewSet(ModelViewSet):
             user=request.user, action='update', module='roles',
             ip_address=get_client_ip(request),
         )
+        # Push WebSocket event to all users with this role so they refetch permissions
+        _push_permissions_update(role)
         return success_response('Role updated successfully', data=RoleSerializer(role).data)
 
     # ------------------------------------------------------------------

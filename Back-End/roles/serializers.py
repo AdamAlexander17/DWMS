@@ -8,7 +8,10 @@ from .models import Module, Role, RolePermission
 class RolePermissionSerializer(serializers.ModelSerializer):
     class Meta:
         model  = RolePermission
-        fields = ['id', 'module', 'can_view', 'can_create', 'can_edit', 'can_delete', 'can_activate', 'can_review', 'can_complete']
+        fields = ['id', 'module', 'can_view', 'can_create', 'can_edit', 'can_delete', 'can_activate',
+                  'can_review', 'can_complete',
+                  'can_upload_slip', 'can_confirm_received', 'can_not_received',
+                  'can_email_bank', 'can_close_ticket', 'can_chat']
 
 
 class RoleSerializer(serializers.ModelSerializer):

@@ -60,21 +60,21 @@ class DepositLogViewSet(
         ).all()
 
         user = self.request.user
-        scope = resolve_module_scope(user, 'deposits')
 
-        if scope == 'all':
+        # Superuser sees everything
+        if user.is_superuser:
             return qs
 
-        if scope == 'own':
+        # Users with 'activate' permission see all data from their brands
+        # Users without 'activate' see only their own data
+        if has_module_permission(user, 'deposits', 'activate'):
+            if user.brands.exists():
+                return qs.filter(
+                    Q(submitted_by__brands__in=user.brands.all())
+                ).distinct()
+            return qs  # activate permission + no brands = see all
+        else:
             return qs.filter(submitted_by=user)
-
-        if scope == 'brand':
-            brand_scope = user.brands.all()
-            return qs.filter(
-                Q(submitted_by__brands__in=brand_scope)
-            ).distinct()
-
-        return qs.none()
 
     # ------------------------------------------------------------------
     # Standard actions

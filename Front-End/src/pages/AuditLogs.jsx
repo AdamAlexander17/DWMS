@@ -78,7 +78,7 @@ export default function AuditLogs() {
               <SortableTh label="IP Address" sortKey="ip_address" toggle={toggleSort} icon={sortIcon} />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-200">
             {logs.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">No logs found</td></tr>}
             {sortedLogs.map((log) => (
               <tr key={log.id} className="hover:bg-blue-50/20 transition-colors">

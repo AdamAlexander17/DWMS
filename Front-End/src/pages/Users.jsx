@@ -523,7 +523,7 @@ export default function Users() {
               )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-200">
             {users.length === 0 && (
               <tr><td colSpan={(canEdit || canDelete) ? 7 : 6} className="px-6 py-10 text-center text-gray-400 text-sm">No users found</td></tr>
             )}
