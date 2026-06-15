@@ -308,6 +308,11 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
 
 // ── Review Form (back office / admin) ──────────────────────────────────────
 function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
+  const { user, hasPermission } = useAuthStore()
+  const canComplete = hasPermission('deposits', 'complete')
+  const options = canComplete
+    ? REVIEW_DECISION_OPTS
+    : REVIEW_DECISION_OPTS.filter((o) => o.value !== 'completed')
   const [decision,    setDecision]    = useState('in_progress')
   const [message,     setMessage]     = useState('')
   const [reviewSlip,  setReviewSlip]  = useState(null)
@@ -400,7 +405,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
           onChange={(e) => setDecision(e.target.value)}
           required
         >
-          {REVIEW_DECISION_OPTS.map(({ value, label, hint }) => (
+          {options.map(({ value, label, hint }) => (
             <option key={value} value={value}>{label} — {hint}</option>
           ))}
         </select>
@@ -761,9 +766,9 @@ export default function Deposits() {
   const canEdit   = hasPermission('deposits', 'edit')
   const canDelete = hasPermission('deposits', 'delete')
   const canActivate = hasPermission('deposits', 'activate')
+  const canReview = hasPermission('deposits', 'review')
   const canWrite  = canCreate || canEdit || canDelete
-  const canReview = canActivate && !canCreate  // BO-only: has activate but doesn't create tickets
-  const isRM      = canCreate && !canActivate
+  const isRM      = canCreate && !canReview
 
   const gateways = useGateways()
 

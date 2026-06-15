@@ -8,7 +8,7 @@ from .models import Module, Role, RolePermission
 class RolePermissionSerializer(serializers.ModelSerializer):
     class Meta:
         model  = RolePermission
-        fields = ['id', 'module', 'can_view', 'can_create', 'can_edit', 'can_delete', 'can_activate']
+        fields = ['id', 'module', 'can_view', 'can_create', 'can_edit', 'can_delete', 'can_activate', 'can_review', 'can_complete']
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -85,7 +85,7 @@ class RoleListSerializer(serializers.ModelSerializer):
         """Total number of enabled permission actions across all modules."""
         total = 0
         for p in obj.permissions.all():
-            total += sum([p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_activate])
+            total += sum([p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_activate, p.can_review, p.can_complete])
         return total
 
     class Meta:

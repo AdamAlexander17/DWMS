@@ -57,6 +57,8 @@ class Role(models.Model):
                 'edit':     p.can_edit,
                 'delete':   p.can_delete,
                 'activate': p.can_activate,
+                'review':   p.can_review,
+                'complete': p.can_complete,
             }
             for p in self.permissions.all()
         }
@@ -70,6 +72,8 @@ class RolePermission(models.Model):
     can_edit   = models.BooleanField(default=False)
     can_delete = models.BooleanField(default=False)
     can_activate = models.BooleanField(default=False)
+    can_review = models.BooleanField(default=False)
+    can_complete = models.BooleanField(default=False)
 
     class Meta:
         db_table        = 'role_permissions'

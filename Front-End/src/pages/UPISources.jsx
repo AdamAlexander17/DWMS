@@ -121,6 +121,7 @@ export default function UPISources() {
     queryKey: ['upi-sources', page, pageSize, debouncedSearch],
     queryFn:  () => getUPISources({ page, page_size: pageSize, search: debouncedSearch }),
     placeholderData: keepPreviousData,
+    refetchInterval: 10_000,
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 
@@ -148,7 +149,24 @@ export default function UPISources() {
   const createM = useMutation({ mutationFn: createUPISource,              onSuccess: () => { resetView(); inv(); setModal(null) } })
   const updateM = useMutation({ mutationFn: ({ id, d }) => updateUPISource(id, d), onSuccess: () => { inv(); setModal(null) } })
   const deleteM = useMutation({ mutationFn: deleteUPISource,              onSuccess: () => { inv(); setDelTarget(null) } })
-  const toggleM = useMutation({ mutationFn: ({ id, a }) => a ? deactivateUPISource(id) : activateUPISource(id), onSuccess: inv })
+  const toggleM = useMutation({
+    mutationFn: ({ id, a }) => a ? deactivateUPISource(id) : activateUPISource(id),
+    onMutate: async ({ id, a }) => {
+      await qc.cancelQueries({ queryKey: ['upi-sources'] })
+      const prev = qc.getQueryData(['upi-sources', page, pageSize, debouncedSearch])
+      qc.setQueryData(['upi-sources', page, pageSize, debouncedSearch], (old) => {
+        if (!old) return old
+        const results = old?.data?.data?.results ?? []
+        const updated = results.map((r) => r.id === id ? { ...r, is_active: !a } : r)
+        return { ...old, data: { ...old.data, data: { ...old.data.data, results: updated } } }
+      })
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['upi-sources', page, pageSize, debouncedSearch], ctx.prev)
+    },
+    onSettled: inv,
+  })
 
   if (isLoading) return <PageSpinner />
 

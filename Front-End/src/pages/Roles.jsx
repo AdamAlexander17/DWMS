@@ -13,13 +13,19 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const ACTIONS = ['view', 'create', 'edit', 'delete', 'activate'];
+const ACTIONS = ['view', 'create', 'edit', 'delete', 'activate', 'review', 'complete'];
 
 // Modules that should NOT show the "Activate / Deactivate" permission
 const NO_ACTIVATE_MODULES = ['payment_methods', 'master', 'audit_logs', 'deposit_history', 'withdrawal_history'];
 
 // Modules that should NOT show the "Create" permission
 const NO_CREATE_MODULES = ['deposit_history', 'withdrawal_history'];
+
+// Modules that show the "Review" permission (only deposits)
+const REVIEW_MODULES = ['deposits'];
+
+// Modules that show the "Completed Status" permission (only deposits)
+const COMPLETE_MODULES = ['deposits'];
 
 const EMPTY_PERMISSION = (module) => ({
   module,
@@ -28,6 +34,8 @@ const EMPTY_PERMISSION = (module) => ({
   can_edit:     false,
   can_delete:   false,
   can_activate: false,
+  can_review:   false,
+  can_complete: false,
 });
 
 // Human-readable label for each action within a module
@@ -39,6 +47,8 @@ function actionLabel(action, moduleLabel) {
     case 'edit':     return `Edit ${m}`;
     case 'delete':   return `Delete ${m}`;
     case 'activate': return `Activate / Deactivate ${m}`;
+    case 'review':   return `Review ${m}`;
+    case 'complete': return `Completed Status`;
     default:         return action;
   }
 }
@@ -55,7 +65,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
     const key = `can_${action}`;
     const updated = { ...existing, [key]: !existing[key] };
     if (action === 'view' && !updated.can_view) {
-      updated.can_create = updated.can_edit = updated.can_delete = updated.can_activate = false;
+      updated.can_create = updated.can_edit = updated.can_delete = updated.can_activate = updated.can_review = updated.can_complete = false;
     }
     if (action !== 'view' && updated[key]) updated.can_view = true;
     onChange(permissions.filter((p) => p.module !== modValue).concat(updated));
@@ -108,6 +118,8 @@ function PermissionSelector({ modules, permissions, onChange }) {
           const moduleActions = ACTIONS.filter((a) => {
             if (a === 'activate' && NO_ACTIVATE_MODULES.includes(mod.value)) return false;
             if (a === 'create' && NO_CREATE_MODULES.includes(mod.value)) return false;
+            if (a === 'review' && !REVIEW_MODULES.includes(mod.value)) return false;
+            if (a === 'complete' && !COMPLETE_MODULES.includes(mod.value)) return false;
             return true;
           });
           const perm         = permMap[mod.value] || EMPTY_PERMISSION(mod.value);
@@ -361,7 +373,7 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
 // ---------------------------------------------------------------------------
 function PermissionBadges({ role }) {
   const count = role.permissions_count ?? role.permissions?.reduce((sum, p) =>
-    sum + ['can_view','can_create','can_edit','can_delete','can_activate'].filter(k => p[k]).length, 0) ?? 0;
+    sum + ['can_view','can_create','can_edit','can_delete','can_activate','can_review','can_complete'].filter(k => p[k]).length, 0) ?? 0;
   if (count === 0) return <span className="text-xs text-gray-400">No permissions</span>;
   return (
     <span className="inline-flex items-center gap-1 text-xs bg-accent/10 text-accent border border-accent/20 rounded-full px-2.5 py-0.5 font-medium">

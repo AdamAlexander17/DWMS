@@ -343,6 +343,7 @@ export default function QRCodes() {
     queryKey: ['qr-codes', page, pageSize, debouncedSearch],
     queryFn:  () => getQRCodes({ page, page_size: pageSize, search: debouncedSearch }),
     placeholderData: keepPreviousData,
+    refetchInterval: 10_000,
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 
@@ -361,7 +362,24 @@ export default function QRCodes() {
   const createM = useMutation({ mutationFn: createQRCode,                                    onSuccess: () => { resetView(); inv(); setModal(null) } })
   const updateM = useMutation({ mutationFn: ({ id, d }) => updateQRCode(id, clean(d)),       onSuccess: () => { inv(); setModal(null) } })
   const deleteM = useMutation({ mutationFn: deleteQRCode,                                    onSuccess: () => { inv(); setDelTarget(null) } })
-  const toggleM = useMutation({ mutationFn: ({ id, a }) => a ? deactivateQRCode(id) : activateQRCode(id), onSuccess: inv })
+  const toggleM = useMutation({
+    mutationFn: ({ id, a }) => a ? deactivateQRCode(id) : activateQRCode(id),
+    onMutate: async ({ id, a }) => {
+      await qc.cancelQueries({ queryKey: ['qr-codes'] })
+      const prev = qc.getQueryData(['qr-codes', page, pageSize, debouncedSearch])
+      qc.setQueryData(['qr-codes', page, pageSize, debouncedSearch], (old) => {
+        if (!old) return old
+        const results = old?.data?.data?.results ?? []
+        const updated = results.map((r) => r.id === id ? { ...r, is_active: !a } : r)
+        return { ...old, data: { ...old.data, data: { ...old.data.data, results: updated } } }
+      })
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['qr-codes', page, pageSize, debouncedSearch], ctx.prev)
+    },
+    onSettled: inv,
+  })
 
   if (isLoading) return <PageSpinner />
 

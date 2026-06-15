@@ -171,6 +171,7 @@ export default function BankAccounts() {
     queryKey: ['bank-accounts', page, pageSize, debouncedSearch],
     queryFn:  () => getBankAccounts({ page, page_size: pageSize, search: debouncedSearch }),
     placeholderData: keepPreviousData,
+    refetchInterval: 10_000,
   })
   const { data: brandsData } = useQuery({ queryKey: ['brands-all'], queryFn: () => getBrands({ page_size: 100 }) })
 
@@ -201,7 +202,24 @@ export default function BankAccounts() {
   const createM = useMutation({ mutationFn: createBankAccount,                  onSuccess: () => { resetView(); inv(); setModal(null) } })
   const updateM = useMutation({ mutationFn: ({ id, d }) => updateBankAccount(id, d), onSuccess: () => { inv(); setModal(null) } })
   const deleteM = useMutation({ mutationFn: deleteBankAccount,                  onSuccess: () => { inv(); setDelTarget(null) } })
-  const toggleM = useMutation({ mutationFn: ({ id, a }) => a ? deactivateBankAccount(id) : activateBankAccount(id), onSuccess: inv })
+  const toggleM = useMutation({
+    mutationFn: ({ id, a }) => a ? deactivateBankAccount(id) : activateBankAccount(id),
+    onMutate: async ({ id, a }) => {
+      await qc.cancelQueries({ queryKey: ['bank-accounts'] })
+      const prev = qc.getQueryData(['bank-accounts', page, pageSize, debouncedSearch])
+      qc.setQueryData(['bank-accounts', page, pageSize, debouncedSearch], (old) => {
+        if (!old) return old
+        const results = old?.data?.data?.results ?? []
+        const updated = results.map((r) => r.id === id ? { ...r, is_active: !a } : r)
+        return { ...old, data: { ...old.data, data: { ...old.data.data, results: updated } } }
+      })
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['bank-accounts', page, pageSize, debouncedSearch], ctx.prev)
+    },
+    onSettled: inv,
+  })
 
   if (isLoading) return <PageSpinner />
 

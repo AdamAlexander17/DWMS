@@ -41,6 +41,8 @@ class RoleService:
                     'can_edit':    p.can_edit,
                     'can_delete':  p.can_delete,
                     'can_activate': p.can_activate,
+                    'can_review':  p.can_review,
+                    'can_complete': p.can_complete,
                 })
             else:
                 result.append({
@@ -50,5 +52,7 @@ class RoleService:
                     'can_edit':    False,
                     'can_delete':  False,
                     'can_activate': False,
+                    'can_review':  False,
+                    'can_complete': False,
                 })
         return result
