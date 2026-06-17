@@ -16,8 +16,8 @@ from common.permissions import ModulePermission, resolve_module_scope, has_modul
 from common.responses import success_response, error_response
 
 from .filters import DepositLogFilter
-from .models import DepositLog, DepositNotification, DepositActivity
-from .serializers import DepositLogSerializer, DepositNotificationSerializer, DepositActivitySerializer
+from .models import DepositLog, DepositNotification, DepositActivity, DepositMessage
+from .serializers import DepositLogSerializer, DepositNotificationSerializer, DepositActivitySerializer, DepositMessageSerializer, PostDepositMessageSerializer
 from .services import push_deposit_event
 
 
@@ -49,15 +49,29 @@ class DepositLogViewSet(
             'update': 'edit',
             'partial_update': 'edit',
             'destroy': 'create',  # RM can delete own; method enforces ownership
-            'review': 'edit',
+            'review': 'review',
+            'messages': 'view',
+            'activities': 'view',
         }
-        return [IsAuthenticated(), ModulePermission('deposits', action_map.get(self.action, 'view'))()]
+        return [IsAuthenticated(), ModulePermission('deposits', action_map.get(self.action, 'view'))()] 
 
     def get_queryset(self):
+        from django.db.models import Subquery, OuterRef
+        from .models import DepositMessageRead
+
+        user = self.request.user
+
+        # Annotate last_read for the current user (used by serializer to compute unread)
+        read_sq = DepositMessageRead.objects.filter(
+            deposit=OuterRef('pk'), user=user
+        ).values('last_read_at')[:1]
+
         qs = DepositLog.objects.select_related(
             'submitted_by', 'reviewed_by', 'gateway',
             'qr_code', 'upi_source', 'bank_account',
-        ).all()
+        ).annotate(
+            _last_read=Subquery(read_sq),
+        )
 
         user = self.request.user
 
@@ -95,7 +109,7 @@ class DepositLogViewSet(
             queryset = self.filter_queryset(self.get_queryset()).filter(
                 status=DepositLog.STATUS_COMPLETED
             )
-
+ 
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -173,7 +187,7 @@ class DepositLogViewSet(
     @action(detail=True, methods=['post'], url_path='review',
             parser_classes=[MultiPartParser, FormParser, JSONParser])
     def review(self, request, pk=None):
-        if not has_module_permission(request.user, 'deposits', 'edit'):
+        if not has_module_permission(request.user, 'deposits', 'review'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('You do not have permission to review deposits.')
 
@@ -195,8 +209,11 @@ class DepositLogViewSet(
 
         # 'added' is a slip_status shorthand, not a real status value
         if action_val == 'added':
-            deposit.status     = DepositLog.STATUS_IN_PROGRESS
+            deposit.status      = DepositLog.STATUS_IN_PROGRESS
             deposit.slip_status = DepositLog.SLIP_ADDED
+        elif action_val == 'in_progress':
+            deposit.status = action_val
+            # Don't change slip_status — keep whatever it currently is
         else:
             deposit.status = action_val
 
@@ -210,8 +227,7 @@ class DepositLogViewSet(
         review_slip = request.FILES.get('review_slip')
         if review_slip:
             deposit.review_slip = review_slip
-            deposit.slip_status = DepositLog.SLIP_ADDED   # auto-mark slip as added
-            update_fields += ['review_slip', 'slip_status']
+            update_fields += ['review_slip']
 
         deposit.save(update_fields=update_fields)
 
@@ -247,6 +263,97 @@ class DepositLogViewSet(
             'Activities fetched',
             DepositActivitySerializer(activities, many=True).data,
         )
+
+    # ------------------------------------------------------------------
+    # Chat / Messages
+    # ------------------------------------------------------------------
+
+    def _can_participate(self, request, deposit):
+        """Submitter, reviewer (has review/edit), or admin can read/post."""
+        user = request.user
+        if user.is_superuser:
+            return True
+        if deposit.submitted_by_id == user.pk:
+            return True
+        if (has_module_permission(user, 'deposits', 'review')
+                or has_module_permission(user, 'deposits', 'edit')
+                or has_module_permission(user, 'deposits', 'activate')):
+            return True
+        return False
+
+    def _message_recipients(self, deposit, sender):
+        """Everyone party to the deposit EXCEPT the sender."""
+        from auth.models import User
+        recipients = {}
+        if deposit.submitted_by_id:
+            recipients[deposit.submitted_by_id] = deposit.submitted_by
+        reviewer_qs = User.objects.filter(
+            role__permissions__module='deposits',
+            role__permissions__can_review=True,
+        ).distinct()
+        for u in reviewer_qs:
+            recipients[u.pk] = u
+        recipients.pop(sender.pk, None)
+        return list(recipients.values())
+
+    @extend_schema(summary='Deposit chat — list / post messages', tags=['Deposits'])
+    @action(detail=True, methods=['get', 'post'], url_path='messages',
+            parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def messages(self, request, pk=None):
+        deposit = self.get_object()
+        if not self._can_participate(request, deposit):
+            return error_response('Not allowed', status_code=status.HTTP_403_FORBIDDEN)
+
+        if request.method == 'GET':
+            qs = deposit.messages.select_related('sender').all()
+
+            # Mark messages as read for this user
+            from django.utils import timezone as tz
+            from .models import DepositMessageRead
+            DepositMessageRead.objects.update_or_create(
+                deposit=deposit, user=request.user,
+                defaults={'last_read_at': tz.now()},
+            )
+
+            return success_response(
+                'Messages fetched',
+                DepositMessageSerializer(qs, many=True, context={'request': request}).data,
+            )
+
+        # POST: create a new message
+        s = PostDepositMessageSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+
+        role_name = (getattr(request.user.role, 'name', None) or '').lower() if getattr(request.user, 'role', None) else ''
+        attachment = s.validated_data.get('attachment')
+        msg = DepositMessage.objects.create(
+            deposit        = deposit,
+            sender         = request.user,
+            sender_role    = role_name,
+            message        = (s.validated_data.get('message') or '').strip(),
+            attachment     = attachment,
+            attachment_name= attachment.name if attachment else '',
+            is_protected   = bool(s.validated_data.get('is_protected')) if attachment else False,
+            password_hint  = s.validated_data.get('password_hint', '') if attachment else '',
+        )
+
+        msg_data = DepositMessageSerializer(msg, context={'request': request}).data
+
+        # Broadcast over WebSocket to everyone viewing this deposit's chat
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+            from .consumers import deposit_group
+            layer = get_channel_layer()
+            if layer:
+                async_to_sync(layer.group_send)(
+                    deposit_group(deposit.pk),
+                    {'type': 'message_created', 'message': msg_data},
+                )
+        except Exception:
+            pass
+
+        return success_response('Message sent', msg_data, status_code=status.HTTP_201_CREATED)
 
 
 # ── Deposit Notifications ──────────────────────────────────────────────────

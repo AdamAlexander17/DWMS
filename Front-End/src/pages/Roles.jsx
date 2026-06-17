@@ -31,6 +31,10 @@ const REVIEW_MODULES = ['deposits'];
 // Modules that show the "Completed Status" permission (only deposits)
 const COMPLETE_MODULES = ['deposits'];
 
+// Modules that show the "Chat / Message" permission (deposits get it standalone;
+// withdrawals already get it via EXTRA_ACTIONS)
+const CHAT_MODULES = ['deposits'];
+
 const EMPTY_PERMISSION = (module) => ({
   module,
   can_view:             false,
@@ -96,7 +100,9 @@ function PermissionSelector({ modules, permissions, onChange }) {
       if (a === 'complete' && !COMPLETE_MODULES.includes(modValue)) return false;
       return true;
     });
-    return EXTRA_ACTION_MODULES.includes(modValue) ? [...base, ...EXTRA_ACTIONS] : base;
+    if (EXTRA_ACTION_MODULES.includes(modValue)) return [...base, ...EXTRA_ACTIONS];
+    if (CHAT_MODULES.includes(modValue)) return [...base, 'chat'];
+    return base;
   };
 
   const toggleModule = (modValue) => {
@@ -154,7 +160,8 @@ function PermissionSelector({ modules, permissions, onChange }) {
               if (a === 'complete' && !COMPLETE_MODULES.includes(mod.value)) return false;
               return true;
             }),
-            ...(EXTRA_ACTION_MODULES.includes(mod.value) ? EXTRA_ACTIONS : []),
+            ...(EXTRA_ACTION_MODULES.includes(mod.value) ? EXTRA_ACTIONS
+                : CHAT_MODULES.includes(mod.value) ? ['chat'] : []),
           ];
           const perm         = permMap[mod.value] || EMPTY_PERMISSION(mod.value);
           const selectedCount = moduleActions.filter((a) => perm[`can_${a}`]).length;

@@ -262,18 +262,18 @@ export default function BankAccounts() {
             {records.length === 0 && <tr><td colSpan={canWrite ? 9 : 8} className="px-4 py-10 text-center text-gray-400 text-sm">No bank accounts found</td></tr>}
             {sortedRecords.map((r, i) => (
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
-                <td className="px-4 py-2.5 font-medium text-gray-800 text-xs whitespace-nowrap">{r.bank_name}</td>
-                <td className="px-4 py-2.5 text-gray-600 text-xs text-center">{r.account_holder_name}</td>
-                <td className="px-4 py-2.5 font-mono text-gray-700 text-xs text-center">{r.account_number}</td>
-                <td className="px-4 py-2.5 font-mono text-xs text-gray-600 text-center">{r.ifsc_code}</td>
+                <td className="px-4 py-2.5 font-medium text-gray-800 text-sm whitespace-nowrap">{r.bank_name}</td>
+                <td className="px-4 py-2.5 text-gray-600 text-sm text-center">{r.account_holder_name}</td>
+                <td className="px-4 py-2.5 font-mono text-gray-700 text-sm text-center">{r.account_number}</td>
+                <td className="px-4 py-2.5 font-mono text-sm text-gray-600 text-center">{r.ifsc_code}</td>
                 <td className="px-4 py-2.5 text-center">
-                  <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-xs font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
                 </td>
-                <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap text-center">₹{r.range_from} – ₹{r.range_to}</td>
+                <td className="px-4 py-2.5 text-gray-600 text-sm whitespace-nowrap text-center">₹{Number(r.range_from).toLocaleString('en-IN')} – ₹{Number(r.range_to).toLocaleString('en-IN')}</td>
                 <td className="px-4 py-2.5 text-center">
                   {r.daily_limit
-                    ? <span className="text-xs text-gray-600 font-medium">₹{Number(r.daily_limit).toLocaleString('en-IN')}</span>
-                    : <span className="text-[11px] text-gray-300 italic">No limit</span>
+                    ? <span className="text-sm text-gray-700 font-medium">₹{Number(r.daily_limit).toLocaleString('en-IN')}</span>
+                    : <span className="text-xs text-gray-300 italic">No limit</span>
                   }
                 </td>
                 <td className="px-4 py-2.5 text-center"><Badge variant={r.is_active ? 'active' : 'inactive'} /></td>

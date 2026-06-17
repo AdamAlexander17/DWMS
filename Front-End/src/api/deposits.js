@@ -9,6 +9,11 @@ export const deleteDeposit  = (id) => api.delete(`/deposits/${id}/`)
 export const reviewDeposit  = (id, data) => api.post(`/deposits/${id}/review/`, data)
 export const getDepositActivities = (id) => api.get(`/deposits/${id}/activities/`)
 
+// Deposit chat
+export const getDepositMessages = (id) => api.get(`/deposits/${id}/messages/`)
+export const postDepositMessage = (id, formData) =>
+  api.post(`/deposits/${id}/messages/`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+
 // Notifications
 export const getNotifications     = (params) => api.get('/deposits/notifications/', { params })
 export const getUnreadCount       = ()  => api.get('/deposits/notifications/unread_count/')

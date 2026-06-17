@@ -2,6 +2,12 @@ from django.conf import settings
 from django.db import models
 
 
+def deposit_message_upload_path(instance, filename):
+    import uuid, os
+    ext = os.path.splitext(filename)[1].lower() or '.bin'
+    return f'deposit_messages/{uuid.uuid4().hex}{ext}'
+
+
 class DepositLog(models.Model):
     # Channel type choices
     CHANNEL_QR   = 'qr'
@@ -89,6 +95,22 @@ class DepositLog(models.Model):
         db_index=True,
     )
     ark_id = models.CharField(max_length=100, blank=True, default='')
+
+    # Problem category
+    PROBLEM_DEPOSIT_FAILED      = 'deposit_failed'
+    PROBLEM_AMOUNT_NOT_RECEIVED = 'amount_not_received'
+    PROBLEM_CHOICES = [
+        (PROBLEM_DEPOSIT_FAILED,      'Deposit Failed'),
+        (PROBLEM_AMOUNT_NOT_RECEIVED, 'Deposit Amount Didn\'t Receive'),
+    ]
+    problem_category = models.CharField(
+        max_length=30,
+        choices=PROBLEM_CHOICES,
+        blank=True,
+        default='',
+        db_index=True,
+    )
+
     comment = models.TextField(blank=True, default='')
 
     submitted_by = models.ForeignKey(
@@ -204,3 +226,52 @@ class DepositNotification(models.Model):
 
     def __str__(self) -> str:
         return f'DepositNotif({self.level}) → {self.recipient}'
+
+
+class DepositMessage(models.Model):
+    """Free-form chat between RM and Back Office on a deposit ticket."""
+    deposit = models.ForeignKey(
+        DepositLog, on_delete=models.CASCADE,
+        related_name='messages',
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name='deposit_messages',
+    )
+    sender_role = models.CharField(max_length=30, blank=True)  # snapshot at send time
+    message = models.TextField(blank=True)
+
+    attachment      = models.FileField(upload_to=deposit_message_upload_path, null=True, blank=True)
+    attachment_name = models.CharField(max_length=255, blank=True)
+    is_protected    = models.BooleanField(default=False)
+    password_hint   = models.CharField(max_length=255, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'deposit_messages'
+        ordering = ['created_at']
+        indexes = [models.Index(fields=['deposit', 'created_at'])]
+
+    def __str__(self):
+        return f'Msg #{self.pk} on Deposit#{self.deposit_id} by {self.sender}'
+
+
+class DepositMessageRead(models.Model):
+    """Tracks when each user last read messages on a deposit ticket."""
+    deposit = models.ForeignKey(
+        DepositLog, on_delete=models.CASCADE,
+        related_name='message_reads',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='deposit_message_reads',
+    )
+    last_read_at = models.DateTimeField()
+
+    class Meta:
+        db_table = 'deposit_message_reads'
+        unique_together = ('deposit', 'user')
+
+    def __str__(self):
+        return f'User {self.user_id} read Deposit#{self.deposit_id} at {self.last_read_at}'

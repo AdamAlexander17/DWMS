@@ -1,15 +1,16 @@
 from rest_framework import serializers
 
-from common.file_validators import validate_slip
+from common.file_validators import validate_slip, validate_attachment
 from common.validators import validate_text
 
 from master.serializers import GatewaySerializer
-from .models import DepositLog, DepositNotification, DepositActivity
+from .models import DepositLog, DepositNotification, DepositActivity, DepositMessage
 
 
 class DepositLogSerializer(serializers.ModelSerializer):
     submitted_by_name = serializers.SerializerMethodField()
     reviewed_by_name  = serializers.SerializerMethodField()
+    message_count     = serializers.SerializerMethodField()
 
     # Nested gateway detail (read)
     gateway_detail = GatewaySerializer(source='gateway', read_only=True)
@@ -33,6 +34,7 @@ class DepositLogSerializer(serializers.ModelSerializer):
             'slip',
             'slip_status', 'slip_status_display',
             'ark_id',
+            'problem_category',
             'comment',
             'submitted_by', 'submitted_by_name',
             'status', 'status_display',
@@ -40,6 +42,7 @@ class DepositLogSerializer(serializers.ModelSerializer):
             'review_slip',
             'reviewed_by', 'reviewed_by_name',
             'reviewed_at',
+            'message_count',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
@@ -52,6 +55,18 @@ class DepositLogSerializer(serializers.ModelSerializer):
 
     def get_reviewed_by_name(self, obj) -> str | None:
         return obj.reviewed_by.username if obj.reviewed_by else None
+
+    def get_message_count(self, obj) -> int:
+        """Return unread message count for the current user."""
+        request = self.context.get('request')
+        if not request:
+            return 0
+        user = request.user
+        last_read = getattr(obj, '_last_read', None)
+        qs = obj.messages.exclude(sender=user)
+        if last_read:
+            qs = qs.filter(created_at__gt=last_read)
+        return qs.count()
 
     def get_channel_label(self, obj) -> str | None:
         if obj.channel_type == DepositLog.CHANNEL_QR and obj.qr_code:
@@ -147,3 +162,62 @@ class DepositActivitySerializer(serializers.ModelSerializer):
 
     def get_actor_name(self, obj) -> str | None:
         return obj.actor.username if obj.actor else None
+
+
+class DepositMessageSerializer(serializers.ModelSerializer):
+    sender_name        = serializers.SerializerMethodField()
+    attachment_url     = serializers.SerializerMethodField()
+    attachment_size_kb = serializers.SerializerMethodField()
+
+    def get_sender_name(self, obj):
+        return obj.sender.username if obj.sender_id else 'Deleted user'
+
+    def get_attachment_url(self, obj):
+        if not obj.attachment:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.attachment.url) if request else obj.attachment.url
+
+    def get_attachment_size_kb(self, obj):
+        try:
+            return round(obj.attachment.size / 1024, 1) if obj.attachment else None
+        except Exception:
+            return None
+
+    class Meta:
+        model = DepositMessage
+        fields = [
+            'id', 'deposit_id', 'sender', 'sender_name', 'sender_role',
+            'message', 'attachment_url', 'attachment_name', 'attachment_size_kb',
+            'is_protected', 'password_hint', 'created_at',
+        ]
+
+
+class PostDepositMessageSerializer(serializers.Serializer):
+    message       = serializers.CharField(required=False, allow_blank=True, default='', max_length=5000)
+    attachment    = serializers.FileField(required=False, allow_null=True)
+    is_protected  = serializers.BooleanField(required=False, default=False)
+    password_hint = serializers.CharField(required=False, allow_blank=True, default='', max_length=200)
+
+    def validate_message(self, value):
+        return validate_text(value, field='Message', max_length=5000, allow_blank=True)
+
+    def validate_password_hint(self, value):
+        return validate_text(value, field='Password hint', max_length=200, allow_blank=True)
+
+    def validate_attachment(self, value):
+        if value is None:
+            return value
+        validate_attachment(value, field='Attachment')
+        return value
+
+    def validate(self, attrs):
+        msg = (attrs.get('message') or '').strip()
+        att = attrs.get('attachment')
+        if not msg and not att:
+            raise serializers.ValidationError('Please type a message or attach a file.')
+        if attrs.get('is_protected') and not att:
+            raise serializers.ValidationError(
+                {'is_protected': 'A protected message must include an attachment.'}
+            )
+        return attrs

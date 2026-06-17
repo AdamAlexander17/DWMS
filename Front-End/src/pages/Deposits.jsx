@@ -1,7 +1,7 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2, Eye, User, Calendar } from 'lucide-react'
-import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit, getDepositActivities } from '../api/deposits'
+import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2, Eye, User, Calendar, ArrowLeftRight, MessageSquare, Send, X, Lock } from 'lucide-react'
+import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit, getDepositActivities, getDepositMessages, postDepositMessage } from '../api/deposits'
 import { getGateways }     from '../api/master'
 import { getQRCodes }      from '../api/payments'
 import { getUPISources }   from '../api/payments'
@@ -13,6 +13,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Pagination    from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useAuthStore } from '../store/authStore'
+import { connectWS } from '../api/ws'
 import { slipFile as vSlipFile, extractApiErrors } from '../utils/validators'
 
 // Gateway options are fetched from master API – see useGateways() hook below
@@ -37,6 +38,13 @@ const RM_STATUS_OPTS = [
   { value: 'completed',    label: 'Completed'    },
 ]
 
+// Problem category options
+const PROBLEM_CATEGORY_OPTS = [
+  { value: '',                    label: 'Select category…' },
+  { value: 'deposit_failed',     label: 'Deposit Failed' },
+  { value: 'amount_not_received', label: 'Deposit Amount Didn\'t Receive' },
+]
+
 // Unified "Ticket Status" derived from both slip_status + review status
 const TICKET_STATUS_CONFIG = {
   not_received: { label: 'Not Received', bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    Icon: XCircle     },
@@ -54,7 +62,7 @@ function deriveTicketStatus(r) {
   if (r.status === 'completed') return 'completed'
   if (r.status === 'approved')  return 'approved'
   if (r.status === 'rejected')  return 'rejected'
-  if (r.status === 'in_progress') return r.review_slip ? 'added' : 'in_progress'
+  if (r.status === 'in_progress') return r.slip_status === 'added' ? 'added' : 'in_progress'
   if (r.slip_status === 'not_received') return 'not_received'
   return 'pending'
 }
@@ -153,6 +161,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
     slip:         null,
     rm_status:    'not_received',
     ark_id:       '',
+    problem_category: '',
     comment:      '',
   })
   const [local, setLocal] = useState({})
@@ -194,6 +203,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
       fd.append('slip_status', 'not_received')
     }
     fd.append('ark_id',      form.ark_id)
+    if (form.problem_category) fd.append('problem_category', form.problem_category)
     fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
     onSubmit(fd)
@@ -278,6 +288,20 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Problem Category */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Problem Category</label>
+        <select
+          className="input"
+          value={form.problem_category}
+          onChange={(e) => f('problem_category')(e.target.value)}
+        >
+          {PROBLEM_CATEGORY_OPTS.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Comment */}
@@ -388,6 +412,14 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
             </a>
           </div>
         )}
+        {initial?.problem_category && (
+          <div className="flex justify-between items-center pt-1.5 border-t border-gray-200">
+            <span className="text-gray-500">Problem Category</span>
+            <span className="text-xs font-semibold text-gray-800">
+              {PROBLEM_CATEGORY_OPTS.find(o => o.value === initial.problem_category)?.label || initial.problem_category}
+            </span>
+          </div>
+        )}
         {initial?.comment && (
           <div className="pt-1.5 border-t border-gray-200">
             <p className="text-gray-400 text-xs mb-0.5">Comment</p>
@@ -409,9 +441,6 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
             <option key={value} value={value}>{label} — {hint}</option>
           ))}
         </select>
-        {decision === 'added' && !reviewSlip && !initial?.review_slip && (
-          <p className="mt-1 text-[11px] text-amber-600">Please attach a receipt to mark as Added.</p>
-        )}
       </div>
 
       {/* Back-office receipt upload */}
@@ -459,7 +488,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       {(error || errors.non_field) && <p className="text-red-500 text-sm">{errors.non_field || error}</p>}
       <button
         type="submit"
-        disabled={loading || (decision === 'added' && !reviewSlip && !initial?.review_slip)}
+        disabled={loading}
         className="btn-primary w-full justify-center mt-1"
       >
         {loading ? 'Submitting…' : 'Submit Review'}
@@ -481,6 +510,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
     channel_type: initial?.channel_type ?? '',
     channel_id:   initChannelId,
     ark_id:       initial?.ark_id ?? '',
+    problem_category: initial?.problem_category ?? '',
     comment:      initial?.comment      ?? '',
     slip:         null,
     rm_status:    initial?.status === 'completed' ? 'completed' : 'not_received',
@@ -527,6 +557,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       fd.append('status',      'pending')
     }
     fd.append('ark_id',      form.ark_id)
+    if (form.problem_category) fd.append('problem_category', form.problem_category)
     fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
     onSubmit(fd)
@@ -613,6 +644,20 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         </div>
       </div>
 
+      {/* Problem Category */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Problem Category</label>
+        <select
+          className="input"
+          value={form.problem_category}
+          onChange={(e) => f('problem_category')(e.target.value)}
+        >
+          {PROBLEM_CATEGORY_OPTS.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
+
       {/* Comment */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Comment</label>
@@ -635,8 +680,230 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   )
 }
 
+// ── Deposit Chat (conversation between RM and reviewers) ────────────────────
+function DepositChat({ depositId, currentUserId }) {
+  const qc = useQueryClient()
+  const [text, setText]   = useState('')
+  const [file, setFile]   = useState(null)
+  const [composerErr, setComposerErr] = useState('')
+  const [wsLive, setWsLive] = useState(false)
+  const fileInputRef = useRef(null)
+  const scrollerRef  = useRef(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['deposit-messages', depositId],
+    queryFn:  () => getDepositMessages(depositId),
+  })
+  const messages = data?.data?.data ?? []
+
+  // ── Live WebSocket subscription ────────────────────────────────────────
+  useEffect(() => {
+    const { accessToken } = useAuthStore.getState()
+    if (!accessToken || !depositId) return
+    const conn = connectWS(`/ws/deposits/${depositId}/`, accessToken, {
+      onOpen:  () => setWsLive(true),
+      onClose: () => setWsLive(false),
+      onMessage: (data) => {
+        if (data?.type === 'message_created' && data.message) {
+          qc.setQueryData(['deposit-messages', depositId], (prev) => {
+            if (!prev) return prev
+            const list = prev.data?.data ?? []
+            if (list.some(m => m.id === data.message.id)) return prev
+            return { ...prev, data: { ...prev.data, data: [...list, data.message] } }
+          })
+        }
+      },
+    })
+    return () => conn.close()
+  }, [depositId, qc])
+
+  useEffect(() => {
+    if (scrollerRef.current) scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight
+  }, [messages.length])
+
+  const postM = useMutation({
+    mutationFn: ({ id, fd }) => postDepositMessage(id, fd),
+    onMutate: async ({ optimistic }) => {
+      // Optimistic: show the message instantly in the UI
+      if (optimistic) {
+        await qc.cancelQueries({ queryKey: ['deposit-messages', depositId] })
+        qc.setQueryData(['deposit-messages', depositId], (prev) => {
+          if (!prev) return prev
+          const list = prev.data?.data ?? []
+          return { ...prev, data: { ...prev.data, data: [...list, optimistic] } }
+        })
+      }
+    },
+    onSuccess: (res) => {
+      // Replace optimistic message with real one from server
+      qc.invalidateQueries({ queryKey: ['deposit-messages', depositId] })
+    },
+    onError: () => {
+      // Revert optimistic on error
+      qc.invalidateQueries({ queryKey: ['deposit-messages', depositId] })
+    },
+  })
+
+  const canSend = (text.trim() || file) && !postM.isPending
+
+  const handleSend = () => {
+    if (!canSend) return
+    setComposerErr('')
+    const trimmed = text.trim()
+    if (trimmed.length > 5000) { setComposerErr('Message is too long (max 5000 characters).'); return }
+
+    // Create optimistic message for instant display
+    const optimisticMsg = {
+      id: `temp-${Date.now()}`,
+      deposit_id: depositId,
+      sender: currentUserId,
+      sender_name: 'You',
+      sender_role: '',
+      message: trimmed,
+      attachment_url: null,
+      attachment_name: file?.name || '',
+      attachment_size_kb: file ? Math.round(file.size / 1024) : null,
+      is_protected: false,
+      password_hint: '',
+      created_at: new Date().toISOString(),
+    }
+
+    const fd = new FormData()
+    if (trimmed) fd.append('message', trimmed)
+    if (file) fd.append('attachment', file)
+    postM.mutate({ id: depositId, fd, optimistic: optimisticMsg })
+    // Clear input immediately for snappy feel
+    setText('')
+    setFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const fmtTime = (d) => new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+  const roleLabel = (r) => {
+    if (r === 'rm')          return { txt: 'RM',          bg: 'bg-blue-100',   text: 'text-blue-700' }
+    if (r === 'back_office') return { txt: 'Back Office', bg: 'bg-purple-100', text: 'text-purple-700' }
+    if (r === 'admin')       return { txt: 'Admin',       bg: 'bg-amber-100',  text: 'text-amber-700' }
+    return { txt: r || '—', bg: 'bg-gray-100', text: 'text-gray-600' }
+  }
+
+  return (
+    <div className="flex flex-col h-[440px] border border-gray-200 rounded-xl bg-gradient-to-b from-gray-50/60 to-white overflow-hidden shadow-inner">
+      {/* Messages */}
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {isLoading && (
+          <div className="flex items-center justify-center h-full text-xs text-gray-400 gap-2">
+            <Loader2 size={14} className="animate-spin" /> Loading conversation…
+          </div>
+        )}
+        {!isLoading && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center px-6">
+            <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mb-3 shadow-sm">
+              <MessageSquare size={22} className="text-accent" />
+            </div>
+            <p className="text-sm font-semibold text-gray-700">No messages yet</p>
+            <p className="text-xs text-gray-400 mt-1 max-w-xs">Start the conversation. Attach files if needed.</p>
+          </div>
+        )}
+        {messages.map((m, idx) => {
+          const mine = m.sender === currentUserId
+          const role = roleLabel(m.sender_role)
+          const prev = messages[idx - 1]
+          const sameSenderAsPrev = prev && prev.sender === m.sender
+          const showHeader = !sameSenderAsPrev
+          const initials = (m.sender_name || '?').slice(0, 2).toUpperCase()
+          return (
+            <div key={m.id} className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''} ${sameSenderAsPrev ? '-mt-2' : ''}`}>
+              <div className="shrink-0 w-8 h-8">
+                {showHeader && (
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${mine ? 'bg-accent text-white' : `${role.bg} ${role.text}`}`}>
+                    {initials}
+                  </div>
+                )}
+              </div>
+              <div className={`max-w-[75%] flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                {showHeader && (
+                  <div className={`flex items-center gap-1.5 mb-1 px-1 ${mine ? 'flex-row-reverse' : ''}`}>
+                    <span className="text-[11px] font-semibold text-gray-700">{m.sender_name}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${role.bg} ${role.text} uppercase tracking-wide`}>{role.txt}</span>
+                  </div>
+                )}
+                <div className={`rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${
+                  mine ? 'bg-accent text-white rounded-br-md' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
+                }`}>
+                  {m.message && <p className="whitespace-pre-wrap break-words leading-snug">{m.message}</p>}
+                  {m.attachment_url && (
+                    <div className={`${m.message ? 'mt-2' : ''} flex items-start gap-2.5 rounded-xl px-2.5 py-2 ${mine ? 'bg-white/15' : 'bg-gray-50 border border-gray-200'}`}>
+                      <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${mine ? 'bg-white/20' : 'bg-accent/10'}`}>
+                        <Paperclip size={15} className={mine ? 'text-white' : 'text-accent'} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-[11px] font-semibold truncate ${mine ? 'text-white' : 'text-gray-800'}`}>{m.attachment_name || 'Attachment'}</p>
+                        <p className={`text-[10px] ${mine ? 'text-white/70' : 'text-gray-500'}`}>{m.attachment_size_kb ? `${m.attachment_size_kb} KB` : ''}</p>
+                        <a href={m.attachment_url} target="_blank" rel="noreferrer"
+                          className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold ${mine ? 'text-white hover:underline' : 'text-accent hover:text-accent-dark'}`}>
+                          <ExternalLink size={9} /> Open / download
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p className={`text-[10px] text-gray-400 mt-1 px-1 ${mine ? 'text-right' : ''}`}>{fmtTime(m.created_at)}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Composer */}
+      <div className="border-t border-gray-200 bg-white px-4 pt-3 pb-3">
+        {file && (
+          <div className="mb-2 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-2.5 py-2">
+            <Paperclip size={13} className="text-accent mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold text-gray-800 truncate">{file.name}</p>
+              <p className="text-[10px] text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+            </div>
+            <button type="button" onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+              className="text-gray-400 hover:text-red-500" title="Remove file">
+              <X size={13} />
+            </button>
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <input ref={fileInputRef} type="file" className="hidden"
+            onChange={(e) => { setFile(e.target.files?.[0] ?? null); setComposerErr('') }} />
+          <button type="button" onClick={() => fileInputRef.current?.click()} title="Attach file"
+            className="shrink-0 w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors">
+            <Paperclip size={15} />
+          </button>
+          <textarea
+            rows={1}
+            value={text}
+            onChange={(e) => { setText(e.target.value); if (composerErr) setComposerErr('') }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+            maxLength={5000}
+            placeholder="Type a message…  (Enter to send)"
+            className={`flex-1 resize-none text-sm px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent max-h-32 ${composerErr ? 'border-red-300' : 'border-gray-200'}`}
+          />
+          <button type="button" onClick={handleSend} disabled={!canSend}
+            className="shrink-0 w-9 h-9 rounded-lg bg-accent hover:bg-accent-dark text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-colors" title="Send">
+            <Send size={15} />
+          </button>
+        </div>
+        {composerErr && <p className="mt-1.5 text-[11px] text-red-600">{composerErr}</p>}
+        <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1.5">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${wsLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+          {wsLive ? 'Live — connected' : 'Reconnecting…'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ── Deposit Timeline (View modal content) ──────────────────────────────────
-function DepositTimeline({ deposit }) {
+function DepositTimeline({ deposit, initialTab = 'timeline' }) {
+  const [tab, setTab] = useState(initialTab)
+  const { user } = useAuthStore()
   const { data, isLoading } = useQuery({
     queryKey: ['deposit-activities', deposit.id],
     queryFn:  () => getDepositActivities(deposit.id),
@@ -658,6 +925,30 @@ function DepositTimeline({ deposit }) {
 
   return (
     <div className="space-y-4">
+      {/* Tab toggle */}
+      <div className="inline-flex rounded-lg bg-gray-100 p-1">
+        <button
+          onClick={() => setTab('timeline')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+            tab === 'timeline' ? 'bg-white text-accent shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Clock size={11} className="inline -mt-0.5 mr-1" /> Timeline
+        </button>
+        <button
+          onClick={() => setTab('chat')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+            tab === 'chat' ? 'bg-white text-accent shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <MessageSquare size={11} className="inline -mt-0.5 mr-1" /> Chat
+        </button>
+      </div>
+
+      {tab === 'chat' ? (
+        <DepositChat depositId={deposit.id} currentUserId={user?.id} />
+      ) : (
+      <>
       {/* Deposit summary */}
       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-2 text-sm">
         <div className="flex justify-between">
@@ -754,6 +1045,8 @@ function DepositTimeline({ deposit }) {
           })}
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }
@@ -767,6 +1060,7 @@ export default function Deposits() {
   const canDelete = hasPermission('deposits', 'delete')
   const canActivate = hasPermission('deposits', 'activate')
   const canReview = hasPermission('deposits', 'review')
+  const canChat   = hasPermission('deposits', 'chat')
   const canWrite  = canCreate || canEdit || canDelete
   const isRM      = canCreate && !canReview
 
@@ -781,7 +1075,7 @@ export default function Deposits() {
   const [modal,           setModal]           = useState(null)
   const [delTarget,       setDelTarget]       = useState(null)
   const fmtDate = (d) => d
-    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
     : '—'
 
   // Debounce search — wait 400ms after last keystroke before firing API
@@ -810,6 +1104,7 @@ export default function Deposits() {
     if (key === 'comment')       return (row.comment ?? '').toLowerCase()
     if (key === 'logged_by')     return (row.submitted_by_name ?? '').toLowerCase()
     if (key === 'created_at')    return row.created_at ? new Date(row.created_at).getTime() : 0
+    if (key === 'problem')       return (row.problem_category ?? '').toLowerCase()
     if (key === 'ticket_status') return (TICKET_STATUS_CONFIG[deriveTicketStatus(row)]?.label ?? '').toLowerCase()
     return ''
   }
@@ -825,6 +1120,20 @@ export default function Deposits() {
   const updateM = useMutation({ mutationFn: ({ id, d }) => updateDeposit(id, d),            onSuccess: () => { inv(); setModal(null) } })
   const deleteM = useMutation({ mutationFn: deleteDeposit,                                  onSuccess: () => { inv(); setDelTarget(null) } })
   const reviewM = useMutation({ mutationFn: ({ id, d }) => reviewDeposit(id, d),            onSuccess: () => { inv(); setModal(null) } })
+  const toggleStatusM = useMutation({
+    mutationFn: ({ id, currentStatus }) => {
+      const fd = new FormData()
+      if (currentStatus === 'completed') {
+        fd.append('slip_status', 'not_received')
+        fd.append('status', 'pending')
+      } else {
+        fd.append('slip_status', 'added')
+        fd.append('status', 'completed')
+      }
+      return updateDeposit(id, fd)
+    },
+    onSuccess: inv,
+  })
 
   if (isLoading) return <PageSpinner />
 
@@ -884,15 +1193,16 @@ export default function Deposits() {
               <SortableTh label="Comment"         sortKey="comment"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Logged By"       sortKey="logged_by"      toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Created At"      sortKey="created_at"     toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Problem"         sortKey="problem"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Ticket Status"   sortKey="ticket_status"  toggle={toggleSort} icon={sortIcon} />
-              {(canWrite || canReview) && (
+              {(canWrite || canReview || canChat) && (
                 <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
               )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {records.length === 0 && (
-              <tr><td colSpan={canWrite || canReview ? 10 : 9} className="px-4 py-10 text-center text-gray-400 text-sm">
+              <tr><td colSpan={canWrite || canReview || canChat ? 11 : 10} className="px-4 py-10 text-center text-gray-400 text-sm">
                 {canCreate ? 'No deposits logged yet. Use "Log Deposit" to record a deposit.' : 'No deposit logs found.'}
               </td></tr>
             )}
@@ -935,6 +1245,12 @@ export default function Deposits() {
                 <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{r.submitted_by_name ?? '—'}</td>
                 {/* Created At */}
                 <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{fmtDate(r.created_at)}</td>
+                {/* Problem Category */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center">
+                  {r.problem_category
+                    ? (PROBLEM_CATEGORY_OPTS.find(o => o.value === r.problem_category)?.label || r.problem_category)
+                    : '—'}
+                </td>
                 {/* Ticket Status */}
                 <td className="px-4 py-2.5 text-center">
                   {(() => {
@@ -956,7 +1272,7 @@ export default function Deposits() {
                   })()}
                 </td>
                 {/* Actions */}
-                {(canWrite || canReview) && (
+                {(canWrite || canReview || canChat) && (
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 justify-end">
                       {/* View timeline */}
@@ -964,6 +1280,33 @@ export default function Deposits() {
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors" title="View Timeline">
                         <Eye size={12} />
                       </button>
+                      {/* Chat */}
+                      {canChat && (
+                        <button onClick={() => setModal({ mode: 'view', data: r, tab: 'chat' })}
+                          className="relative inline-flex items-center justify-center w-7 h-7 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors" title="Open Chat">
+                          <MessageSquare size={12} />
+                          {r.message_count > 0 && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                              {r.message_count > 9 ? '9+' : r.message_count}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                      {/* Toggle status: Not Received ↔ Completed (RM only, on own tickets) */}
+                      {canCreate && (
+                        <button
+                          onClick={() => toggleStatusM.mutate({ id: r.id, currentStatus: r.status })}
+                          disabled={toggleStatusM.isPending}
+                          className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
+                            r.status === 'completed'
+                              ? 'bg-amber-50 text-amber-500 hover:bg-amber-100'
+                              : 'bg-teal-50 text-teal-500 hover:bg-teal-100'
+                          }`}
+                          title={r.status === 'completed' ? 'Mark as Not Received' : 'Mark as Completed'}
+                        >
+                          <ArrowLeftRight size={12} />
+                        </button>
+                      )}
                       {canReview && r.status !== 'completed' && (
                         <button onClick={() => setModal({ mode: 'review', data: r })}
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-green-50 text-green-500 hover:bg-green-100 transition-colors" title="Review">
@@ -992,9 +1335,9 @@ export default function Deposits() {
       </div>
 
       {/* View / Timeline Modal */}
-      <Modal open={modal?.mode === 'view'} onClose={() => setModal(null)} title="Deposit Timeline" size="lg">
+      <Modal open={modal?.mode === 'view'} onClose={() => { setModal(null); inv() }} title="Deposit Timeline" size="lg">
         {modal?.mode === 'view' && modal?.data && (
-          <DepositTimeline deposit={modal.data} />
+          <DepositTimeline deposit={modal.data} initialTab={modal.tab ?? 'timeline'} />
         )}
       </Modal>
 

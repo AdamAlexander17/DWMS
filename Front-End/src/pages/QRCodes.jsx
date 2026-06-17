@@ -176,18 +176,18 @@ function QRCard({ r, canEdit, canDelete, canActivate, onEdit, onDelete, onToggle
 
         {/* Range */}
         <div>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Range</p>
-          <p className="text-xs text-gray-600 font-medium">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Range</p>
+          <p className="text-sm text-gray-700 font-semibold">
             ₹{Number(r.range_from).toLocaleString('en-IN')} – ₹{Number(r.range_to).toLocaleString('en-IN')}
           </p>
         </div>
 
         {/* Daily capacity */}
         <div>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Daily Capacity</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Daily Capacity</p>
           {r.daily_limit
-            ? <p className="text-xs text-gray-600 font-medium">₹{Number(r.daily_limit).toLocaleString('en-IN')}</p>
-            : <span className="text-[11px] text-gray-300 italic">No limit</span>
+            ? <p className="text-sm text-gray-700 font-semibold">₹{Number(r.daily_limit).toLocaleString('en-IN')}</p>
+            : <span className="text-xs text-gray-300 italic">No limit</span>
           }
         </div>
 

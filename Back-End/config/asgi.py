@@ -12,10 +12,11 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
 
 from withdrawals.ws_auth import JWTAuthMiddleware
-from withdrawals.routing import websocket_urlpatterns
+from withdrawals.routing import websocket_urlpatterns as withdrawal_ws_urls
+from deposits.routing import websocket_urlpatterns as deposit_ws_urls
 
 
 application = ProtocolTypeRouter({
     'http':      get_asgi_application(),
-    'websocket': JWTAuthMiddleware(URLRouter(websocket_urlpatterns)),
+    'websocket': JWTAuthMiddleware(URLRouter(withdrawal_ws_urls + deposit_ws_urls)),
 })

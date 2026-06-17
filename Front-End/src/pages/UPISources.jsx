@@ -206,15 +206,15 @@ export default function UPISources() {
             {records.length === 0 && <tr><td colSpan={canWrite ? 6 : 5} className="px-4 py-10 text-center text-gray-400 text-sm">No UPI sources found</td></tr>}
             {sortedRecords.map((r, i) => (
               <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
-                <td className="px-4 py-2.5 font-mono font-medium text-gray-800 text-xs">{r.upi_id}</td>
+                <td className="px-4 py-2.5 font-mono font-medium text-gray-800 text-sm">{r.upi_id}</td>
                 <td className="px-4 py-2.5 text-center">
-                  <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
+                  <span className="inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-xs font-semibold border bg-accent/10 text-accent-dark border-accent/20 whitespace-nowrap">{r.brand_name}</span>
                 </td>
-                <td className="px-4 py-2.5 text-gray-500 text-xs text-center">₹{r.range_from} – ₹{r.range_to}</td>
+                <td className="px-4 py-2.5 text-gray-600 text-sm text-center">₹{Number(r.range_from).toLocaleString('en-IN')} – ₹{Number(r.range_to).toLocaleString('en-IN')}</td>
                 <td className="px-4 py-2.5 text-center">
                   {r.daily_limit
-                    ? <span className="text-xs text-gray-600 font-medium">₹{Number(r.daily_limit).toLocaleString('en-IN')}</span>
-                    : <span className="text-[11px] text-gray-300 italic">No limit</span>
+                    ? <span className="text-sm text-gray-700 font-medium">₹{Number(r.daily_limit).toLocaleString('en-IN')}</span>
+                    : <span className="text-xs text-gray-300 italic">No limit</span>
                   }
                 </td>
                 <td className="px-4 py-2.5 text-center"><Badge variant={r.is_active ? 'active' : 'inactive'} /></td>

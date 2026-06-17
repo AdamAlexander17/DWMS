@@ -43,6 +43,7 @@ class RoleService:
                     'can_activate': p.can_activate,
                     'can_review':  p.can_review,
                     'can_complete': p.can_complete,
+                    'can_chat':    p.can_chat,
                 })
             else:
                 result.append({
@@ -54,5 +55,6 @@ class RoleService:
                     'can_activate': False,
                     'can_review':  False,
                     'can_complete': False,
+                    'can_chat':    False,
                 })
         return result
