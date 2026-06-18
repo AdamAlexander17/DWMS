@@ -85,3 +85,10 @@ class TicketConsumer(AsyncJsonWebsocketConsumer):
 
     async def ticket_updated(self, event):
         await self.send_json({'type': 'ticket_updated', 'withdrawal': event['withdrawal']})
+
+    async def messages_read(self, event):
+        await self.send_json({
+            'type': 'messages_read',
+            'user_id': event.get('user_id'),
+            'read_at': event.get('read_at'),
+        })

@@ -459,6 +459,19 @@ class WithdrawalViewSet(ModelViewSet):
             return error_response('Not allowed', status_code=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'GET':
+            from django.utils import timezone as tz
+            from .models import WithdrawalMessageRead
+            # Mark messages as read by updating last_read_at for this user
+            WithdrawalMessageRead.objects.update_or_create(
+                withdrawal=instance, user=request.user,
+                defaults={'last_read_at': tz.now()},
+            )
+            # Notify other participants that this user has read messages
+            _push(ticket_group(instance.pk), 'messages_read', {
+                'user_id': request.user.pk,
+                'read_at': tz.now().isoformat(),
+            })
+
             qs = instance.messages.select_related('sender').all()
             return success_response(
                 'Messages fetched',

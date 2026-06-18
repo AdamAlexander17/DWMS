@@ -153,3 +153,24 @@ class WithdrawalMessage(models.Model):
 
     def __str__(self):
         return f'Msg #{self.pk} on WD#{self.withdrawal_id} by {self.sender}'
+
+
+class WithdrawalMessageRead(models.Model):
+    """Tracks the last time each user read messages in a withdrawal chat."""
+    withdrawal = models.ForeignKey(
+        Withdrawal, on_delete=models.CASCADE,
+        related_name='message_reads',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='withdrawal_message_reads',
+    )
+    last_read_at = models.DateTimeField()
+
+    class Meta:
+        db_table = 'withdrawal_message_reads'
+        unique_together = ('withdrawal', 'user')
+        indexes = [models.Index(fields=['withdrawal', 'user'])]
+
+    def __str__(self):
+        return f'User {self.user_id} read WD#{self.withdrawal_id} at {self.last_read_at}'

@@ -144,6 +144,7 @@ class WithdrawalMessageSerializer(serializers.ModelSerializer):
     sender_name    = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
     attachment_size_kb = serializers.SerializerMethodField()
+    read_status    = serializers.SerializerMethodField()
 
     def get_sender_name(self, obj):
         return obj.sender.username if obj.sender_id else 'Deleted user'
@@ -160,12 +161,24 @@ class WithdrawalMessageSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def get_read_status(self, obj):
+        """Returns: 'sent', 'delivered', or 'read' for WhatsApp-style ticks."""
+        from .models import WithdrawalMessageRead
+        # Check if any other user has read messages up to this message's timestamp
+        read_count = WithdrawalMessageRead.objects.filter(
+            withdrawal_id=obj.withdrawal_id,
+            last_read_at__gte=obj.created_at,
+        ).exclude(user_id=obj.sender_id).count()
+        if read_count > 0:
+            return 'read'       # double blue tick
+        return 'delivered'      # double grey tick
+
     class Meta:
         model = WithdrawalMessage
         fields = [
             'id', 'withdrawal_id', 'sender', 'sender_name', 'sender_role',
             'message', 'attachment_url', 'attachment_name', 'attachment_size_kb',
-            'is_protected', 'password_hint', 'created_at',
+            'is_protected', 'password_hint', 'read_status', 'created_at',
         ]
 
 
