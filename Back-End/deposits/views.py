@@ -350,6 +350,34 @@ class DepositLogViewSet(
                     deposit_group(deposit.pk),
                     {'type': 'message_created', 'message': msg_data},
                 )
+
+                # Also push notification to all recipients' personal channels
+                # AND persist a DepositNotification so it shows in the Messages tab
+                recipients = self._message_recipients(deposit, request.user)
+                preview = msg.message[:80] if msg.message else f'sent an attachment ({msg.attachment_name})'
+                notif_payload = {
+                    'type': 'deposit_message',
+                    'deposit_id': deposit.pk,
+                    'sender': request.user.username,
+                    'message': preview,
+                }
+
+                # Persist notifications
+                for r in recipients:
+                    DepositNotification.objects.create(
+                        recipient=r,
+                        deposit_log=deposit,
+                        level='info',
+                        channel_label=f'Chat from {request.user.username}',
+                        message=f'{request.user.username}: {preview}',
+                        is_read=False,
+                    )
+
+                for r in recipients:
+                    async_to_sync(layer.group_send)(
+                        f'user_notif_{r.pk}',
+                        {'type': 'notify', 'payload': notif_payload},
+                    )
         except Exception:
             pass
 

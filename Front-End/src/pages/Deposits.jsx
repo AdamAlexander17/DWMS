@@ -18,6 +18,27 @@ import { slipFile as vSlipFile, extractApiErrors } from '../utils/validators'
 
 // Gateway options are fetched from master API – see useGateways() hook below
 
+// ── Notification sound (Web Audio API — no file needed) ─────────────────────
+function playNotifSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const notes = [660, 880]   // E5 → A5 (soft two-tone ping)
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      gain.gain.value = 0.08
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      const start = ctx.currentTime + i * 0.12
+      osc.start(start)
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3)
+      osc.stop(start + 0.35)
+    })
+  } catch { /* browser blocked audio — silently ignore */ }
+}
+
 const CHANNEL_OPTS = [
   { value: 'qr',   label: 'QR Code',      Icon: QrCode    },
   { value: 'upi',  label: 'UPI',          Icon: Wallet    },
@@ -711,6 +732,10 @@ function DepositChat({ depositId, currentUserId }) {
             if (list.some(m => m.id === data.message.id)) return prev
             return { ...prev, data: { ...prev.data, data: [...list, data.message] } }
           })
+          // Play sound for messages from others
+          if (data.message.sender !== currentUserId) {
+            playNotifSound()
+          }
         }
       },
     })

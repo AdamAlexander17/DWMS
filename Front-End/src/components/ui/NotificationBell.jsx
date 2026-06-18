@@ -105,7 +105,10 @@ export default function NotificationBell() {
     staleTime: 10_000,
     refetchInterval: 15_000,
   })
-  const depNotifs = depList?.data?.data?.results ?? []
+  const allDepNotifs = depList?.data?.data?.results ?? []
+  // Separate deposit notifications: "Chat from..." are chat messages, rest are channel alerts
+  const depChatNotifs = allDepNotifs.filter(n => (n.channel_label || '').startsWith('Chat from'))
+  const depNotifs     = allDepNotifs.filter(n => !(n.channel_label || '').startsWith('Chat from'))
 
   // ── Withdrawal alerts ─────────────────────────────────────────────────────
   const { data: wdCount } = useQuery({
@@ -132,7 +135,7 @@ export default function NotificationBell() {
   const wdNotifs  = wdAll.filter(n => n.notif_type !== 'new_message')
   const msgNotifs = wdAll.filter(n => n.notif_type === 'new_message')
   const wdUnreadShown  = wdNotifs.filter(n => !n.is_read).length
-  const msgUnreadShown = msgNotifs.filter(n => !n.is_read).length
+  const msgUnreadShown = msgNotifs.filter(n => !n.is_read).length + depChatNotifs.filter(n => !n.is_read).length
 
   // Live WS push for withdrawal notifications
   useEffect(() => {
@@ -166,6 +169,12 @@ export default function NotificationBell() {
           // live-refresh deposit tables on both sides
           qc.invalidateQueries({ queryKey: ['deposits'] })
           qc.invalidateQueries({ queryKey: ['deposit-history'] })
+        }
+        if (data?.type === 'deposit_message') {
+          playChime()   // ← new deposit chat message notification
+          qc.invalidateQueries({ queryKey: ['deposits'] })  // update badge count
+          qc.invalidateQueries({ queryKey: ['notifications-list'] })  // refresh notifications
+          qc.invalidateQueries({ queryKey: ['notifications-unread'] })
         }
         if (data?.type === 'unread_count') {
           qc.setQueryData(['wd-notifications-unread'], (prev) => {
@@ -434,12 +443,29 @@ export default function NotificationBell() {
               </>
             )}
 
-            {/* Messages tab — chat messages from withdrawal tickets */}
+            {/* Messages tab — chat messages from withdrawal + deposit tickets */}
             {tab === 'messages' && (
               <>
-                {msgNotifs.length === 0 && (
+                {msgNotifs.length === 0 && depChatNotifs.length === 0 && (
                   <p className="px-4 py-10 text-center text-sm text-gray-400">No new messages</p>
                 )}
+                {/* Deposit chat messages */}
+                {depChatNotifs.map((n) => (
+                  <div
+                    key={`dep-${n.id}`}
+                    className={`group relative flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                  >
+                    <div className="shrink-0 w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
+                      <MessageCircle size={15} className="text-accent" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-6">
+                      <p className="text-xs font-semibold text-accent">Deposit Chat</p>
+                      <p className="text-xs text-gray-700 mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{timeAgo(n.created_at)}</p>
+                    </div>
+                    {!n.is_read && <div className="shrink-0 w-2 h-2 rounded-full bg-accent self-start mt-2" />}
+                  </div>
+                ))}
                 {msgNotifs.map((n) => {
                   const cfg  = WD_CFG.new_message
                   const Icon = cfg.Icon
