@@ -168,6 +168,7 @@ class DepositMessageSerializer(serializers.ModelSerializer):
     sender_name        = serializers.SerializerMethodField()
     attachment_url     = serializers.SerializerMethodField()
     attachment_size_kb = serializers.SerializerMethodField()
+    read_status        = serializers.SerializerMethodField()
 
     def get_sender_name(self, obj):
         return obj.sender.username if obj.sender_id else 'Deleted user'
@@ -184,12 +185,27 @@ class DepositMessageSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def get_read_status(self, obj):
+        """
+        Returns: 'sent' (single tick), 'delivered' (double grey tick), 'read' (double blue tick)
+        For the sender's own messages: check if ANY other participant has read it.
+        """
+        from .models import DepositMessageRead
+        # Check if any other user has read messages up to this timestamp
+        read_count = DepositMessageRead.objects.filter(
+            deposit=obj.deposit,
+            last_read_at__gte=obj.created_at,
+        ).exclude(user=obj.sender).count()
+        if read_count > 0:
+            return 'read'       # double blue tick
+        return 'delivered'      # double grey tick (server received)
+
     class Meta:
         model = DepositMessage
         fields = [
             'id', 'deposit_id', 'sender', 'sender_name', 'sender_role',
             'message', 'attachment_url', 'attachment_name', 'attachment_size_kb',
-            'is_protected', 'password_hint', 'created_at',
+            'is_protected', 'password_hint', 'read_status', 'created_at',
         ]
 
 

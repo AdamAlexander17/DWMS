@@ -315,6 +315,27 @@ class DepositLogViewSet(
                 defaults={'last_read_at': tz.now()},
             )
 
+            # Clear chat notifications for this deposit for this user
+            DepositNotification.objects.filter(
+                deposit_log=deposit,
+                recipient=request.user,
+                channel_label__startswith='Chat from',
+            ).delete()
+
+            # Broadcast "messages_read" so the sender's ticks update
+            try:
+                from asgiref.sync import async_to_sync
+                from channels.layers import get_channel_layer
+                from .consumers import deposit_group
+                layer = get_channel_layer()
+                if layer:
+                    async_to_sync(layer.group_send)(
+                        deposit_group(deposit.pk),
+                        {'type': 'messages_read', 'user_id': request.user.pk},
+                    )
+            except Exception:
+                pass
+
             return success_response(
                 'Messages fetched',
                 DepositMessageSerializer(qs, many=True, context={'request': request}).data,

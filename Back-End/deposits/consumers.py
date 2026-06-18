@@ -53,3 +53,6 @@ class DepositTicketConsumer(AsyncJsonWebsocketConsumer):
     # broadcast handler
     async def message_created(self, event):
         await self.send_json({'type': 'message_created', 'message': event['message']})
+
+    async def messages_read(self, event):
+        await self.send_json({'type': 'messages_read', 'user_id': event['user_id']})
