@@ -288,9 +288,10 @@ export default function NotificationBell() {
   const handleDepClick = (n) => {
     if (!n.is_read) depReadM.mutate(n.id)
     setOpen(false)
-    // Navigate to deposit page — if notification has a deposit_id, open that specific deposit
-    if (n.deposit_id) {
-      navigate(`/deposits?highlight=${n.deposit_id}`)
+    // Navigate to deposit page and open the specific ticket detail
+    const depositId = n.deposit_log || n.deposit_id
+    if (depositId) {
+      navigate(`/deposits?ticket=${depositId}`)
     } else {
       navigate('/deposits')
     }
@@ -453,6 +454,7 @@ export default function NotificationBell() {
                 {depChatNotifs.map((n) => (
                   <div
                     key={`dep-${n.id}`}
+                    onClick={() => handleDepClick(n)}
                     className={`group relative flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
                   >
                     <div className="shrink-0 w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">

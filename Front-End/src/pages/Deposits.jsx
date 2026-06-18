@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2, Eye, User, Calendar, ArrowLeftRight, MessageSquare, Send, X, Lock } from 'lucide-react'
-import { createDeposit, deleteDeposit, getDeposits, updateDeposit, reviewDeposit, getDepositActivities, getDepositMessages, postDepositMessage } from '../api/deposits'
+import { createDeposit, deleteDeposit, getDeposit, getDeposits, updateDeposit, reviewDeposit, getDepositActivities, getDepositMessages, postDepositMessage } from '../api/deposits'
 import { getGateways }     from '../api/master'
 import { getQRCodes }      from '../api/payments'
 import { getUPISources }   from '../api/payments'
@@ -1154,6 +1155,27 @@ export default function Deposits() {
     const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
     return () => clearTimeout(t)
   }, [search])
+
+  // Deep-link from notification click: ?ticket=<id>
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const tid = searchParams.get('ticket')
+    if (!tid) return
+    let cancelled = false
+    getDeposit(tid)
+      .then((res) => {
+        if (cancelled) return
+        const dep = res?.data?.data ?? res?.data
+        if (dep) setModal({ mode: 'view', data: dep, tab: 'chat' })
+      })
+      .catch(() => { /* ticket may have been deleted */ })
+      .finally(() => {
+        const next = new URLSearchParams(searchParams)
+        next.delete('ticket')
+        setSearchParams(next, { replace: true })
+      })
+    return () => { cancelled = true }
+  }, [searchParams, setSearchParams])
 
   const { data, isLoading } = useQuery({
     queryKey: ['deposits', page, pageSize, debouncedSearch, gatewayFilter, channelFilter],
