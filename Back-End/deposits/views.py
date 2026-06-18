@@ -282,18 +282,27 @@ class DepositLogViewSet(
         return False
 
     def _message_recipients(self, deposit, sender):
-        """Everyone party to the deposit EXCEPT the sender."""
+        """Notify only the ticket submitter and reviewers (with activate permission) sharing the brand."""
         from auth.models import User
         recipients = {}
-        if deposit.submitted_by_id:
+
+        # Always include the ticket submitter (only they see notifications for their own tickets)
+        if deposit.submitted_by_id and deposit.submitted_by_id != sender.pk:
             recipients[deposit.submitted_by_id] = deposit.submitted_by
-        reviewer_qs = User.objects.filter(
-            role__permissions__module='deposits',
-            role__permissions__can_review=True,
-        ).distinct()
-        for u in reviewer_qs:
-            recipients[u.pk] = u
-        recipients.pop(sender.pk, None)
+
+        # Include reviewers (with activate permission) sharing the submitter's brand(s)
+        if deposit.submitted_by_id:
+            submitter_brands = deposit.submitted_by.brands.all()
+            if submitter_brands.exists():
+                reviewer_qs = User.objects.filter(
+                    role__permissions__module='deposits',
+                    role__permissions__can_activate=True,
+                    is_active=True,
+                    brands__in=submitter_brands,
+                ).exclude(pk=sender.pk).distinct()
+                for u in reviewer_qs:
+                    recipients[u.pk] = u
+
         return list(recipients.values())
 
     @extend_schema(summary='Deposit chat — list / post messages', tags=['Deposits'])

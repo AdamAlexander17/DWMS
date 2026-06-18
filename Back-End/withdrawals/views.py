@@ -439,16 +439,23 @@ class WithdrawalViewSet(ModelViewSet):
         return False
 
     def _message_recipients(self, instance, sender):
-        """Everyone party to the ticket EXCEPT the sender."""
-        recipients = {instance.submitted_by_id: instance.submitted_by} if instance.submitted_by_id else {}
-        reviewer_qs = User.objects.filter(
-            role__permissions__module='withdrawals',
-            role__permissions__can_edit=True,
-        )
+        """Notify only ticket submitter and reviewers from the same brand."""
+        recipients = {}
+        if instance.submitted_by_id:
+            recipients[instance.submitted_by_id] = instance.submitted_by
+
+        # Include reviewers/BOs sharing the ticket's brand
         if instance.brand_id:
-            reviewer_qs = reviewer_qs.filter(brands=instance.brand)
-        for u in reviewer_qs.distinct():
-            recipients[u.pk] = u
+            reviewer_qs = User.objects.filter(
+                role__permissions__module='withdrawals',
+                role__permissions__can_activate=True,
+                is_active=True,
+                brands=instance.brand,
+            ).distinct()
+            for u in reviewer_qs:
+                recipients[u.pk] = u
+
+        # Remove the sender
         recipients.pop(sender.pk, None)
         return list(recipients.values())
 
