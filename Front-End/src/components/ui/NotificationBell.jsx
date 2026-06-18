@@ -103,7 +103,7 @@ export default function NotificationBell() {
     queryKey: ['notifications-list'],
     queryFn:  () => getNotifications({ page_size: 50 }),
     staleTime: 10_000,
-    refetchInterval: 15_000,
+    refetchInterval: wsLive ? 30_000 : 5_000,
   })
   const allDepNotifs = depList?.data?.data?.results ?? []
   // Separate deposit notifications: "Chat from..." are chat messages, rest are channel alerts
@@ -322,10 +322,10 @@ export default function NotificationBell() {
                 <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{totalUnread}</span>
               )}
               <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
-                wsLive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
+                wsLive ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-600'
               }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${wsLive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                {wsLive ? 'LIVE' : 'OFF'}
+                <span className={`w-1.5 h-1.5 rounded-full ${wsLive ? 'bg-green-500 animate-pulse' : 'bg-amber-400'}`} />
+                {wsLive ? 'LIVE' : 'POLL'}
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -549,7 +549,7 @@ export default function NotificationBell() {
 
           <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
             <p className="text-[10px] text-gray-400 text-center">
-              {wsLive ? 'Live — instant updates over WebSocket' : 'Reconnecting…'}
+              {wsLive ? 'Live — instant updates over WebSocket' : 'Polling for updates…'}
             </p>
           </div>
         </div>

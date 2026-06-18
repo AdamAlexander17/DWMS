@@ -714,6 +714,8 @@ function DepositChat({ depositId, currentUserId }) {
   const { data, isLoading } = useQuery({
     queryKey: ['deposit-messages', depositId],
     queryFn:  () => getDepositMessages(depositId),
+    // Fallback polling when WebSocket is disconnected
+    refetchInterval: wsLive ? false : 3000,
   })
   const messages = data?.data?.data ?? []
 
@@ -724,23 +726,23 @@ function DepositChat({ depositId, currentUserId }) {
     const conn = connectWS(`/ws/deposits/${depositId}/`, accessToken, {
       onOpen:  () => setWsLive(true),
       onClose: () => setWsLive(false),
-      onMessage: (data) => {
-        if (data?.type === 'message_created' && data.message) {
+      onMessage: (wsData) => {
+        if (wsData?.type === 'message_created' && wsData.message) {
           qc.setQueryData(['deposit-messages', depositId], (prev) => {
             if (!prev) return prev
             const list = prev.data?.data ?? []
-            if (list.some(m => m.id === data.message.id)) return prev
-            return { ...prev, data: { ...prev.data, data: [...list, data.message] } }
+            if (list.some(m => m.id === wsData.message.id)) return prev
+            return { ...prev, data: { ...prev.data, data: [...list, wsData.message] } }
           })
           // Play sound for messages from others
-          if (data.message.sender !== currentUserId) {
+          if (wsData.message.sender !== currentUserId) {
             playNotifSound()
           }
         }
       },
     })
     return () => conn.close()
-  }, [depositId, qc])
+  }, [depositId, qc, currentUserId])
 
   useEffect(() => {
     if (scrollerRef.current) scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight
