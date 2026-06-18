@@ -345,6 +345,14 @@ class DepositLogViewSet(
         s = PostDepositMessageSerializer(data=request.data)
         s.is_valid(raise_exception=True)
 
+        # Sending a message means you've read everything up to now
+        from django.utils import timezone as tz
+        from .models import DepositMessageRead
+        DepositMessageRead.objects.update_or_create(
+            deposit=deposit, user=request.user,
+            defaults={'last_read_at': tz.now()},
+        )
+
         role_name = (getattr(request.user.role, 'name', None) or '').lower() if getattr(request.user, 'role', None) else ''
         attachment = s.validated_data.get('attachment')
         msg = DepositMessage.objects.create(
@@ -370,6 +378,11 @@ class DepositLogViewSet(
                 async_to_sync(layer.group_send)(
                     deposit_group(deposit.pk),
                     {'type': 'message_created', 'message': msg_data},
+                )
+                # Broadcast read receipt (sender has read everything by sending)
+                async_to_sync(layer.group_send)(
+                    deposit_group(deposit.pk),
+                    {'type': 'messages_read', 'user_id': request.user.pk},
                 )
 
                 # Also push notification to all recipients' personal channels

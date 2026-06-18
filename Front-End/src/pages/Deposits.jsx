@@ -740,12 +740,22 @@ function DepositChat({ depositId, currentUserId }) {
           qc.setQueryData(['deposit-messages', depositId], (prev) => {
             if (!prev) return prev
             const list = prev.data?.data ?? []
+            // If this is our own message coming back from server, replace the temp optimistic one
+            if (wsData.message.sender === currentUserId) {
+              // Remove any temp messages and check if real message already exists
+              const filtered = list.filter(m => !String(m.id).startsWith('temp-'))
+              if (filtered.some(m => m.id === wsData.message.id)) return { ...prev, data: { ...prev.data, data: filtered } }
+              return { ...prev, data: { ...prev.data, data: [...filtered, wsData.message] } }
+            }
+            // Message from someone else — just append if not duplicate
             if (list.some(m => m.id === wsData.message.id)) return prev
             return { ...prev, data: { ...prev.data, data: [...list, wsData.message] } }
           })
           // Play sound for messages from others
           if (wsData.message.sender !== currentUserId) {
             playNotifSound()
+            // Auto-mark as read since chat is open — call GET to update last_read_at
+            qc.invalidateQueries({ queryKey: ['deposit-messages', depositId] })
           }
         }
         // When someone reads messages, refetch to update tick marks

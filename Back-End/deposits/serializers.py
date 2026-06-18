@@ -188,14 +188,13 @@ class DepositMessageSerializer(serializers.ModelSerializer):
     def get_read_status(self, obj):
         """
         Returns: 'sent' (single tick), 'delivered' (double grey tick), 'read' (double blue tick)
-        For the sender's own messages: check if ANY other participant has read it.
         """
         from .models import DepositMessageRead
-        # Check if any other user has read messages up to this timestamp
+        # Check if any other user has read messages up to this message's timestamp
         read_count = DepositMessageRead.objects.filter(
-            deposit=obj.deposit,
+            deposit_id=obj.deposit_id,
             last_read_at__gte=obj.created_at,
-        ).exclude(user=obj.sender).count()
+        ).exclude(user_id=obj.sender_id).count()
         if read_count > 0:
             return 'read'       # double blue tick
         return 'delivered'      # double grey tick (server received)
