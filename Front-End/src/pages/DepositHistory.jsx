@@ -37,7 +37,7 @@ export default function DepositHistory() {
   const { hasPermission } = useAuthStore()
   const qc = useQueryClient()
 
-  const canDelete  = hasPermission('deposits', 'delete') || hasPermission('deposits', 'edit')
+  const canDelete  = hasPermission('deposit_history', 'delete')
 
   const [page,          setPage]          = useState(1)
   const [pageSize,      setPageSize]      = useState(25)

@@ -115,9 +115,9 @@ export default function WithdrawalHistory() {
   const qc = useQueryClient()
   const { user, hasPermission } = useAuthStore()
   const role = user?.role
-  const canReview = hasPermission('withdrawals', 'edit') || hasPermission('withdrawals', 'activate')
-  const canDelete = hasPermission('withdrawals', 'delete')
-  const isRM = hasPermission('withdrawals', 'create') && !canReview
+  const canReview = hasPermission('withdrawal_history', 'edit') || hasPermission('withdrawal_history', 'activate')
+  const canDelete = hasPermission('withdrawal_history', 'delete')
+  const isRM = hasPermission('withdrawal_history', 'create') && !canReview
 
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(25)
@@ -287,7 +287,7 @@ export default function WithdrawalHistory() {
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors">
                         <Eye size={13} />
                       </button>
-                      {(canDelete || isOwn) && (
+                      {canDelete && (
                         <button onClick={() => setDel(r)} title="Delete from history"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
                           <Trash2 size={13} />

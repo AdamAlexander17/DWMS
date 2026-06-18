@@ -406,15 +406,23 @@ function MessageThread({ withdrawalId, currentUserId }) {
             if (list.some(m => m.id === data.message.id)) return prev
             return { ...prev, data: { ...prev.data, data: [...list, data.message] } }
           })
+          // Auto-mark as read since chat is open (refetch updates last_read_at)
+          if (data.message.sender !== currentUserId) {
+            qc.invalidateQueries({ queryKey: ['wd-messages', withdrawalId] })
+          }
         }
         if (data?.type === 'ticket_updated' && data.withdrawal) {
           qc.invalidateQueries({ queryKey: ['withdrawals'] })
           qc.invalidateQueries({ queryKey: ['withdrawal-stats'] })
         }
+        // When someone reads messages, refetch to update tick marks
+        if (data?.type === 'messages_read' && data.user_id !== currentUserId) {
+          qc.invalidateQueries({ queryKey: ['wd-messages', withdrawalId] })
+        }
       },
     })
     return () => conn.close()
-  }, [withdrawalId, qc])
+  }, [withdrawalId, qc, currentUserId])
 
   useEffect(() => {
     if (scrollerRef.current) scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight
@@ -558,7 +566,28 @@ function MessageThread({ withdrawalId, currentUserId }) {
                   )}
                 </div>
 
-                <p className={`text-[10px] text-gray-400 mt-1 px-1 ${mine ? 'text-right' : ''}`}>{fmtTime(m.created_at)}</p>
+                <p className={`text-[10px] text-gray-400 mt-1 px-1 flex items-center gap-1 ${mine ? 'justify-end' : ''}`}>
+                  {fmtTime(m.created_at)}
+                  {mine && (
+                    <span className="inline-flex">
+                      {m.read_status === 'read' ? (
+                        <svg width="16" height="11" viewBox="0 0 16 11" className="text-blue-500">
+                          <path d="M0.5 5.5L3.5 8.5L8 4" stroke="currentColor" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M5 5.5L8 8.5L15 1.5" stroke="currentColor" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : m.read_status === 'delivered' ? (
+                        <svg width="16" height="11" viewBox="0 0 16 11" className="text-gray-400">
+                          <path d="M0.5 5.5L3.5 8.5L8 4" stroke="currentColor" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M5 5.5L8 8.5L15 1.5" stroke="currentColor" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : (
+                        <svg width="12" height="11" viewBox="0 0 12 11" className="text-gray-400">
+                          <path d="M1 5.5L4 8.5L11 1.5" stroke="currentColor" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
           )
