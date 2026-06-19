@@ -182,14 +182,19 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
   )
 }
 
-function BulkImportModal({ onClose, onSuccess }) {
+function BulkImportModal({ onClose, onSuccess, roles = [], brands = [] }) {
   const [file, setFile]       = useState(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult]   = useState(null)
   const [error, setError]     = useState(null)
   const inputRef = useRef()
 
-  const SAMPLE_CSV = 'username,role,brands,password\njohn_doe,rm,"Trade Karo,Trade Bazaar",123456\njane_smith,back_office,BazaarFx,123456'
+  // Build dynamic sample CSV using actual roles and brands from the system
+  const sampleRole1 = roles.find(r => r.name?.toLowerCase() !== 'admin')?.name || 'RM'
+  const sampleRole2 = roles.find(r => r.name?.toLowerCase() !== 'admin' && r.name !== sampleRole1)?.name || sampleRole1
+  const sampleBrand1 = brands[0]?.name || 'BrandA'
+  const sampleBrand2 = brands[1]?.name || 'BrandB'
+  const SAMPLE_CSV = `username,role,brands,password\njohn_doe,${sampleRole1},"${sampleBrand1},${sampleBrand2}",123456\njane_smith,${sampleRole2},${sampleBrand1},123456`
 
   const downloadSample = () => {
     const blob = new Blob([SAMPLE_CSV], { type: 'text/csv' })
@@ -240,8 +245,8 @@ function BulkImportModal({ onClose, onSuccess }) {
           <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 space-y-0.5">
             <p className="font-semibold text-gray-600 mb-1">Required columns:</p>
             <p><span className="font-medium text-gray-700">username</span> — unique username</p>
-            <p><span className="font-medium text-gray-700">role</span> — admin / back_office / rm</p>
-            <p><span className="font-medium text-gray-700">brands</span> — comma-separated brand names (optional)</p>
+            <p><span className="font-medium text-gray-700">role</span> — exact role name as shown in Roles page (e.g. {roles.map(r => r.name).join(', ') || 'admin, RM, BackOffice'})</p>
+            <p><span className="font-medium text-gray-700">brands</span> — comma-separated, exact names from Brands page (e.g. {brands.slice(0,3).map(b => b.name).join(', ') || 'TK, TB, BFX'})</p>
             <p><span className="font-medium text-gray-700">password</span> — defaults to 123456 if empty</p>
           </div>
 
@@ -630,7 +635,7 @@ export default function Users() {
       </div>
 
       {showImport && (
-        <BulkImportModal onClose={() => setShowImport(false)} onSuccess={() => { qc.invalidateQueries({ queryKey: ['users'] }) }} />
+        <BulkImportModal onClose={() => setShowImport(false)} onSuccess={() => { qc.invalidateQueries({ queryKey: ['users'] }) }} roles={roles} brands={brands} />
       )}
 
       {!!modal && (        <UserModal
