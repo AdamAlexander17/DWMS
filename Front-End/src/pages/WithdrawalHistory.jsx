@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
   Search, Eye, Trash2, IndianRupee, Calendar, CheckCircle2, XCircle, Clock,
   FileText, AlertTriangle, Mail, History as HistoryIcon, MessageSquare, Download,
+  Send, Paperclip, X, Loader2,
 } from 'lucide-react'
 import {
-  getWithdrawals, deleteWithdrawal,
+  getWithdrawals, deleteWithdrawal, getMessages, postMessage,
 } from '../api/withdrawals'
+import { connectWS } from '../api/ws'
+import { useAuthStore } from '../store/authStore'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Pagination from '../components/ui/Pagination'
 import { PageSpinner } from '../components/ui/Spinner'
-import { useAuthStore } from '../store/authStore'
 
 // Reuse status config style
 const STATUS = {
@@ -30,12 +32,30 @@ function StatusChip({ status }) {
   )
 }
 
-function HistoryDetailModal({ withdrawal }) {
+function HistoryDetailModal({ withdrawal, initialTab = 'details' }) {
+  const [tab, setTab] = useState(initialTab)
+  const { user } = useAuthStore()
   const fmtDt   = (d) => d ? new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 
   return (
     <div className="space-y-4">
+      {/* Tab toggle */}
+      <div className="inline-flex rounded-lg bg-gray-100 p-1">
+        <button onClick={() => setTab('details')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${tab === 'details' ? 'bg-white text-accent shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          <FileText size={11} className="inline -mt-0.5 mr-1" /> Details
+        </button>
+        <button onClick={() => setTab('chat')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${tab === 'chat' ? 'bg-white text-accent shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          <MessageSquare size={11} className="inline -mt-0.5 mr-1" /> Chat
+        </button>
+      </div>
+
+      {tab === 'chat' ? (
+        <WdHistoryChat withdrawalId={withdrawal.id} currentUserId={user?.id} />
+      ) : (
+      <>
       <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
         {[
           ['Client',       withdrawal.client_name],
@@ -107,6 +127,134 @@ function HistoryDetailModal({ withdrawal }) {
           <p className="text-sm text-gray-700">{withdrawal.review_message}</p>
         </div>
       )}
+      </>
+      )}
+    </div>
+  )
+}
+
+// ── Withdrawal History Chat ────────────────────────────────────────────────
+function WdHistoryChat({ withdrawalId, currentUserId }) {
+  const qc = useQueryClient()
+  const [text, setText] = useState('')
+  const [file, setFile] = useState(null)
+  const [wsLive, setWsLive] = useState(false)
+  const fileInputRef = useRef(null)
+  const scrollerRef  = useRef(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['wd-messages', withdrawalId],
+    queryFn:  () => getMessages(withdrawalId),
+    refetchInterval: wsLive ? false : 3000,
+  })
+  const messages = data?.data?.data ?? []
+
+  useEffect(() => {
+    const { accessToken } = useAuthStore.getState()
+    if (!accessToken || !withdrawalId) return
+    const conn = connectWS(`/ws/withdrawals/${withdrawalId}/`, accessToken, {
+      onOpen:  () => setWsLive(true),
+      onClose: () => setWsLive(false),
+      onMessage: (wsData) => {
+        if (wsData?.type === 'message_created' && wsData.message) {
+          qc.setQueryData(['wd-messages', withdrawalId], (prev) => {
+            if (!prev) return prev
+            const list = prev.data?.data ?? []
+            if (list.some(m => m.id === wsData.message.id)) return prev
+            return { ...prev, data: { ...prev.data, data: [...list, wsData.message] } }
+          })
+        }
+      },
+    })
+    return () => conn.close()
+  }, [withdrawalId, qc])
+
+  useEffect(() => {
+    if (scrollerRef.current) scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight
+  }, [messages.length])
+
+  const postM = useMutation({
+    mutationFn: ({ id, fd }) => postMessage(id, fd),
+    onSuccess: () => { setText(''); setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; qc.invalidateQueries({ queryKey: ['wd-messages', withdrawalId] }) },
+  })
+
+  const canSend = (text.trim() || file) && !postM.isPending
+  const handleSend = () => {
+    if (!canSend) return
+    const fd = new FormData()
+    if (text.trim()) fd.append('message', text.trim())
+    if (file) fd.append('attachment', file)
+    postM.mutate({ id: withdrawalId, fd })
+  }
+
+  const fmtTime = (d) => new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+  const roleLabel = (r) => {
+    if (r === 'rm')          return { txt: 'RM',          bg: 'bg-blue-100',   text: 'text-blue-700' }
+    if (r === 'back_office') return { txt: 'Back Office', bg: 'bg-purple-100', text: 'text-purple-700' }
+    if (r === 'admin')       return { txt: 'Admin',       bg: 'bg-amber-100',  text: 'text-amber-700' }
+    return { txt: r || '—', bg: 'bg-gray-100', text: 'text-gray-600' }
+  }
+
+  return (
+    <div className="flex flex-col h-[440px] border border-gray-200 rounded-xl bg-gradient-to-b from-gray-50/60 to-white overflow-hidden shadow-inner">
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {isLoading && <div className="flex items-center justify-center h-full text-xs text-gray-400 gap-2"><Loader2 size={14} className="animate-spin" /> Loading…</div>}
+        {!isLoading && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <MessageSquare size={22} className="text-accent mb-2" />
+            <p className="text-sm font-semibold text-gray-700">No messages yet</p>
+          </div>
+        )}
+        {messages.map((m, idx) => {
+          const mine = m.sender === currentUserId
+          const role = roleLabel(m.sender_role)
+          const showHeader = !messages[idx - 1] || messages[idx - 1].sender !== m.sender
+          const initials = (m.sender_name || '?').slice(0, 2).toUpperCase()
+          return (
+            <div key={m.id} className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''} ${!showHeader ? '-mt-2' : ''}`}>
+              <div className="shrink-0 w-8 h-8">
+                {showHeader && <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${mine ? 'bg-accent text-white' : `${role.bg} ${role.text}`}`}>{initials}</div>}
+              </div>
+              <div className={`max-w-[75%] flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                {showHeader && (
+                  <div className={`flex items-center gap-1.5 mb-1 px-1 ${mine ? 'flex-row-reverse' : ''}`}>
+                    <span className="text-[11px] font-semibold text-gray-700">{m.sender_name}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${role.bg} ${role.text} uppercase`}>{role.txt}</span>
+                  </div>
+                )}
+                <div className={`rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${mine ? 'bg-accent text-white rounded-br-md' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'}`}>
+                  {m.message && <p className="whitespace-pre-wrap break-words leading-snug">{m.message}</p>}
+                  {m.attachment_url && <a href={m.attachment_url} target="_blank" rel="noreferrer" className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold ${mine ? 'text-white' : 'text-accent'}`}><Paperclip size={10} /> {m.attachment_name || 'File'}</a>}
+                </div>
+                <p className={`text-[10px] text-gray-400 mt-1 px-1 ${mine ? 'text-right' : ''}`}>{fmtTime(m.created_at)}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="border-t border-gray-200 bg-white px-4 pt-3 pb-3">
+        {file && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-2.5 py-2">
+            <Paperclip size={13} className="text-accent shrink-0" />
+            <span className="text-[11px] text-gray-800 truncate flex-1">{file.name}</span>
+            <button onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="text-gray-400 hover:text-red-500"><X size={13} /></button>
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="shrink-0 w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center"><Paperclip size={15} /></button>
+          <textarea rows={1} value={text} onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+            maxLength={5000} placeholder="Type a message…  (Enter to send)"
+            className="flex-1 resize-none text-sm px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-accent/30 max-h-32" />
+          <button type="button" onClick={handleSend} disabled={!canSend}
+            className="shrink-0 w-9 h-9 rounded-lg bg-accent hover:bg-accent-dark text-white flex items-center justify-center disabled:opacity-40 transition-colors"><Send size={15} /></button>
+        </div>
+        <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1.5">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${wsLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+          {wsLive ? 'Live — connected' : 'Polling…'}
+        </p>
+      </div>
     </div>
   )
 }
@@ -287,6 +435,10 @@ export default function WithdrawalHistory() {
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors">
                         <Eye size={13} />
                       </button>
+                      <button onClick={() => setView({ ...r, __openChat: true })} title="Open Chat"
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors">
+                        <MessageSquare size={13} />
+                      </button>
                       {canDelete && (
                         <button onClick={() => setDel(r)} title="Delete from history"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
@@ -303,8 +455,8 @@ export default function WithdrawalHistory() {
       </div>
 
       {/* Detail modal */}
-      <Modal open={!!viewTarget} onClose={() => setView(null)} title="Closed Ticket — Full Record" size="md">
-        {viewTarget && <HistoryDetailModal withdrawal={viewTarget} />}
+      <Modal open={!!viewTarget} onClose={() => setView(null)} title="Closed Ticket — Full Record" size="lg">
+        {viewTarget && <HistoryDetailModal withdrawal={viewTarget} initialTab={viewTarget.__openChat ? 'chat' : 'details'} />}
       </Modal>
 
       {/* Delete confirm */}
