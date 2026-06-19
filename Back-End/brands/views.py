@@ -114,7 +114,14 @@ class BrandViewSet(ModelViewSet):
             old_data={'id': instance.id, 'name': instance.name},
             ip_address=get_client_ip(request),
         )
-        instance.delete()
+        try:
+            instance.delete()
+        except Exception:
+            return error_response(
+                f'Brand "{instance.name}" has linked records (users, deposits, etc.) '
+                f'and cannot be deleted. Deactivate it instead.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         return success_response('Brand deleted successfully', status_code=status.HTTP_204_NO_CONTENT)
 
     # ------------------------------------------------------------------
