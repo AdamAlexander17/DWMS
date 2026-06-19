@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { Search, Paperclip, QrCode, Wallet, Building2, BadgeCheck, Trash2, ExternalLink, FileCheck2, Eye, User, Calendar, Plus, SquarePen, CheckCircle2, Clock } from 'lucide-react'
-import { getDeposits, deleteDeposit, getDepositActivities } from '../api/deposits'
+import { Search, Paperclip, QrCode, Wallet, Building2, BadgeCheck, Trash2, ExternalLink, FileCheck2, Eye, User, Calendar, Plus, SquarePen, CheckCircle2, Clock, MessageSquare, Send, X, Loader2 } from 'lucide-react'
+import { getDeposits, deleteDeposit, getDepositActivities, getDepositMessages, postDepositMessage } from '../api/deposits'
 import { getGateways } from '../api/master'
 import Modal         from '../components/ui/Modal'
 import Pagination    from '../components/ui/Pagination'
@@ -10,6 +10,7 @@ import { useSortable } from '../hooks/useSortable'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useAuthStore } from '../store/authStore'
+import { connectWS } from '../api/ws'
 
 const CHANNEL_BADGE = {
   qr:   'bg-purple-50 text-purple-700 border-purple-200',
@@ -246,6 +247,18 @@ export default function DepositHistory() {
                     >
                       <Eye size={12} />
                     </button>
+                    <button
+                      onClick={() => setViewTarget({ ...r, __openChat: true })}
+                      className="relative inline-flex items-center justify-center w-7 h-7 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                      title="Open Chat"
+                    >
+                      <MessageSquare size={12} />
+                      {r.message_count > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                          {r.message_count > 9 ? '9+' : r.message_count}
+                        </span>
+                      )}
+                    </button>
                     {canDelete && (
                       <button
                         onClick={() => setDelTarget(r)}
@@ -274,15 +287,17 @@ export default function DepositHistory() {
       />
 
       {/* Timeline Modal */}
-      <Modal open={!!viewTarget} onClose={() => setViewTarget(null)} title="Deposit Timeline" size="lg">
-        {viewTarget && <HistoryTimeline deposit={viewTarget} />}
+      <Modal open={!!viewTarget} onClose={() => { setViewTarget(null); qc.invalidateQueries({ queryKey: ['deposit-history'] }) }} title="Deposit Timeline" size="lg">
+        {viewTarget && <HistoryTimeline deposit={viewTarget} initialTab={viewTarget.__openChat ? 'chat' : 'timeline'} />}
       </Modal>
     </div>
   )
 }
 
 // ── Timeline component for Deposit History ─────────────────────────────────
-function HistoryTimeline({ deposit }) {
+function HistoryTimeline({ deposit, initialTab = 'timeline' }) {
+  const [tab, setTab] = useState(initialTab)
+  const { user } = useAuthStore()
   const { data, isLoading } = useQuery({
     queryKey: ['deposit-activities', deposit.id],
     queryFn:  () => getDepositActivities(deposit.id),
@@ -304,6 +319,30 @@ function HistoryTimeline({ deposit }) {
 
   return (
     <div className="space-y-4">
+      {/* Tab toggle */}
+      <div className="inline-flex rounded-lg bg-gray-100 p-1">
+        <button
+          onClick={() => setTab('timeline')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+            tab === 'timeline' ? 'bg-white text-accent shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Clock size={11} className="inline -mt-0.5 mr-1" /> Timeline
+        </button>
+        <button
+          onClick={() => setTab('chat')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+            tab === 'chat' ? 'bg-white text-accent shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <MessageSquare size={11} className="inline -mt-0.5 mr-1" /> Chat
+        </button>
+      </div>
+
+      {tab === 'chat' ? (
+        <HistoryChat depositId={deposit.id} currentUserId={user?.id} />
+      ) : (
+      <>
       {/* Deposit summary */}
       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-2 text-sm">
         <div className="flex justify-between">
@@ -394,6 +433,164 @@ function HistoryTimeline({ deposit }) {
             )
           })}
         </div>
+      </div>
+      </>
+      )}
+    </div>
+  )
+}
+
+// ── Chat component for Deposit History ─────────────────────────────────────
+function HistoryChat({ depositId, currentUserId }) {
+  const qc = useQueryClient()
+  const [text, setText] = useState('')
+  const [file, setFile] = useState(null)
+  const [composerErr, setComposerErr] = useState('')
+  const [wsLive, setWsLive] = useState(false)
+  const fileInputRef = useRef(null)
+  const scrollerRef  = useRef(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['deposit-messages', depositId],
+    queryFn:  () => getDepositMessages(depositId),
+    refetchInterval: wsLive ? false : 3000,
+  })
+  const messages = data?.data?.data ?? []
+
+  useEffect(() => {
+    const { accessToken } = useAuthStore.getState()
+    if (!accessToken || !depositId) return
+    const conn = connectWS(`/ws/deposits/${depositId}/`, accessToken, {
+      onOpen:  () => setWsLive(true),
+      onClose: () => setWsLive(false),
+      onMessage: (wsData) => {
+        if (wsData?.type === 'message_created' && wsData.message) {
+          qc.setQueryData(['deposit-messages', depositId], (prev) => {
+            if (!prev) return prev
+            const list = prev.data?.data ?? []
+            if (wsData.message.sender === currentUserId) {
+              const filtered = list.filter(m => !String(m.id).startsWith('temp-'))
+              if (filtered.some(m => m.id === wsData.message.id)) return { ...prev, data: { ...prev.data, data: filtered } }
+              return { ...prev, data: { ...prev.data, data: [...filtered, wsData.message] } }
+            }
+            if (list.some(m => m.id === wsData.message.id)) return prev
+            return { ...prev, data: { ...prev.data, data: [...list, wsData.message] } }
+          })
+          if (wsData.message.sender !== currentUserId) {
+            qc.invalidateQueries({ queryKey: ['deposit-messages', depositId] })
+          }
+        }
+        if (wsData?.type === 'messages_read' && wsData.user_id !== currentUserId) {
+          qc.invalidateQueries({ queryKey: ['deposit-messages', depositId] })
+        }
+      },
+    })
+    return () => conn.close()
+  }, [depositId, qc, currentUserId])
+
+  useEffect(() => {
+    if (scrollerRef.current) scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight
+  }, [messages.length])
+
+  const postM = useMutation({
+    mutationFn: ({ id, fd }) => postDepositMessage(id, fd),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['deposit-messages', depositId] }),
+  })
+
+  const canSend = (text.trim() || file) && !postM.isPending
+
+  const handleSend = () => {
+    if (!canSend) return
+    setComposerErr('')
+    const trimmed = text.trim()
+    if (trimmed.length > 5000) { setComposerErr('Max 5000 characters.'); return }
+    const fd = new FormData()
+    if (trimmed) fd.append('message', trimmed)
+    if (file) fd.append('attachment', file)
+    postM.mutate({ id: depositId, fd })
+    setText(''); setFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const fmtTime = (d) => new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+  const roleLabel = (r) => {
+    if (r === 'rm')          return { txt: 'RM',          bg: 'bg-blue-100',   text: 'text-blue-700' }
+    if (r === 'back_office') return { txt: 'Back Office', bg: 'bg-purple-100', text: 'text-purple-700' }
+    if (r === 'admin')       return { txt: 'Admin',       bg: 'bg-amber-100',  text: 'text-amber-700' }
+    return { txt: r || '—', bg: 'bg-gray-100', text: 'text-gray-600' }
+  }
+
+  return (
+    <div className="flex flex-col h-[440px] border border-gray-200 rounded-xl bg-gradient-to-b from-gray-50/60 to-white overflow-hidden shadow-inner">
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {isLoading && (
+          <div className="flex items-center justify-center h-full text-xs text-gray-400 gap-2">
+            <Loader2 size={14} className="animate-spin" /> Loading…
+          </div>
+        )}
+        {!isLoading && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <MessageSquare size={22} className="text-accent mb-2" />
+            <p className="text-sm font-semibold text-gray-700">No messages yet</p>
+          </div>
+        )}
+        {messages.map((m, idx) => {
+          const mine = m.sender === currentUserId
+          const role = roleLabel(m.sender_role)
+          const prev = messages[idx - 1]
+          const showHeader = !prev || prev.sender !== m.sender
+          const initials = (m.sender_name || '?').slice(0, 2).toUpperCase()
+          return (
+            <div key={m.id} className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''} ${!showHeader ? '-mt-2' : ''}`}>
+              <div className="shrink-0 w-8 h-8">
+                {showHeader && (
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${mine ? 'bg-accent text-white' : `${role.bg} ${role.text}`}`}>{initials}</div>
+                )}
+              </div>
+              <div className={`max-w-[75%] flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                {showHeader && (
+                  <div className={`flex items-center gap-1.5 mb-1 px-1 ${mine ? 'flex-row-reverse' : ''}`}>
+                    <span className="text-[11px] font-semibold text-gray-700">{m.sender_name}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${role.bg} ${role.text} uppercase tracking-wide`}>{role.txt}</span>
+                  </div>
+                )}
+                <div className={`rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${mine ? 'bg-accent text-white rounded-br-md' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'}`}>
+                  {m.message && <p className="whitespace-pre-wrap break-words leading-snug">{m.message}</p>}
+                  {m.attachment_url && (
+                    <a href={m.attachment_url} target="_blank" rel="noreferrer" className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold ${mine ? 'text-white' : 'text-accent'}`}>
+                      <Paperclip size={10} /> {m.attachment_name || 'Attachment'}
+                    </a>
+                  )}
+                </div>
+                <p className={`text-[10px] text-gray-400 mt-1 px-1 ${mine ? 'text-right' : ''}`}>{fmtTime(m.created_at)}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="border-t border-gray-200 bg-white px-4 pt-3 pb-3">
+        {file && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-2.5 py-2">
+            <Paperclip size={13} className="text-accent shrink-0" />
+            <span className="text-[11px] text-gray-800 truncate flex-1">{file.name}</span>
+            <button onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="text-gray-400 hover:text-red-500"><X size={13} /></button>
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="shrink-0 w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center"><Paperclip size={15} /></button>
+          <textarea rows={1} value={text} onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+            maxLength={5000} placeholder="Type a message…  (Enter to send)"
+            className={`flex-1 resize-none text-sm px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/30 max-h-32 ${composerErr ? 'border-red-300' : 'border-gray-200'}`} />
+          <button type="button" onClick={handleSend} disabled={!canSend}
+            className="shrink-0 w-9 h-9 rounded-lg bg-accent hover:bg-accent-dark text-white flex items-center justify-center disabled:opacity-40 transition-colors"><Send size={15} /></button>
+        </div>
+        {composerErr && <p className="mt-1.5 text-[11px] text-red-600">{composerErr}</p>}
+        <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1.5">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${wsLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+          {wsLive ? 'Live — connected' : 'Polling…'}
+        </p>
       </div>
     </div>
   )
