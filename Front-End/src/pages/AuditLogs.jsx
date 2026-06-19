@@ -1,10 +1,8 @@
 ﻿import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Search } from 'lucide-react'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { getAuditLogs } from '../api/auditLogs'
 import Pagination    from '../components/ui/Pagination'
-import SortableTh    from '../components/ui/SortableTh'
-import { useSortable } from '../hooks/useSortable'
 import { PageSpinner } from '../components/ui/Spinner'
 
 const moduleColors = {
@@ -19,45 +17,68 @@ const moduleColors = {
   'Bank Account': 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
-export default function AuditLogs() {
-  const [page, setPage]     = useState(1)
-  const [pageSize, setPageSize] = useState(25)
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [module, setModule] = useState('')
+// Map frontend sort keys to backend ordering fields
+const SORT_KEY_MAP = {
+  timestamp:  'timestamp',
+  user:       'user__username',
+  module:     'module',
+  action:     'action',
+  ip_address: 'ip_address',
+}
 
-  // Debounce search — wait 400ms after last keystroke
+export default function AuditLogs() {
+  const [page, setPage]       = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [search, setSearch]   = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [module, setModule]   = useState('')
+  const [sortBy, setSortBy]   = useState('timestamp')
+  const [sortDir, setSortDir] = useState('desc')
+
+  // Debounce search — 400ms after last keystroke
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
     return () => clearTimeout(t)
   }, [search])
 
+  const ordering = sortBy
+    ? `${sortDir === 'desc' ? '-' : ''}${SORT_KEY_MAP[sortBy] || sortBy}`
+    : '-timestamp'
+
   const { data, isLoading } = useQuery({
-    queryKey: ['audit-logs', page, pageSize, debouncedSearch, module],
+    queryKey: ['audit-logs', page, pageSize, debouncedSearch, module, ordering],
     queryFn:  () => getAuditLogs({
       page,
       page_size: pageSize,
       search: debouncedSearch || undefined,
       module: module || undefined,
+      ordering,
     }),
+    placeholderData: keepPreviousData,
   })
 
   const logs       = data?.data?.data?.results ?? []
   const total      = data?.data?.data?.count   ?? 0
   const totalPages = data?.data?.data?.total_pages ?? 1
 
-  const getLogVal = (log, key) => {
-    if (key === 'timestamp')  return log.timestamp ? new Date(log.timestamp).getTime() : 0
-    if (key === 'user')       return (log.username ?? '').toLowerCase()
-    if (key === 'module')     return (log.module ?? '').toLowerCase()
-    if (key === 'action')     return (log.action ?? '').toLowerCase()
-    if (key === 'ip_address') return (log.ip_address ?? '').toLowerCase()
-    return ''
+  const toggleSort = (key) => {
+    if (sortBy === key) {
+      setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(key)
+      setSortDir('asc')
+    }
+    setPage(1)
   }
-  const { sorted: sortedLogs, toggle: toggleSort, icon: sortIcon } =
-    useSortable(logs, getLogVal, 'timestamp', 'desc')
 
-  if (isLoading) return <PageSpinner />
+  const sortIcon = (key) => {
+    if (sortBy !== key) return <ChevronsUpDown size={12} className="text-gray-300" />
+    return sortDir === 'asc'
+      ? <ChevronUp size={12} className="text-accent" />
+      : <ChevronDown size={12} className="text-accent" />
+  }
+
+  if (isLoading && !data) return <PageSpinner />
 
   return (
     <div className="space-y-6">
@@ -70,7 +91,7 @@ export default function AuditLogs() {
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[320px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input className="input pl-9" placeholder="Search action or user…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+            <input className="input pl-9" placeholder="Search action, module, user…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <select className="input max-w-[160px]" value={module} onChange={(e) => { setModule(e.target.value); setPage(1) }}>
             <option value="">All Modules</option>
@@ -86,16 +107,28 @@ export default function AuditLogs() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
-              <SortableTh label="Time"       sortKey="timestamp"  toggle={toggleSort} icon={sortIcon} left />
-              <SortableTh label="User"       sortKey="user"       toggle={toggleSort} icon={sortIcon} />
-              <SortableTh label="Module"     sortKey="module"     toggle={toggleSort} icon={sortIcon} />
-              <SortableTh label="Action"     sortKey="action"     toggle={toggleSort} icon={sortIcon} />
-              <SortableTh label="IP Address" sortKey="ip_address" toggle={toggleSort} icon={sortIcon} />
+              {[
+                { key: 'timestamp',  label: 'Time',       left: true },
+                { key: 'user',       label: 'User'       },
+                { key: 'module',     label: 'Module'     },
+                { key: 'action',     label: 'Action'     },
+                { key: 'ip_address', label: 'IP Address' },
+              ].map(({ key, label, left }) => (
+                <th
+                  key={key}
+                  onClick={() => toggleSort(key)}
+                  className={`px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-gray-100 transition-colors ${left ? 'text-left' : 'text-center'}`}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    {label} {sortIcon(key)}
+                  </span>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {logs.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">No logs found</td></tr>}
-            {sortedLogs.map((log) => (
+            {logs.map((log) => (
               <tr key={log.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">
                   {new Date(log.timestamp).toLocaleString()}

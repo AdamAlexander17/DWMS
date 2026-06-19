@@ -24,7 +24,7 @@ class AuditLogViewSet(ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
     filterset_class = AuditLogFilter
     search_fields = ['action', 'module', 'user__username']
-    ordering_fields = ['timestamp', 'module', 'action']
+    ordering_fields = ['timestamp', 'module', 'action', 'ip_address', 'user__username']
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
