@@ -255,8 +255,18 @@ class UserViewSet(ModelViewSet):
         except Exception as exc:
             return error_response(f'Failed to parse file: {exc}', status_code=status.HTTP_400_BAD_REQUEST)
 
-        roles_cache  = {r.name.lower(): r for r in Role.objects.filter(is_active=True)}
-        brands_cache = {b.name.lower(): b for b in Brand.objects.all()}
+        roles_cache  = {}
+        for r in Role.objects.filter(is_active=True):
+            # Match by name (lowercased) and also with spaces replaced by underscores
+            roles_cache[r.name.lower()] = r
+            roles_cache[r.name.lower().replace('_', ' ')] = r
+            roles_cache[r.name.lower().replace(' ', '_')] = r
+
+        brands_cache = {}
+        for b in Brand.objects.all():
+            # Match by exact name (case-insensitive)
+            brands_cache[b.name.lower()] = b
+            brands_cache[b.name.lower().replace(' ', '')] = b
 
         created, skipped, errors = [], [], []
 
@@ -274,9 +284,17 @@ class UserViewSet(ModelViewSet):
             role_obj  = roles_cache.get(role_key)
 
             brand_names = [b.strip().lower() for b in str(row.get('brands') or '').split(',') if b.strip()]
-            brand_objs  = [brands_cache[bn] for bn in brand_names if bn in brands_cache]
+            brand_objs  = []
+            for bn in brand_names:
+                brand = brands_cache.get(bn) or brands_cache.get(bn.replace(' ', ''))
+                if brand:
+                    brand_objs.append(brand)
 
             password = str(row.get('password') or '').strip() or '123456'
+
+            if not role_obj and role_key:
+                errors.append({'row': i, 'username': username, 'error': f"Role '{row.get('role', '')}' not found"})
+                continue
 
             try:
                 user = User(username=username, role=role_obj, must_change_password=True)
@@ -284,6 +302,11 @@ class UserViewSet(ModelViewSet):
                 user.save()
                 if brand_objs:
                     user.brands.set(brand_objs)
+                elif brand_names:
+                    # Some brands weren't found — warn but still create user
+                    unmatched = [bn for bn in brand_names if not (brands_cache.get(bn) or brands_cache.get(bn.replace(' ', '')))]
+                    if unmatched:
+                        errors.append({'row': i, 'username': username, 'error': f"Brand(s) not found: {', '.join(unmatched)} — user created without them"})
                 created.append(username)
             except Exception as exc:
                 errors.append({'row': i, 'username': username, 'error': str(exc)})
