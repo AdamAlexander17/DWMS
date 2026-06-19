@@ -39,6 +39,7 @@ export default function DepositHistory() {
   const qc = useQueryClient()
 
   const canDelete  = hasPermission('deposit_history', 'delete')
+  const canChat    = hasPermission('deposit_history', 'chat')
 
   const [page,          setPage]          = useState(1)
   const [pageSize,      setPageSize]      = useState(25)
@@ -247,6 +248,7 @@ export default function DepositHistory() {
                     >
                       <Eye size={12} />
                     </button>
+                    {canChat && (
                     <button
                       onClick={() => setViewTarget({ ...r, __openChat: true })}
                       className="relative inline-flex items-center justify-center w-7 h-7 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
@@ -259,6 +261,7 @@ export default function DepositHistory() {
                         </span>
                       )}
                     </button>
+                    )}
                     {canDelete && (
                       <button
                         onClick={() => setDelTarget(r)}

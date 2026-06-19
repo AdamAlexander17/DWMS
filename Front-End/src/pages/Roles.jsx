@@ -33,7 +33,7 @@ const COMPLETE_MODULES = ['deposits'];
 
 // Modules that show the "Chat / Message" permission (deposits get it standalone;
 // withdrawals already get it via EXTRA_ACTIONS)
-const CHAT_MODULES = ['deposits'];
+const CHAT_MODULES = ['deposits', 'deposit_history', 'withdrawal_history'];
 
 const EMPTY_PERMISSION = (module) => ({
   module,
