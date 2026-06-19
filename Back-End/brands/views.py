@@ -106,7 +106,25 @@ class BrandViewSet(ModelViewSet):
         return success_response('Brand updated successfully', BrandSerializer(brand).data)
 
     def destroy(self, request, *args, **kwargs):
+        from django.db.models.deletion import ProtectedError
         instance = self.get_object()
+        try:
+            instance.delete()
+        except ProtectedError as exc:
+            # Collect the names of blocking objects for a helpful message
+            protected = [str(obj) for obj in exc.protected_objects]
+            return error_response(
+                f'Brand "{instance.name}" cannot be deleted because it has linked records: '
+                f'{", ".join(protected[:5])}{"..." if len(protected) > 5 else ""}. '
+                f'Delete those records first or deactivate the brand instead.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            return error_response(
+                f'Brand "{instance.name}" cannot be deleted due to linked records. '
+                f'Deactivate it instead.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         AuditLogService.log(
             user=request.user,
             action='Deleted brand',
@@ -114,14 +132,6 @@ class BrandViewSet(ModelViewSet):
             old_data={'id': instance.id, 'name': instance.name},
             ip_address=get_client_ip(request),
         )
-        try:
-            instance.delete()
-        except Exception:
-            return error_response(
-                f'Brand "{instance.name}" has linked records (users, deposits, etc.) '
-                f'and cannot be deleted. Deactivate it instead.',
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
         return success_response('Brand deleted successfully', status_code=status.HTTP_204_NO_CONTENT)
 
     # ------------------------------------------------------------------

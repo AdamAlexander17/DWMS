@@ -1,6 +1,7 @@
 import logging
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
+from django.db.models.deletion import ProtectedError, RestrictedError
 from rest_framework.views import exception_handler
 from rest_framework.response import Response
 from rest_framework import status
@@ -126,6 +127,18 @@ def custom_exception_handler(exc, context):
                 'message': 'A database constraint was violated',
                 'data': None,
                 'errors': {'detail': 'Duplicate or conflicting data provided'},
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if isinstance(exc, (ProtectedError, RestrictedError)):
+        protected = [str(obj) for obj in getattr(exc, 'protected_objects', [])]
+        return Response(
+            {
+                'success': False,
+                'message': 'Cannot delete this record because it has linked data',
+                'data': None,
+                'errors': {'detail': f'Linked records: {", ".join(protected[:5])}' if protected else 'Has dependent records'},
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
