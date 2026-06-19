@@ -392,6 +392,7 @@ export default function Users() {
   const [delTarget, setDelTarget]   = useState(null)
   const [resetTarget, setResetTarget] = useState(null)
   const [showImport, setShowImport] = useState(false)
+  const [deleteMsg, setDeleteMsg] = useState(null)
 
   // Debounce search — wait 400ms after last keystroke before firing API
   useEffect(() => {
@@ -445,7 +446,19 @@ export default function Users() {
 
   const createM = useMutation({ mutationFn: (d) => createUser(buildPayload(d)), onSuccess: () => { inv(); setModal(null) } })
   const updateM = useMutation({ mutationFn: ({ id, d }) => updateUser(id, buildPayload(d)), onSuccess: () => { inv(); setModal(null) } })
-  const deleteM = useMutation({ mutationFn: deleteUser, onSuccess: () => { inv(); setDelTarget(null) } })
+  const deleteM = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: (res) => {
+      inv()
+      setDelTarget(null)
+      const msg = res?.data?.message
+      if (msg && !msg.toLowerCase().includes('deleted successfully')) {
+        // User was deactivated instead of deleted — show the message
+        setDeleteMsg(msg)
+        setTimeout(() => setDeleteMsg(null), 6000)
+      }
+    },
+  })
   const toggleM = useMutation({ mutationFn: ({ id, active }) => active ? deactivateUser(id) : activateUser(id), onSuccess: inv })
   const resetM  = useMutation({ mutationFn: ({ id, pw }) => resetPassword(id, pw), onSuccess: () => { setResetTarget(null) } })
 
@@ -453,6 +466,19 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
+      {/* Delete feedback message */}
+      {deleteMsg && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
+          <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm text-amber-800 font-medium">{deleteMsg}</p>
+          </div>
+          <button onClick={() => setDeleteMsg(null)} className="text-amber-400 hover:text-amber-600">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">Users</h1>
