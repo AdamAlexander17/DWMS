@@ -74,12 +74,24 @@ class GatewayViewSet(ViewSet):
         return success_response('Gateway updated successfully', GatewaySerializer(gw).data)
 
     def destroy(self, request, pk=None):
+        from django.db.models.deletion import ProtectedError
         try:
             gw = Gateway.objects.get(pk=pk)
         except Gateway.DoesNotExist:
             return error_response('Gateway not found.', status_code=status.HTTP_404_NOT_FOUND)
-        GatewayService.deactivate(gw)
-        return success_response(f"Gateway '{gw.name}' deactivated.")
+        try:
+            gw.delete()
+        except ProtectedError:
+            return error_response(
+                f"Gateway '{gw.name}' has linked records and cannot be deleted. Deactivate it instead.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            return error_response(
+                f"Gateway '{gw.name}' cannot be deleted due to linked records. Deactivate it instead.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        return success_response(f"Gateway '{gw.name}' deleted successfully.", status_code=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
