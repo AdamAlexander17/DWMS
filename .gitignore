@@ -38,3 +38,11 @@ desktop.ini
 
 # Logs
 *.log
+
+# Backup files (actual dumps — scripts are tracked)
+Back-End/dwms/backups/daily/
+Back-End/dwms/backups/weekly/
+Back-End/dwms/backups/monthly/
+Back-End/backup/pull.log
+*.sql.gz
+*.sql.gz.sha256

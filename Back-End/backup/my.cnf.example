@@ -1,0 +1,18 @@
+# =============================================================================
+# MySQL Client Configuration for Backup User
+# =============================================================================
+# Copy this file to ~/.my.cnf on the PRODUCTION SERVER
+# Then: chmod 600 ~/.my.cnf
+# =============================================================================
+
+[mysqldump]
+user=dwms_backup
+password=<YOUR_SECURE_PASSWORD_HERE>
+host=localhost
+port=3306
+
+[mysql]
+user=dwms_backup
+password=<YOUR_SECURE_PASSWORD_HERE>
+host=localhost
+port=3306
