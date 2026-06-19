@@ -4,9 +4,9 @@
  */
 
 const WS_BASE = (() => {
-  // axios.js uses http://127.0.0.1:8000/api → strip /api, swap http→ws
-  const httpBase = 'http://127.0.0.1:8000'
-  return httpBase.replace(/^http/, 'ws')
+  // Use current host with ws/wss protocol
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${proto}://${window.location.host}`
 })()
 
 export function connectWS(path, token, { onMessage, onOpen, onClose } = {}) {
