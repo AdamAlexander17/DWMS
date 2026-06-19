@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import { getAuditLogs } from '../api/auditLogs'
@@ -8,23 +8,38 @@ import { useSortable } from '../hooks/useSortable'
 import { PageSpinner } from '../components/ui/Spinner'
 
 const moduleColors = {
-  Auth:  'bg-purple-50 text-purple-700 border-purple-200',
-  User:  'bg-blue-50 text-blue-700 border-blue-200',
-  Brand: 'bg-amber-50 text-amber-700 border-amber-200',
-  'QR Code':       'bg-green-50 text-green-700 border-green-200',
-  UPI:             'bg-cyan-50 text-cyan-700 border-cyan-200',
-  'Bank Account':  'bg-rose-50 text-rose-700 border-rose-200',
+  Auth:           'bg-purple-50 text-purple-700 border-purple-200',
+  User:           'bg-blue-50 text-blue-700 border-blue-200',
+  Brand:          'bg-amber-50 text-amber-700 border-amber-200',
+  roles:          'bg-indigo-50 text-indigo-700 border-indigo-200',
+  Withdrawal:     'bg-pink-50 text-pink-700 border-pink-200',
+  Deposit:        'bg-teal-50 text-teal-700 border-teal-200',
+  'QR Code':      'bg-green-50 text-green-700 border-green-200',
+  UPI:            'bg-cyan-50 text-cyan-700 border-cyan-200',
+  'Bank Account': 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
 export default function AuditLogs() {
   const [page, setPage]     = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [module, setModule] = useState('')
 
+  // Debounce search — wait 400ms after last keystroke
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['audit-logs', page, pageSize, search, module],
-    queryFn:  () => getAuditLogs({ page, page_size: pageSize, search, module: module || undefined }),
+    queryKey: ['audit-logs', page, pageSize, debouncedSearch, module],
+    queryFn:  () => getAuditLogs({
+      page,
+      page_size: pageSize,
+      search: debouncedSearch || undefined,
+      module: module || undefined,
+    }),
   })
 
   const logs       = data?.data?.data?.results ?? []
