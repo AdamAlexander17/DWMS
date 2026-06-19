@@ -34,10 +34,8 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
 
   const validate = () => {
     const errs = {}
-    if (!isEdit) {
-      const u = vUsername(form.username)
-      if (u) errs.username = u
-    }
+    const u = vUsername(form.username)
+    if (u) errs.username = u
     if (!form.role) errs.role = 'Please select a role.'
     const roleObj = roles.find(r => String(r.id) === String(form.role))
     if (roleObj && roleObj.name.toLowerCase() === 'rm' && form.brands.length === 0) {
@@ -90,7 +88,6 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
                 value={form.username}
                 onChange={(e) => { setForm(p => ({ ...p, username: e.target.value })); clearErr('username') }}
                 required
-                disabled={isEdit}
                 maxLength={50}
               />
               {errors.username && <p className="mt-1 text-xs text-red-600">{errors.username}</p>}

@@ -143,7 +143,17 @@ class UserViewSet(ModelViewSet):
             old_data={'id': instance.id, 'username': instance.username},
             ip_address=get_client_ip(request),
         )
-        instance.delete()
+        try:
+            instance.delete()
+        except Exception:
+            # FK constraint — deactivate instead of hard-deleting
+            instance.is_active = False
+            instance.save(update_fields=['is_active', 'updated_at'])
+            return success_response(
+                'User has linked records and could not be permanently deleted. '
+                'The account has been deactivated instead.',
+                status_code=status.HTTP_200_OK,
+            )
         return success_response('User deleted successfully', status_code=status.HTTP_204_NO_CONTENT)
 
     # ------------------------------------------------------------------

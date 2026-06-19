@@ -108,7 +108,16 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = User
-        fields = ['role', 'brands']
+        fields = ['username', 'role', 'brands']
+
+    def validate_username(self, value):
+        v = validate_username(value)
+        qs = User.objects.filter(username__iexact=v)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('A user with this username already exists.')
+        return v
 
     def validate(self, attrs):
         role   = attrs.get('role', self.instance.role if self.instance else None)
