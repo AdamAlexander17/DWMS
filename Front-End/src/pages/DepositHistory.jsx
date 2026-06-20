@@ -40,6 +40,7 @@ export default function DepositHistory() {
 
   const canDelete  = hasPermission('deposit_history', 'delete')
   const canChat    = hasPermission('deposit_history', 'chat')
+  const canViewDetails = hasPermission('deposit_history', 'view_details')
 
   const [page,          setPage]          = useState(1)
   const [pageSize,      setPageSize]      = useState(25)
@@ -241,6 +242,7 @@ export default function DepositHistory() {
                 {/* Actions */}
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-1.5 justify-end">
+                    {canViewDetails && (
                     <button
                       onClick={() => setViewTarget(r)}
                       className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors"
@@ -248,6 +250,7 @@ export default function DepositHistory() {
                     >
                       <Eye size={12} />
                     </button>
+                    )}
                     {canChat && (
                     <button
                       onClick={() => setViewTarget({ ...r, __openChat: true })}

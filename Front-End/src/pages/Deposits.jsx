@@ -1133,6 +1133,7 @@ export default function Deposits() {
   const canActivate = hasPermission('deposits', 'activate')
   const canReview = hasPermission('deposits', 'review')
   const canChat   = hasPermission('deposits', 'chat')
+  const canViewDetails = hasPermission('deposits', 'view_details')
   const canWrite  = canCreate || canEdit || canDelete
   const isRM      = canCreate && !canReview
 
@@ -1369,10 +1370,12 @@ export default function Deposits() {
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 justify-end">
                       {/* View timeline */}
+                      {canViewDetails && (
                       <button onClick={() => setModal({ mode: 'view', data: r })}
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors" title="View Timeline">
                         <Eye size={12} />
                       </button>
+                      )}
                       {/* Chat */}
                       {canChat && (
                         <button onClick={() => setModal({ mode: 'view', data: r, tab: 'chat' })}

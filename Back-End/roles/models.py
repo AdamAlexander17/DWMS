@@ -65,6 +65,7 @@ class Role(models.Model):
                 'email_bank':       p.can_email_bank,
                 'close_ticket':     p.can_close_ticket,
                 'chat':             p.can_chat,
+                'view_details':     p.can_view_details,
             }
             for p in self.permissions.all()
         }
@@ -87,6 +88,7 @@ class RolePermission(models.Model):
     can_email_bank       = models.BooleanField(default=False)
     can_close_ticket     = models.BooleanField(default=False)
     can_chat             = models.BooleanField(default=False)
+    can_view_details     = models.BooleanField(default=False)
 
     class Meta:
         db_table        = 'role_permissions'

@@ -35,6 +35,9 @@ const COMPLETE_MODULES = ['deposits'];
 // withdrawals already get it via EXTRA_ACTIONS)
 const CHAT_MODULES = ['deposits', 'deposit_history', 'withdrawal_history'];
 
+// Modules that show the "View Details" permission
+const VIEW_DETAILS_MODULES = ['deposits', 'withdrawals', 'deposit_history', 'withdrawal_history'];
+
 const EMPTY_PERMISSION = (module) => ({
   module,
   can_view:             false,
@@ -50,6 +53,7 @@ const EMPTY_PERMISSION = (module) => ({
   can_email_bank:       false,
   can_close_ticket:     false,
   can_chat:             false,
+  can_view_details:     false,
 });
 
 // Human-readable label for each action within a module
@@ -69,6 +73,7 @@ function actionLabel(action, moduleLabel) {
     case 'email_bank':       return `Email to Bank`;
     case 'close_ticket':     return `Close Ticket`;
     case 'chat':             return `Chat / Message`;
+    case 'view_details':     return `View Details`;
     default:                 return action;
   }
 }
@@ -100,9 +105,11 @@ function PermissionSelector({ modules, permissions, onChange }) {
       if (a === 'complete' && !COMPLETE_MODULES.includes(modValue)) return false;
       return true;
     });
-    if (EXTRA_ACTION_MODULES.includes(modValue)) return [...base, ...EXTRA_ACTIONS];
-    if (CHAT_MODULES.includes(modValue)) return [...base, 'chat'];
-    return base;
+    const extra = [];
+    if (EXTRA_ACTION_MODULES.includes(modValue)) extra.push(...EXTRA_ACTIONS);
+    else if (CHAT_MODULES.includes(modValue)) extra.push('chat');
+    if (VIEW_DETAILS_MODULES.includes(modValue)) extra.push('view_details');
+    return [...base, ...extra];
   };
 
   const toggleModule = (modValue) => {
@@ -162,6 +169,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
             }),
             ...(EXTRA_ACTION_MODULES.includes(mod.value) ? EXTRA_ACTIONS
                 : CHAT_MODULES.includes(mod.value) ? ['chat'] : []),
+            ...(VIEW_DETAILS_MODULES.includes(mod.value) ? ['view_details'] : []),
           ];
           const perm         = permMap[mod.value] || EMPTY_PERMISSION(mod.value);
           const selectedCount = moduleActions.filter((a) => perm[`can_${a}`]).length;
@@ -415,7 +423,7 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
 function PermissionBadges({ role }) {
   const count = role.permissions_count ?? role.permissions?.reduce((sum, p) =>
     sum + ['can_view','can_create','can_edit','can_delete','can_activate','can_review','can_complete',
-           'can_upload_slip','can_confirm_received','can_not_received','can_email_bank','can_close_ticket','can_chat'].filter(k => p[k]).length, 0) ?? 0;
+           'can_upload_slip','can_confirm_received','can_not_received','can_email_bank','can_close_ticket','can_chat','can_view_details'].filter(k => p[k]).length, 0) ?? 0;
   if (count === 0) return <span className="text-xs text-gray-400">No permissions</span>;
   return (
     <span className="inline-flex items-center gap-1 text-xs bg-accent/10 text-accent border border-accent/20 rounded-full px-2.5 py-0.5 font-medium">

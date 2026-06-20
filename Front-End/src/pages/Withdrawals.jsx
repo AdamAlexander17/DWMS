@@ -906,6 +906,7 @@ export default function Withdrawals() {
   const canEmailBank      = hasPermission('withdrawals', 'email_bank')
   const canCloseTicket    = hasPermission('withdrawals', 'close_ticket')
   const canChat           = hasPermission('withdrawals', 'chat')
+  const canViewDetails    = hasPermission('withdrawals', 'view_details')
   const canReview    = canUploadSlip || canEmailBank || canCloseTicket
   const isRM         = canCreate && !canReview
 
@@ -1140,10 +1141,12 @@ export default function Withdrawals() {
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1 justify-end">
                       {/* View / details */}
+                      {canViewDetails && (
                       <button onClick={() => setView(r)} title="View Details"
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors">
                         <Eye size={13} />
                       </button>
+                      )}
 
                       {/* Edit */}
                       {(canEdit || (canCreate && r.submitted_by === user?.id)) && (

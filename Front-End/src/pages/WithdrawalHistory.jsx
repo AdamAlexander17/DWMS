@@ -266,6 +266,7 @@ export default function WithdrawalHistory() {
   const canReview = hasPermission('withdrawal_history', 'edit') || hasPermission('withdrawal_history', 'activate')
   const canDelete = hasPermission('withdrawal_history', 'delete')
   const canChat   = hasPermission('withdrawal_history', 'chat')
+  const canViewDetails = hasPermission('withdrawal_history', 'view_details')
   const isRM = hasPermission('withdrawal_history', 'create') && !canReview
 
   const [page, setPage]         = useState(1)
@@ -432,10 +433,12 @@ export default function WithdrawalHistory() {
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1 justify-end">
+                      {canViewDetails && (
                       <button onClick={() => setView(r)} title="View Details"
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-accent transition-colors">
                         <Eye size={13} />
                       </button>
+                      )}
                       {canChat && (
                       <button onClick={() => setView({ ...r, __openChat: true })} title="Open Chat"
                         className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors">

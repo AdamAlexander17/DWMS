@@ -11,7 +11,7 @@ class RolePermissionSerializer(serializers.ModelSerializer):
         fields = ['id', 'module', 'can_view', 'can_create', 'can_edit', 'can_delete', 'can_activate',
                   'can_review', 'can_complete',
                   'can_upload_slip', 'can_confirm_received', 'can_not_received',
-                  'can_email_bank', 'can_close_ticket', 'can_chat']
+                  'can_email_bank', 'can_close_ticket', 'can_chat', 'can_view_details']
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -92,6 +92,7 @@ class RoleListSerializer(serializers.ModelSerializer):
                 p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_activate,
                 p.can_review, p.can_complete, p.can_upload_slip, p.can_confirm_received,
                 p.can_not_received, p.can_email_bank, p.can_close_ticket, p.can_chat,
+                p.can_view_details,
             ])
         return total
 
