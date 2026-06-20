@@ -1134,6 +1134,7 @@ export default function Deposits() {
   const canReview = hasPermission('deposits', 'review')
   const canChat   = hasPermission('deposits', 'chat')
   const canViewDetails = hasPermission('deposits', 'view_details')
+  const canComplete = hasPermission('deposits', 'complete')
   const canWrite  = canCreate || canEdit || canDelete
   const isRM      = canCreate && !canReview
 
@@ -1388,8 +1389,8 @@ export default function Deposits() {
                           )}
                         </button>
                       )}
-                      {/* Toggle status: Not Received ↔ Completed (RM only, on own tickets) */}
-                      {canCreate && (
+                      {/* Toggle status: Not Received ↔ Completed (only with complete permission) */}
+                      {canComplete && (
                         <button
                           onClick={() => toggleStatusM.mutate({ id: r.id, currentStatus: r.status })}
                           disabled={toggleStatusM.isPending}

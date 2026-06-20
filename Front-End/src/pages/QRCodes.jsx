@@ -351,7 +351,7 @@ export default function QRCodes() {
   const total      = data?.data?.data?.count   ?? 0
   const totalPages = data?.data?.data?.total_pages ?? 1
   const allBrands  = brandsData?.data?.data?.results ?? []
-  const brands     = user?.role === 'admin'
+  const brands     = (user?.brand_ids ?? []).length === 0
     ? allBrands
     : allBrands.filter(b => (user?.brand_ids ?? []).includes(b.id))
 

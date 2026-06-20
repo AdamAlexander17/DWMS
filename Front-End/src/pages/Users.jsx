@@ -37,10 +37,6 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
     const u = vUsername(form.username)
     if (u) errs.username = u
     if (!form.role) errs.role = 'Please select a role.'
-    const roleObj = roles.find(r => String(r.id) === String(form.role))
-    if (roleObj && roleObj.name.toLowerCase() === 'rm' && form.brands.length === 0) {
-      errs.brands = 'RM users must be assigned to at least one brand.'
-    }
     setLocalErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -108,7 +104,7 @@ function UserModal({ initial, brands, roles, onSubmit, onClose, loading, apiErro
           {/* Brands */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Brands {roles.find(r => String(r.id) === String(form.role))?.name?.toLowerCase() === 'rm' && <span className="text-red-500">*</span>}
+              Brands
             </label>
             <div className="flex flex-wrap gap-2">
               {brands.map(b => {

@@ -50,7 +50,7 @@ export const useAuthStore = create(
 
       isAdmin: () => {
         const { user } = get()
-        return String(user?.role ?? '').toLowerCase() === 'admin'
+        return !!(user?.is_superuser)
       },
 
       hasAnyModulePermission: (modules, action = 'view') => {
