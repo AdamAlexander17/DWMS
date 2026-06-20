@@ -309,8 +309,9 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
     }
   };
 
+  const ALL_POSSIBLE_ACTIONS = [...ACTIONS, ...EXTRA_ACTIONS, 'view_details'];
   const selectedCount = permissions.reduce((sum, p) =>
-    sum + ACTIONS.filter((a) => p[`can_${a}`]).length, 0);
+    sum + ALL_POSSIBLE_ACTIONS.filter((a) => p[`can_${a}`]).length, 0);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/30 px-4">
