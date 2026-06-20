@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from brands.models import Brand
+from brands.serializers import BrandSerializer
 from common.file_validators import validate_qr_image as fv_validate_qr_image
 from common.utils import validate_image_file
 from common.validators import (
@@ -8,7 +10,6 @@ from common.validators import (
     validate_positive_amount,
     validate_range,
     validate_safe_name,
-    validate_text,
     validate_upi_vpa,
 )
 
@@ -38,9 +39,9 @@ def _validate_daily_limit(attrs, instance=None):
         )
 
 
-def _validate_brand_scope(brand, request):
+def _validate_brands_scope(brands, request):
     """Users with 'all' scope or superusers can use any brand. Others must be assigned."""
-    if brand is None or request is None:
+    if not brands or request is None:
         return
     from common.permissions import is_admin_user, resolve_module_scope
     user = getattr(request, 'user', None)
@@ -49,10 +50,11 @@ def _validate_brand_scope(brand, request):
     if resolve_module_scope(user) == 'all':
         return
     allowed_ids = set(user.brands.values_list('id', flat=True))
-    if brand.id not in allowed_ids:
-        raise serializers.ValidationError(
-            {'brand': 'You are not assigned to this brand.'}
-        )
+    for brand in brands:
+        if brand.id not in allowed_ids:
+            raise serializers.ValidationError(
+                {'brands': f'You are not assigned to brand "{brand.name}".'}
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -60,20 +62,28 @@ def _validate_brand_scope(brand, request):
 # ---------------------------------------------------------------------------
 
 class QRCodeSerializer(serializers.ModelSerializer):
-    brand_name      = serializers.SerializerMethodField()
+    # Read: nested brand objects
+    brands_detail = BrandSerializer(source='brands', many=True, read_only=True)
+    # Write: list of brand IDs
+    brands = serializers.PrimaryKeyRelatedField(
+        queryset=Brand.objects.all(), many=True, required=True,
+    )
+    brand_name = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = QRCode
         fields = [
-            'id', 'brand', 'brand_name', 'qr_name', 'qr_image',
+            'id', 'brands', 'brands_detail', 'brand_name', 'qr_name', 'qr_image',
             'range_from', 'range_to', 'daily_limit', 'is_active',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
     def get_brand_name(self, obj) -> str:
-        return obj.brand.name if obj.brand else None
+        """Comma-separated brand names for backward-compatible display."""
+        names = obj.brands.values_list('name', flat=True)
+        return ', '.join(names) if names else None
 
     def get_created_by_name(self, obj) -> str:
         return obj.created_by.username if obj.created_by else None
@@ -104,15 +114,30 @@ class QRCodeSerializer(serializers.ModelSerializer):
             return None
         return validate_positive_amount(value, field='Daily limit')
 
+    def validate_brands(self, value):
+        if not value:
+            raise serializers.ValidationError('At least one brand is required.')
+        return value
+
     def validate(self, attrs):
         _validate_range(attrs, self.instance)
         _validate_daily_limit(attrs, self.instance)
-        _validate_brand_scope(attrs.get('brand', getattr(self.instance, 'brand', None)), self.context.get('request'))
+        _validate_brands_scope(attrs.get('brands'), self.context.get('request'))
         return attrs
 
     def create(self, validated_data):
+        brands = validated_data.pop('brands', [])
         validated_data['created_by'] = self.context['request'].user
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        instance.brands.set(brands)
+        return instance
+
+    def update(self, instance, validated_data):
+        brands = validated_data.pop('brands', None)
+        instance = super().update(instance, validated_data)
+        if brands is not None:
+            instance.brands.set(brands)
+        return instance
 
 
 # ---------------------------------------------------------------------------
@@ -120,20 +145,25 @@ class QRCodeSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 
 class UPISourceSerializer(serializers.ModelSerializer):
-    brand_name      = serializers.SerializerMethodField()
+    brands_detail = BrandSerializer(source='brands', many=True, read_only=True)
+    brands = serializers.PrimaryKeyRelatedField(
+        queryset=Brand.objects.all(), many=True, required=True,
+    )
+    brand_name = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = UPISource
         fields = [
-            'id', 'brand', 'brand_name', 'upi_id',
+            'id', 'brands', 'brands_detail', 'brand_name', 'upi_id',
             'range_from', 'range_to', 'daily_limit', 'is_active',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
     def get_brand_name(self, obj) -> str:
-        return obj.brand.name if obj.brand else None
+        names = obj.brands.values_list('name', flat=True)
+        return ', '.join(names) if names else None
 
     def get_created_by_name(self, obj) -> str:
         return obj.created_by.username if obj.created_by else None
@@ -158,15 +188,30 @@ class UPISourceSerializer(serializers.ModelSerializer):
             return None
         return validate_positive_amount(value, field='Daily limit')
 
+    def validate_brands(self, value):
+        if not value:
+            raise serializers.ValidationError('At least one brand is required.')
+        return value
+
     def validate(self, attrs):
         _validate_range(attrs, self.instance)
         _validate_daily_limit(attrs, self.instance)
-        _validate_brand_scope(attrs.get('brand', getattr(self.instance, 'brand', None)), self.context.get('request'))
+        _validate_brands_scope(attrs.get('brands'), self.context.get('request'))
         return attrs
 
     def create(self, validated_data):
+        brands = validated_data.pop('brands', [])
         validated_data['created_by'] = self.context['request'].user
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        instance.brands.set(brands)
+        return instance
+
+    def update(self, instance, validated_data):
+        brands = validated_data.pop('brands', None)
+        instance = super().update(instance, validated_data)
+        if brands is not None:
+            instance.brands.set(brands)
+        return instance
 
 
 # ---------------------------------------------------------------------------
@@ -174,13 +219,17 @@ class UPISourceSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 
 class BankAccountSerializer(serializers.ModelSerializer):
-    brand_name      = serializers.SerializerMethodField()
+    brands_detail = BrandSerializer(source='brands', many=True, read_only=True)
+    brands = serializers.PrimaryKeyRelatedField(
+        queryset=Brand.objects.all(), many=True, required=True,
+    )
+    brand_name = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = BankAccount
         fields = [
-            'id', 'brand', 'brand_name',
+            'id', 'brands', 'brands_detail', 'brand_name',
             'bank_name', 'account_holder_name', 'account_number',
             'ifsc_code', 'branch_name',
             'range_from', 'range_to', 'daily_limit', 'is_active',
@@ -189,7 +238,8 @@ class BankAccountSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
     def get_brand_name(self, obj) -> str:
-        return obj.brand.name if obj.brand else None
+        names = obj.brands.values_list('name', flat=True)
+        return ', '.join(names) if names else None
 
     def get_created_by_name(self, obj) -> str:
         return obj.created_by.username if obj.created_by else None
@@ -226,12 +276,27 @@ class BankAccountSerializer(serializers.ModelSerializer):
             return None
         return validate_positive_amount(value, field='Daily limit')
 
+    def validate_brands(self, value):
+        if not value:
+            raise serializers.ValidationError('At least one brand is required.')
+        return value
+
     def validate(self, attrs):
         _validate_range(attrs, self.instance)
         _validate_daily_limit(attrs, self.instance)
-        _validate_brand_scope(attrs.get('brand', getattr(self.instance, 'brand', None)), self.context.get('request'))
+        _validate_brands_scope(attrs.get('brands'), self.context.get('request'))
         return attrs
 
     def create(self, validated_data):
+        brands = validated_data.pop('brands', [])
         validated_data['created_by'] = self.context['request'].user
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        instance.brands.set(brands)
+        return instance
+
+    def update(self, instance, validated_data):
+        brands = validated_data.pop('brands', None)
+        instance = super().update(instance, validated_data)
+        if brands is not None:
+            instance.brands.set(brands)
+        return instance

@@ -227,7 +227,7 @@ function QRCard({ r, canEdit, canDelete, canActivate, onEdit, onDelete, onToggle
 function QRForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
   const [form, setForm] = useState({
     qr_name:     initial?.qr_name     ?? '',
-    brand:       initial?.brand       ?? '',
+    brands:      (initial?.brands ?? []).map(String),
     range_from:  initial?.range_from  ?? '',
     range_to:    initial?.range_to    ?? '',
     daily_limit: initial?.daily_limit ?? '',
@@ -240,12 +240,21 @@ function QRForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
   const cls = (k) => `input ${errors[k] ? 'border-red-300' : ''}`
   const isEdit = !!initial
 
+  const toggleBrand = (id) => {
+    const sid = String(id)
+    setForm(p => ({
+      ...p,
+      brands: p.brands.includes(sid) ? p.brands.filter(b => b !== sid) : [...p.brands, sid],
+    }))
+    if (local.brands) setLocal(p => ({ ...p, brands: undefined }))
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     const errs = {}
     if (!form.qr_name?.trim()) errs.qr_name = 'QR name is required.'
     else if (form.qr_name.length > 100) errs.qr_name = 'QR name must be at most 100 characters.'
-    if (!form.brand) errs.brand = 'Please select a brand.'
+    if (!form.brands.length) errs.brands = 'Please select at least one brand.'
     if (!isEdit && !form.qr_image) errs.qr_image = 'QR image is required.'
     if (form.qr_image) {
       const file = form.qr_image
@@ -267,7 +276,7 @@ function QRForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
       }
     }
     setLocal(errs)
-    if (Object.keys(errs).length === 0) onSubmit({ ...form, qr_name: form.qr_name.trim() })
+    if (Object.keys(errs).length === 0) onSubmit({ ...form, qr_name: form.qr_name.trim(), brands: form.brands.map(Number) })
   }
 
   return (
@@ -278,12 +287,26 @@ function QRForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
         {E('qr_name')}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
-        <select className={cls('brand')} value={form.brand} onChange={(e) => f('brand')(e.target.value)}>
-          <option value="">Select brand</option>
-          {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        {E('brand')}
+        <label className="block text-sm font-medium text-gray-700 mb-2">Brands *</label>
+        <div className="flex flex-wrap gap-2">
+          {brands.map(b => {
+            const sel = form.brands.includes(String(b.id))
+            return (
+              <button
+                key={b.id} type="button"
+                onClick={() => toggleBrand(b.id)}
+                className={`px-4 py-1.5 rounded-lg border text-sm font-medium transition-all
+                  ${sel
+                    ? 'bg-accent text-white border-accent shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-accent hover:text-accent'
+                  }`}
+              >
+                {b.name}
+              </button>
+            )
+          })}
+        </div>
+        {E('brands')}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>

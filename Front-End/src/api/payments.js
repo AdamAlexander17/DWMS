@@ -5,12 +5,26 @@ export const getQRCodes    = (params) => api.get('/payments/qr/', { params })
 export const getQRCode     = (id) => api.get(`/payments/qr/${id}/`)
 export const createQRCode  = (data) => {
   const form = new FormData()
-  Object.entries(data).forEach(([k, v]) => { if (v !== undefined && v !== null) form.append(k, v) })
+  Object.entries(data).forEach(([k, v]) => {
+    if (v === undefined || v === null) return
+    if (k === 'brands' && Array.isArray(v)) {
+      v.forEach(id => form.append('brands', id))
+    } else {
+      form.append(k, v)
+    }
+  })
   return api.post('/payments/qr/', form, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
 export const updateQRCode  = (id, data) => {
   const form = new FormData()
-  Object.entries(data).forEach(([k, v]) => { if (v !== undefined && v !== null) form.append(k, v) })
+  Object.entries(data).forEach(([k, v]) => {
+    if (v === undefined || v === null) return
+    if (k === 'brands' && Array.isArray(v)) {
+      v.forEach(bid => form.append('brands', bid))
+    } else {
+      form.append(k, v)
+    }
+  })
   return api.patch(`/payments/qr/${id}/`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
 export const deleteQRCode     = (id) => api.delete(`/payments/qr/${id}/`)

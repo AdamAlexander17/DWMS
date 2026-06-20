@@ -25,12 +25,18 @@ def push_deposit_event(deposit, actor, event_type: str):
 
     # Resolve deposit brand through selected channel (if available)
     deposit_brand_id = None
-    if deposit.qr_code_id and getattr(deposit, 'qr_code', None) and deposit.qr_code.brand_id:
-        deposit_brand_id = deposit.qr_code.brand_id
-    elif deposit.upi_source_id and getattr(deposit, 'upi_source', None) and deposit.upi_source.brand_id:
-        deposit_brand_id = deposit.upi_source.brand_id
-    elif deposit.bank_account_id and getattr(deposit, 'bank_account', None) and deposit.bank_account.brand_id:
-        deposit_brand_id = deposit.bank_account.brand_id
+    if deposit.qr_code_id and getattr(deposit, 'qr_code', None):
+        first_brand = deposit.qr_code.brands.first()
+        if first_brand:
+            deposit_brand_id = first_brand.id
+    elif deposit.upi_source_id and getattr(deposit, 'upi_source', None):
+        first_brand = deposit.upi_source.brands.first()
+        if first_brand:
+            deposit_brand_id = first_brand.id
+    elif deposit.bank_account_id and getattr(deposit, 'bank_account', None):
+        first_brand = deposit.bank_account.brands.first()
+        if first_brand:
+            deposit_brand_id = first_brand.id
 
     # Compute channel detail label
     if deposit.channel_type == DepositLog.CHANNEL_QR and deposit.qr_code_id:

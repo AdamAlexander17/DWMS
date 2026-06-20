@@ -17,7 +17,7 @@ import { upi as vUpi, positiveAmount as vAmt, rangeOrder, extractApiErrors } fro
 function UPIForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
   const [form, setForm] = useState({
     upi_id:      initial?.upi_id      ?? '',
-    brand:       initial?.brand       ?? '',
+    brands:      (initial?.brands ?? []).map(String),
     range_from:  initial?.range_from  ?? '',
     range_to:    initial?.range_to    ?? '',
     daily_limit: initial?.daily_limit ?? '',
@@ -28,11 +28,20 @@ function UPIForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
   const E = (k) => errors[k] && <p className="mt-1 text-xs text-red-600">{errors[k]}</p>
   const cls = (k) => `input ${errors[k] ? 'border-red-300' : ''}`
 
+  const toggleBrand = (id) => {
+    const sid = String(id)
+    setForm(p => ({
+      ...p,
+      brands: p.brands.includes(sid) ? p.brands.filter(b => b !== sid) : [...p.brands, sid],
+    }))
+    if (local.brands) setLocal(p => ({ ...p, brands: undefined }))
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     const errs = {}
     const u  = vUpi(form.upi_id);                                    if (u)  errs.upi_id = u
-    if (!form.brand) errs.brand = 'Please select a brand.'
+    if (!form.brands.length) errs.brands = 'Please select at least one brand.'
     const rf = vAmt(form.range_from, { label: 'Range From' });       if (rf) errs.range_from = rf
     const rt = vAmt(form.range_to,   { label: 'Range To' });         if (rt) errs.range_to   = rt
     const rorder = rangeOrder(form.range_from, form.range_to, 'Range To'); if (rorder) errs.range_to = rorder
@@ -45,7 +54,7 @@ function UPIForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
     }
     setLocal(errs)
     if (Object.keys(errs).length === 0) {
-      onSubmit({ ...form, upi_id: form.upi_id.toLowerCase().trim() })
+      onSubmit({ ...form, upi_id: form.upi_id.toLowerCase().trim(), brands: form.brands.map(Number) })
     }
   }
 
@@ -63,12 +72,26 @@ function UPIForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
         {E('upi_id')}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
-        <select className={cls('brand')} value={form.brand} onChange={(e) => f('brand')(e.target.value)}>
-          <option value="">Select brand</option>
-          {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        {E('brand')}
+        <label className="block text-sm font-medium text-gray-700 mb-2">Brands *</label>
+        <div className="flex flex-wrap gap-2">
+          {brands.map(b => {
+            const sel = form.brands.includes(String(b.id))
+            return (
+              <button
+                key={b.id} type="button"
+                onClick={() => toggleBrand(b.id)}
+                className={`px-4 py-1.5 rounded-lg border text-sm font-medium transition-all
+                  ${sel
+                    ? 'bg-accent text-white border-accent shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-accent hover:text-accent'
+                  }`}
+              >
+                {b.name}
+              </button>
+            )
+          })}
+        </div>
+        {E('brands')}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -195,7 +218,7 @@ export default function UPISources() {
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
               <SortableTh label="UPI ID"         sortKey="upi_id"   toggle={toggleSort} icon={sortIcon} left />
-              <SortableTh label="Brand"          sortKey="brand"    toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Brands"         sortKey="brand"    toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Range"          sortKey="range"    toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Daily Limit"    sortKey="capacity" toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Status"         sortKey="status"   toggle={toggleSort} icon={sortIcon} />

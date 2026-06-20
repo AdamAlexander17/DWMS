@@ -124,12 +124,18 @@ def _percent_delta(current: float, previous: float) -> float:
 
 def _deposit_brand_label(deposit: DepositLog) -> str | None:
     """Resolve the brand for a deposit via whichever channel FK is set."""
-    if deposit.qr_code_id and deposit.qr_code and deposit.qr_code.brand:
-        return deposit.qr_code.brand.name
-    if deposit.upi_source_id and deposit.upi_source and deposit.upi_source.brand:
-        return deposit.upi_source.brand.name
-    if deposit.bank_account_id and deposit.bank_account and deposit.bank_account.brand:
-        return deposit.bank_account.brand.name
+    if deposit.qr_code_id and deposit.qr_code:
+        first = deposit.qr_code.brands.first()
+        if first:
+            return first.name
+    if deposit.upi_source_id and deposit.upi_source:
+        first = deposit.upi_source.brands.first()
+        if first:
+            return first.name
+    if deposit.bank_account_id and deposit.bank_account:
+        first = deposit.bank_account.brands.first()
+        if first:
+            return first.name
     return None
 
 
@@ -201,9 +207,9 @@ def dashboard_summary(request):
     elif user.brands.exists():
         brand_scope = user.brands.all()
         active_channels = (
-            QRCode.objects.filter(is_active=True, brand__in=brand_scope).count()
-            + UPISource.objects.filter(is_active=True, brand__in=brand_scope).count()
-            + BankAccount.objects.filter(is_active=True, brand__in=brand_scope).count()
+            QRCode.objects.filter(is_active=True, brands__in=brand_scope).distinct().count()
+            + UPISource.objects.filter(is_active=True, brands__in=brand_scope).distinct().count()
+            + BankAccount.objects.filter(is_active=True, brands__in=brand_scope).distinct().count()
         )
     else:
         active_channels = 0
@@ -250,7 +256,7 @@ def dashboard_summary(request):
 
     # ── Brand-wise deposits (top 8) ───────────────────────────────────────
     brand_dep_counter: dict[str, int] = {}
-    for dep in dep_qs.select_related('qr_code__brand', 'upi_source__brand', 'bank_account__brand'):
+    for dep in dep_qs.select_related('qr_code', 'upi_source', 'bank_account').prefetch_related('qr_code__brands', 'upi_source__brands', 'bank_account__brands'):
         label = _deposit_brand_label(dep)
         if label:
             brand_dep_counter[label] = brand_dep_counter.get(label, 0) + 1

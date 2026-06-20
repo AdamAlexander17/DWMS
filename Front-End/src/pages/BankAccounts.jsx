@@ -28,7 +28,7 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
     account_number:       initial?.account_number       ?? '',
     ifsc_code:            initial?.ifsc_code            ?? '',
     branch_name:          initial?.branch_name          ?? '',
-    brand:                initial?.brand                ?? '',
+    brands:               (initial?.brands ?? []).map(String),
     range_from:           initial?.range_from           ?? '',
     range_to:             initial?.range_to             ?? '',
     daily_limit:          initial?.daily_limit          ?? '',
@@ -38,6 +38,15 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
   const f = (k) => (v) => { setForm((p) => ({ ...p, [k]: v })); if (local[k]) setLocal(p => ({ ...p, [k]: undefined })) }
   const E = (k) => errors[k] && <p className="mt-1 text-xs text-red-600">{errors[k]}</p>
   const cls = (k) => `input ${errors[k] ? 'border-red-300' : ''}`
+
+  const toggleBrand = (id) => {
+    const sid = String(id)
+    setForm(p => ({
+      ...p,
+      brands: p.brands.includes(sid) ? p.brands.filter(b => b !== sid) : [...p.brands, sid],
+    }))
+    if (local.brands) setLocal(p => ({ ...p, brands: undefined }))
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -49,7 +58,7 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
     if (form.branch_name) {
       const br = vSafe(form.branch_name, 'Branch name', 100);        if (br)  errs.branch_name = br
     }
-    if (!form.brand) errs.brand = 'Please select a brand.'
+    if (!form.brands.length) errs.brands = 'Please select at least one brand.'
     const rf = vAmt(form.range_from, { label: 'Range From' });      if (rf)  errs.range_from = rf
     const rt = vAmt(form.range_to, { label: 'Range To' });          if (rt)  errs.range_to = rt
     const rorder = rangeOrder(form.range_from, form.range_to, 'Range To'); if (rorder) errs.range_to = rorder
@@ -69,6 +78,7 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
         ifsc_code:           form.ifsc_code.toUpperCase().trim(),
         account_number:      String(form.account_number).replace(/\D/g, ''),
         branch_name:         form.branch_name.trim(),
+        brands:              form.brands.map(Number),
       })
     }
   }
@@ -80,14 +90,6 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Bank Name *</label>
           <input className={cls('bank_name')} value={form.bank_name} onChange={(e) => f('bank_name')(e.target.value)} maxLength={100} />
           {E('bank_name')}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
-          <select className={cls('brand')} value={form.brand} onChange={(e) => f('brand')(e.target.value)}>
-            <option value="">Select brand</option>
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          {E('brand')}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Account Holder *</label>
@@ -131,11 +133,33 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
           <input type="number" className={cls('range_to')} value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} step="0.01" min="0" />
           {E('range_to')}
         </div>
-        <div className="col-span-2">
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Daily Limit (₹) <span className="text-gray-400 font-normal">— optional</span></label>
           <input type="number" className={cls('daily_limit')} placeholder="e.g. 200000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
           {E('daily_limit')}
         </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Brands *</label>
+        <div className="flex flex-wrap gap-2">
+          {brands.map(b => {
+            const sel = form.brands.includes(String(b.id))
+            return (
+              <button
+                key={b.id} type="button"
+                onClick={() => toggleBrand(b.id)}
+                className={`px-4 py-1.5 rounded-lg border text-sm font-medium transition-all
+                  ${sel
+                    ? 'bg-accent text-white border-accent shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-accent hover:text-accent'
+                  }`}
+              >
+                {b.name}
+              </button>
+            )
+          })}
+        </div>
+        {E('brands')}
       </div>
       {errors.non_field && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{errors.non_field}</div>
@@ -251,7 +275,7 @@ export default function BankAccounts() {
               <SortableTh label="Account Holder" sortKey="holder"   toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Account No."   sortKey="acct_no"  toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="IFSC"           sortKey="ifsc"     toggle={toggleSort} icon={sortIcon} />
-              <SortableTh label="Brand"          sortKey="brand"    toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Brands"         sortKey="brand"    toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Range"          sortKey="range"    toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Daily Limit"    sortKey="capacity" toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Status"         sortKey="status"   toggle={toggleSort} icon={sortIcon} />

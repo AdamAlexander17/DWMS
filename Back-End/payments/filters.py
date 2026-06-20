@@ -4,7 +4,7 @@ from .models import BankAccount, QRCode, UPISource
 
 
 class _PaymentSourceFilter(django_filters.FilterSet):
-    brand = django_filters.NumberFilter(field_name='brand_id')
+    brand = django_filters.NumberFilter(field_name='brands', lookup_expr='exact')
     is_active = django_filters.BooleanFilter()
     range_from_min = django_filters.NumberFilter(field_name='range_from', lookup_expr='gte')
     range_from_max = django_filters.NumberFilter(field_name='range_from', lookup_expr='lte')

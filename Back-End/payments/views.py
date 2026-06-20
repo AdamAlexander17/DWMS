@@ -52,9 +52,9 @@ class _PaymentSourceMixin:
 
         brand_scope = user.brands.all()
         if has_module_write_permission(user, self.permission_module):
-            return qs.filter(brand__in=brand_scope)
+            return qs.filter(brands__in=brand_scope).distinct()
         if has_module_permission(user, self.permission_module, 'view'):
-            return qs.filter(brand__in=brand_scope, is_active=True)
+            return qs.filter(brands__in=brand_scope, is_active=True).distinct()
         qs = qs.none()
         return qs
 
@@ -172,7 +172,7 @@ class _PaymentSourceMixin:
     deactivate=extend_schema(summary='Deactivate QR code', tags=['QR Codes'], request=None),
 )
 class QRCodeViewSet(_PaymentSourceMixin, ModelViewSet):
-    queryset = QRCode.objects.select_related('brand', 'created_by').all()
+    queryset = QRCode.objects.prefetch_related('brands').select_related('created_by').all()
     serializer_class = QRCodeSerializer
     filterset_class = QRCodeFilter
     search_fields = ['qr_name']
@@ -192,7 +192,7 @@ class QRCodeViewSet(_PaymentSourceMixin, ModelViewSet):
     deactivate=extend_schema(summary='Deactivate UPI source', tags=['UPI Sources'], request=None),
 )
 class UPISourceViewSet(_PaymentSourceMixin, ModelViewSet):
-    queryset = UPISource.objects.select_related('brand', 'created_by').all()
+    queryset = UPISource.objects.prefetch_related('brands').select_related('created_by').all()
     serializer_class = UPISourceSerializer
     filterset_class = UPISourceFilter
     search_fields = ['upi_id']
@@ -212,7 +212,7 @@ class UPISourceViewSet(_PaymentSourceMixin, ModelViewSet):
     deactivate=extend_schema(summary='Deactivate bank account', tags=['Bank Accounts'], request=None),
 )
 class BankAccountViewSet(_PaymentSourceMixin, ModelViewSet):
-    queryset = BankAccount.objects.select_related('brand', 'created_by').all()
+    queryset = BankAccount.objects.prefetch_related('brands').select_related('created_by').all()
     serializer_class = BankAccountSerializer
     filterset_class = BankAccountFilter
     search_fields = ['bank_name', 'account_holder_name', 'ifsc_code']
