@@ -20,7 +20,7 @@ const EXTRA_ACTIONS = ['upload_slip', 'confirm_received', 'not_received', 'email
 const EXTRA_ACTION_MODULES = ['withdrawals'];
 
 // Modules that should NOT show the "Activate / Deactivate" permission
-const NO_ACTIVATE_MODULES = ['payment_methods', 'master', 'audit_logs', 'deposit_history', 'withdrawal_history'];
+const NO_ACTIVATE_MODULES = ['payment_methods', 'master', 'audit_logs', 'deposit_history', 'withdrawal_history', 'notifications'];
 
 // Modules that should NOT show the "Create" permission
 const NO_CREATE_MODULES = ['deposit_history', 'withdrawal_history'];
@@ -37,6 +37,10 @@ const CHAT_MODULES = ['deposits', 'deposit_history', 'withdrawal_history'];
 
 // Modules that show the "View Details" permission
 const VIEW_DETAILS_MODULES = ['deposits', 'withdrawals', 'deposit_history', 'withdrawal_history'];
+
+// Notifications module uses only view/create/edit mapped to custom labels
+const NOTIFICATION_MODULE = 'notifications';
+const NOTIFICATION_ACTIONS_ONLY = ['view', 'create', 'edit'];
 
 const EMPTY_PERMISSION = (module) => ({
   module,
@@ -57,8 +61,17 @@ const EMPTY_PERMISSION = (module) => ({
 });
 
 // Human-readable label for each action within a module
-function actionLabel(action, moduleLabel) {
+function actionLabel(action, moduleLabel, moduleValue) {
   const m = moduleLabel || '';
+  // Custom labels for notifications module
+  if (moduleValue === NOTIFICATION_MODULE) {
+    switch (action) {
+      case 'view':   return 'Deposit Notifications';
+      case 'create': return 'Withdrawal Notifications';
+      case 'edit':   return 'Message Notifications';
+      default:       return action;
+    }
+  }
   switch (action) {
     case 'view':             return `View ${m}`;
     case 'create':           return `Create ${m}`;
@@ -98,6 +111,8 @@ function PermissionSelector({ modules, permissions, onChange }) {
   };
 
   const getModuleActions = (modValue) => {
+    // Notifications module has only 3 specific actions
+    if (modValue === NOTIFICATION_MODULE) return NOTIFICATION_ACTIONS_ONLY;
     const base = ACTIONS.filter((a) => {
       if (a === 'activate' && NO_ACTIVATE_MODULES.includes(modValue)) return false;
       if (a === 'create' && NO_CREATE_MODULES.includes(modValue)) return false;
@@ -159,7 +174,9 @@ function PermissionSelector({ modules, permissions, onChange }) {
 
       <div className="space-y-2">
         {modules.map((mod) => {
-          const moduleActions = [
+          const moduleActions = mod.value === NOTIFICATION_MODULE
+            ? NOTIFICATION_ACTIONS_ONLY
+            : [
             ...ACTIONS.filter((a) => {
               if (a === 'activate' && NO_ACTIVATE_MODULES.includes(mod.value)) return false;
               if (a === 'create' && NO_CREATE_MODULES.includes(mod.value)) return false;
@@ -204,7 +221,7 @@ function PermissionSelector({ modules, permissions, onChange }) {
                         className="w-4 h-4 rounded cursor-pointer accent-blue-500"
                       />
                       <span className={`text-sm ${checked ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
-                        {actionLabel(action, mod.label)}
+                        {actionLabel(action, mod.label, mod.value)}
                       </span>
                     </label>
                   );

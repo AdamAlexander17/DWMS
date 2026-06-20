@@ -118,11 +118,37 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
           />
           {E('ifsc_code')}
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Branch Name</label>
-          <input className={cls('branch_name')} value={form.branch_name} onChange={(e) => f('branch_name')(e.target.value)} maxLength={100} />
-          {E('branch_name')}
+        <div className="col-span-2 grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Branch Name</label>
+            <input className={cls('branch_name')} value={form.branch_name} onChange={(e) => f('branch_name')(e.target.value)} maxLength={100} />
+            {E('branch_name')}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brands *</label>
+            <div className="flex flex-wrap gap-2">
+              {brands.map(b => {
+                const sel = form.brands.includes(String(b.id))
+                return (
+                  <button
+                    key={b.id} type="button"
+                    onClick={() => toggleBrand(b.id)}
+                    className={`px-4 py-1.5 rounded-lg border text-sm font-medium transition-all
+                      ${sel
+                        ? 'bg-accent text-white border-accent shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-accent hover:text-accent'
+                      }`}
+                  >
+                    {b.name}
+                  </button>
+                )
+              })}
+            </div>
+            {E('brands')}
+          </div>
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Range From *</label>
           <input type="number" className={cls('range_from')} value={form.range_from} onChange={(e) => f('range_from')(e.target.value)} step="0.01" min="0" />
@@ -133,33 +159,11 @@ function BankForm({ initial, brands, onSubmit, loading, apiErrors = {} }) {
           <input type="number" className={cls('range_to')} value={form.range_to} onChange={(e) => f('range_to')(e.target.value)} step="0.01" min="0" />
           {E('range_to')}
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Daily Limit (₹) <span className="text-gray-400 font-normal">— optional</span></label>
-          <input type="number" className={cls('daily_limit')} placeholder="e.g. 200000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
-          {E('daily_limit')}
-        </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Brands *</label>
-        <div className="flex flex-wrap gap-2">
-          {brands.map(b => {
-            const sel = form.brands.includes(String(b.id))
-            return (
-              <button
-                key={b.id} type="button"
-                onClick={() => toggleBrand(b.id)}
-                className={`px-4 py-1.5 rounded-lg border text-sm font-medium transition-all
-                  ${sel
-                    ? 'bg-accent text-white border-accent shadow-sm'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-accent hover:text-accent'
-                  }`}
-              >
-                {b.name}
-              </button>
-            )
-          })}
-        </div>
-        {E('brands')}
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Daily Limit (₹) <span className="text-gray-400 font-normal">— optional</span></label>
+        <input type="number" className={cls('daily_limit')} placeholder="e.g. 200000" value={form.daily_limit} onChange={(e) => f('daily_limit')(e.target.value)} step="0.01" min="0" />
+        {E('daily_limit')}
       </div>
       {errors.non_field && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{errors.non_field}</div>

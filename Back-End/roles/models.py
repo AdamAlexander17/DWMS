@@ -11,6 +11,7 @@ class Module(models.TextChoices):
     MASTER             = 'master',             'Master'
     PAYMENT_METHODS    = 'payment_methods',    'Payment Methods'
     TRANSACTIONS       = 'transactions',       'Transactions'
+    NOTIFICATIONS      = 'notifications',      'Notifications'
 
     # Master children
     GATEWAYS           = 'gateways',           'Gateways'

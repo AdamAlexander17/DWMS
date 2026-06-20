@@ -67,14 +67,28 @@ function timeAgo(dateStr) {
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
-  const [tab,  setTab]  = useState('deposits')   // 'deposits' | 'withdrawals' | 'messages'
+  const [tab,  setTab]  = useState(null)   // will be set to first visible tab
   const [wsLive, setWsLive] = useState(false)
   const ref         = useRef(null)
   const navigate     = useNavigate()
   const qc           = useQueryClient()
-  const { accessToken } = useAuthStore()
+  const { accessToken, hasPermission } = useAuthStore()
   const prevDepUnread = useRef(0)
   const prevWdUnread  = useRef(0)
+
+  // Permission-based tab visibility (from notifications module)
+  const canSeeDeposits    = hasPermission('notifications', 'view')
+  const canSeeWithdrawals = hasPermission('notifications', 'create')
+  const canSeeMessages    = hasPermission('notifications', 'edit')
+
+  // Set default tab to first visible one
+  useEffect(() => {
+    if (!tab) {
+      if (canSeeDeposits) setTab('deposits')
+      else if (canSeeWithdrawals) setTab('withdrawals')
+      else if (canSeeMessages) setTab('messages')
+    }
+  }, [tab, canSeeDeposits, canSeeWithdrawals, canSeeMessages])
 
   useEffect(() => {
     const handler = (e) => {
@@ -200,7 +214,7 @@ export default function NotificationBell() {
     return () => conn.close()
   }, [accessToken, qc])
 
-  const totalUnread = depUnread + wdUnread
+  const totalUnread = (canSeeDeposits ? depUnread : 0) + (canSeeWithdrawals || canSeeMessages ? wdUnread : 0)
 
   const inv = () => {
     qc.invalidateQueries({ queryKey: ['notifications-unread'] })
@@ -299,6 +313,9 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={ref}>
+      {/* Hide bell if user has no notification permissions */}
+      {!(canSeeDeposits || canSeeWithdrawals || canSeeMessages) ? null : (
+      <>
       <button
         onClick={() => setOpen((o) => !o)}
         className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
@@ -363,6 +380,7 @@ export default function NotificationBell() {
 
           {/* Tabs */}
           <div className="flex border-b border-gray-100">
+            {canSeeDeposits && (
             <button
               onClick={() => setTab('deposits')}
               className={`flex-1 px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
@@ -374,6 +392,8 @@ export default function NotificationBell() {
                 <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">{depUnread}</span>
               )}
             </button>
+            )}
+            {canSeeWithdrawals && (
             <button
               onClick={() => setTab('withdrawals')}
               className={`flex-1 px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
@@ -385,6 +405,8 @@ export default function NotificationBell() {
                 <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">{wdUnreadShown}</span>
               )}
             </button>
+            )}
+            {canSeeMessages && (
             <button
               onClick={() => setTab('messages')}
               className={`flex-1 px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
@@ -396,6 +418,7 @@ export default function NotificationBell() {
                 <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">{msgUnreadShown}</span>
               )}
             </button>
+            )}
           </div>
 
           {/* List */}
@@ -555,6 +578,8 @@ export default function NotificationBell() {
             </p>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   )
