@@ -215,6 +215,27 @@ class WithdrawalViewSet(ModelViewSet):
             new_data={'id': instance.pk, 'client': instance.client_name, 'amount': str(instance.amount)},
             ip_address=get_client_ip(request),
         )
+
+        # Notify BackOffice users (with activate permission) sharing the same brand
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        recipients = []
+        if instance.brand_id:
+            recipients = list(
+                User.objects.filter(
+                    brands=instance.brand,
+                    role__permissions__module='withdrawals',
+                    role__permissions__can_activate=True,
+                    is_active=True,
+                ).exclude(pk=request.user.pk).distinct()
+            )
+        _notify(
+            instance, 'slip_uploaded',
+            f'{request.user.username} raised a new withdrawal request for '
+            f'{instance.client_name} (₹{instance.amount:,.0f}).',
+            recipients,
+        )
+
         return success_response(
             'Withdrawal request submitted successfully',
             WithdrawalSerializer(instance, context={'request': request}).data,

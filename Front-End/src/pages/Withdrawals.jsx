@@ -789,7 +789,7 @@ function DetailModal({ withdrawal, currentUserId, canReview, onMarkClose, initia
               {withdrawal.slip_note && <p className="text-sm text-gray-700 mb-2">{withdrawal.slip_note}</p>}
               <a href={withdrawal.slip_url} target="_blank" rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-accent-dark">
-                <ExternalLink size={12} /> View / download slip
+                <ExternalLink size={12} /> View slip
               </a>
             </div>
           )}
