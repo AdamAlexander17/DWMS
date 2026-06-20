@@ -102,11 +102,14 @@ function PermissionSelector({ modules, permissions, onChange }) {
     const existing = permMap[modValue] || EMPTY_PERMISSION(modValue);
     const key = `can_${action}`;
     const updated = { ...existing, [key]: !existing[key] };
-    if (action === 'view' && !updated.can_view) {
-      // Turn off all when view is unchecked
-      ACTIONS.concat(EXTRA_ACTIONS).forEach((a) => { updated[`can_${a}`] = false; });
+    // For notifications module, each checkbox is independent — no cascading
+    if (modValue !== NOTIFICATION_MODULE) {
+      if (action === 'view' && !updated.can_view) {
+        // Turn off all when view is unchecked
+        ACTIONS.concat(EXTRA_ACTIONS).forEach((a) => { updated[`can_${a}`] = false; });
+      }
+      if (action !== 'view' && updated[key]) updated.can_view = true;
     }
-    if (action !== 'view' && updated[key]) updated.can_view = true;
     onChange(permissions.filter((p) => p.module !== modValue).concat(updated));
   };
 
