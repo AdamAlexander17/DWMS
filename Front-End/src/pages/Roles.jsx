@@ -414,7 +414,8 @@ function RoleModal({ role, modules: propModules, onSave, onClose }) {
 // ---------------------------------------------------------------------------
 function PermissionBadges({ role }) {
   const count = role.permissions_count ?? role.permissions?.reduce((sum, p) =>
-    sum + ['can_view','can_create','can_edit','can_delete','can_activate','can_review','can_complete'].filter(k => p[k]).length, 0) ?? 0;
+    sum + ['can_view','can_create','can_edit','can_delete','can_activate','can_review','can_complete',
+           'can_upload_slip','can_confirm_received','can_not_received','can_email_bank','can_close_ticket','can_chat'].filter(k => p[k]).length, 0) ?? 0;
   if (count === 0) return <span className="text-xs text-gray-400">No permissions</span>;
   return (
     <span className="inline-flex items-center gap-1 text-xs bg-accent/10 text-accent border border-accent/20 rounded-full px-2.5 py-0.5 font-medium">

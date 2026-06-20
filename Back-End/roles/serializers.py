@@ -88,7 +88,11 @@ class RoleListSerializer(serializers.ModelSerializer):
         """Total number of enabled permission actions across all modules."""
         total = 0
         for p in obj.permissions.all():
-            total += sum([p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_activate, p.can_review, p.can_complete])
+            total += sum([
+                p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_activate,
+                p.can_review, p.can_complete, p.can_upload_slip, p.can_confirm_received,
+                p.can_not_received, p.can_email_bank, p.can_close_ticket, p.can_chat,
+            ])
         return total
 
     class Meta:

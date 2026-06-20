@@ -1217,8 +1217,8 @@ export default function Withdrawals() {
                         </button>
                       )}
 
-                      {/* Delete: only ticket submitter can delete their own */}
-                      {(canDelete || (canCreate && r.submitted_by === user?.id)) && (
+                      {/* Delete: only users with delete permission */}
+                      {canDelete && (
                         <button onClick={() => setDel(r)} title="Delete"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
                           <Trash2 size={13} />
