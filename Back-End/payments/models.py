@@ -75,7 +75,7 @@ class BankAccount(PaymentSource):
     account_holder_name = models.CharField(max_length=150)
     account_number = models.CharField(max_length=30)
     ifsc_code = models.CharField(max_length=20)
-    branch_name = models.CharField(max_length=100)
+    branch_name = models.CharField(max_length=100, blank=True, default='')
     brands = models.ManyToManyField(
         'brands.Brand',
         related_name='bank_account_sources',

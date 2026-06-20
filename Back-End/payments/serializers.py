@@ -236,6 +236,9 @@ class BankAccountSerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'branch_name': {'required': False, 'allow_blank': True},
+        }
 
     def get_brand_name(self, obj) -> str:
         names = obj.brands.values_list('name', flat=True)
@@ -251,6 +254,8 @@ class BankAccountSerializer(serializers.ModelSerializer):
         return validate_safe_name(value, field='Account holder name', max_length=150)
 
     def validate_branch_name(self, value):
+        if not value or not value.strip():
+            return ''
         return validate_safe_name(value, field='Branch name', max_length=100)
 
     def validate_account_number(self, value):
