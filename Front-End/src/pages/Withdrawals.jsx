@@ -1301,6 +1301,8 @@ export default function Withdrawals() {
         onConfirm={() => confirmM.mutate(confirmTarget.id)}
         loading={confirmM.isPending}
         title="Confirm Client Received"
+        confirmLabel="Confirm"
+        variant="success"
         message={`Has ${confirmTarget?.client_name ?? 'the client'} confirmed receipt of ₹${confirmTarget ? Number(confirmTarget.amount).toLocaleString('en-IN') : ''}? This will close the ticket.`}
       />
 
