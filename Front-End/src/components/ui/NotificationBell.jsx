@@ -214,7 +214,9 @@ export default function NotificationBell() {
     return () => conn.close()
   }, [accessToken, qc])
 
-  const totalUnread = (canSeeDeposits ? depUnread : 0) + (canSeeWithdrawals || canSeeMessages ? wdUnread : 0)
+  const totalUnread = (canSeeDeposits ? depUnread : 0)
+    + (canSeeWithdrawals ? wdUnreadShown : 0)
+    + (canSeeMessages ? msgUnreadShown : 0)
 
   const inv = () => {
     qc.invalidateQueries({ queryKey: ['notifications-unread'] })
