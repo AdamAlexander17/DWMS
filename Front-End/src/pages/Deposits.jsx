@@ -199,7 +199,9 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
       const e = vSlipFile(form.slip)
       if (e) errs.slip = e
     }
-    if (form.rm_status === 'completed' && !form.slip) errs.slip = 'Slip is required when status is completed.'
+    if (form.rm_status === 'completed' && !form.slip) {
+      // Slip is optional — user can mark as completed without slip
+    }
     if (form.ark_id && form.ark_id.length > 100) errs.ark_id = 'ARK ID must be at most 100 characters.'
     if (form.comment && form.comment.length > 2000) errs.comment = 'Comment must be at most 2000 characters.'
     setLocal(errs)
@@ -219,7 +221,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
       fd.append(fkKey, form.channel_id)
     }
     if (form.rm_status === 'completed') {
-      fd.append('slip_status', 'added')
+      fd.append('slip_status', form.slip ? 'added' : 'not_received')
       fd.append('status',      'completed')
     } else {
       fd.append('slip_status', 'not_received')
@@ -551,7 +553,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       if (e) errs.slip = e
     }
     if (form.rm_status === 'completed' && !form.slip && !initial?.slip) {
-      errs.slip = 'Slip is required when status is completed.'
+      // Slip is optional — user can mark as completed without slip
     }
     if (form.ark_id && form.ark_id.length > 100) errs.ark_id = 'ARK ID must be at most 100 characters.'
     if (form.comment && form.comment.length > 2000) errs.comment = 'Comment must be at most 2000 characters.'
@@ -572,7 +574,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       fd.append(fkKey, form.channel_id)
     }
     if (form.rm_status === 'completed') {
-      fd.append('slip_status', 'added')
+      fd.append('slip_status', (form.slip || initial?.slip) ? 'added' : 'not_received')
       fd.append('status',      'completed')
     } else {
       fd.append('slip_status', 'not_received')
@@ -1219,10 +1221,8 @@ export default function Deposits() {
     mutationFn: ({ id, currentStatus }) => {
       const fd = new FormData()
       if (currentStatus === 'completed') {
-        fd.append('slip_status', 'not_received')
         fd.append('status', 'pending')
       } else {
-        fd.append('slip_status', 'added')
         fd.append('status', 'completed')
       }
       return updateDeposit(id, fd)
