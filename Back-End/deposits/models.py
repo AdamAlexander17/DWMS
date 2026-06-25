@@ -13,10 +13,12 @@ class DepositLog(models.Model):
     CHANNEL_QR   = 'qr'
     CHANNEL_UPI  = 'upi'
     CHANNEL_BANK = 'bank'
+    CHANNEL_MANUAL = 'manual'
     CHANNEL_TYPE_CHOICES = [
         (CHANNEL_QR,   'QR Code'),
         (CHANNEL_UPI,  'UPI'),
         (CHANNEL_BANK, 'Bank Account'),
+        (CHANNEL_MANUAL, 'Manual'),
     ]
 
     # Slip status choices

@@ -12,7 +12,6 @@ from audit_logs.services import AuditLogService
 from common.permissions import ModulePermission
 from common.responses import error_response, success_response
 from common.utils import get_client_ip
-
 from .models import Module, Role
 from .serializers import RoleListSerializer, RoleSerializer
 from .services import RoleService

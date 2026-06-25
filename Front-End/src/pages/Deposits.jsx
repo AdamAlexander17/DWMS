@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2, Eye, User, Calendar, ArrowLeftRight, MessageSquare, Send, X, Lock } from 'lucide-react'
@@ -17,13 +17,13 @@ import { useAuthStore } from '../store/authStore'
 import { connectWS } from '../api/ws'
 import { slipFile as vSlipFile, extractApiErrors } from '../utils/validators'
 
-// Gateway options are fetched from master API – see useGateways() hook below
+// Gateway options are fetched from master API — see useGateways() hook below
 
-// ── Notification sound (Web Audio API — no file needed) ─────────────────────
+// -- Notification sound (Web Audio API — no file needed) ---------------------
 function playNotifSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const notes = [660, 880]   // E5 → A5 (soft two-tone ping)
+    const notes = [660, 880]   // E5 ? A5 (soft two-tone ping)
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
@@ -41,35 +41,37 @@ function playNotifSound() {
 }
 
 const CHANNEL_OPTS = [
-  { value: 'qr',   label: 'QR Code',      Icon: QrCode    },
-  { value: 'upi',  label: 'UPI',          Icon: Wallet    },
-  { value: 'bank', label: 'Bank Account', Icon: Building2 },
+  { value: 'qr',     label: 'QR Code',      Icon: QrCode    },
+  { value: 'upi',    label: 'UPI',          Icon: Wallet    },
+  { value: 'bank',   label: 'Bank Account', Icon: Building2 },
+  { value: 'manual', label: 'Manual',       Icon: SquarePen },
 ]
 
 const CHANNEL_BADGE = {
-  qr:   'bg-purple-50 text-purple-700 border-purple-200',
-  upi:  'bg-blue-50 text-blue-700 border-blue-200',
-  bank: 'bg-teal-50 text-teal-700 border-teal-200',
+  qr:     'bg-purple-50 text-purple-700 border-purple-200',
+  upi:    'bg-blue-50 text-blue-700 border-blue-200',
+  bank:   'bg-teal-50 text-teal-700 border-teal-200',
+  manual: 'bg-gray-50 text-gray-700 border-gray-200',
 }
 
-const CHANNEL_LABEL = { qr: 'QR Code', upi: 'UPI', bank: 'Bank Account' }
+const CHANNEL_LABEL = { qr: 'QR Code', upi: 'UPI', bank: 'Bank Account', manual: 'Manual' }
 
 // RM-side status options (shown in Create / Edit forms)
 const RM_STATUS_OPTS = [
-  { value: 'not_received', label: 'Not Received' },
+  { value: 'not_received', label: 'Not Added' },
   { value: 'completed',    label: 'Completed'    },
 ]
 
 // Problem category options
 const PROBLEM_CATEGORY_OPTS = [
-  { value: '',                    label: 'Select category…' },
+  { value: '',                    label: 'Select category—' },
   { value: 'deposit_failed',     label: 'Deposit Failed' },
   { value: 'amount_not_received', label: 'Deposit Amount Didn\'t Receive' },
 ]
 
 // Unified "Ticket Status" derived from both slip_status + review status
 const TICKET_STATUS_CONFIG = {
-  not_received: { label: 'Not Received', bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    Icon: XCircle     },
+  not_received: { label: 'Not Added', bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    Icon: XCircle     },
   pending:      { label: 'Pending',      bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  Icon: Clock       },
   in_progress:  { label: 'In Progress',  bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', Icon: Loader2     },
   added:        { label: 'Added',        bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200',   Icon: FileCheck2  },
@@ -96,7 +98,7 @@ const REVIEW_DECISION_OPTS = [
   { value: 'completed',   label: 'Completed',   hint: 'Fully verified and done'      },
 ]
 
-// ── Shared hook: fetches active gateways from master module ─────────────
+// -- Shared hook: fetches active gateways from master module -------------
 function useGateways() {
   const { data } = useQuery({
     queryKey: ['master-gateways'],
@@ -106,7 +108,7 @@ function useGateways() {
   return data?.data?.data ?? []
 }
 
-// ── Shared hook: fetches all channel options for a given channel_type ─────
+// -- Shared hook: fetches all channel options for a given channel_type -----
 function useChannelOptions(channelType) {
   const { data: qrData }   = useQuery({ queryKey: ['qr-all'],   queryFn: () => getQRCodes({ page_size: 200 }),   enabled: channelType === 'qr'   })
   const { data: upiData }  = useQuery({ queryKey: ['upi-all'],  queryFn: () => getUPISources({ page_size: 200 }),  enabled: channelType === 'upi'  })
@@ -117,20 +119,18 @@ function useChannelOptions(channelType) {
   if (channelType === 'upi')
     return (upiData?.data?.data?.results ?? []).map((c) => ({ id: c.id, label: c.upi_id }))
   if (channelType === 'bank')
-    return (bankData?.data?.data?.results ?? []).map((c) => ({ id: c.id, label: `${c.bank_name} – ${c.account_number}` }))
+    return (bankData?.data?.data?.results ?? []).map((c) => ({ id: c.id, label: `${c.bank_name} — ${c.account_number}` }))
   return []
 }
 
-// ── Channel Type + Channel selector (shared between Create & Edit) ─────────
+// -- Channel Type + Channel selector (shared between Create & Edit) ---------
 function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
-  const options = useChannelOptions(channelType)
-
   return (
     <div className="space-y-3">
       {/* Channel Type */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Channel</label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {CHANNEL_OPTS.map(({ value, label, Icon }) => (
             <button
               key={value}
@@ -147,33 +147,11 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
           ))}
         </div>
       </div>
-
-      {/* Channel Item — only when type is selected */}
-      {channelType && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Select {CHANNEL_LABEL[channelType]}
-          </label>
-          <select
-            className="input"
-            value={channelId}
-            onChange={(e) => onIdChange(e.target.value)}
-          >
-            <option value="">Choose {CHANNEL_LABEL[channelType]}…</option>
-            {options.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}</option>
-            ))}
-          </select>
-          {options.length === 0 && (
-            <p className="mt-1 text-[11px] text-gray-400">No {CHANNEL_LABEL[channelType]} records found.</p>
-          )}
-        </div>
-      )}
     </div>
   )
 }
 
-// ── Create / Log Deposit Form ──────────────────────────────────────────────
+// -- Create / Log Deposit Form ----------------------------------------------
 function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
   const gateways = useGateways()
   const [form, setForm] = useState({
@@ -192,7 +170,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
 
   const validate = () => {
     const errs = {}
-    if (form.channel_type && !form.channel_id) errs.channel_id = 'Please select a channel item.'
+    // channel item removed
     if (!form.ark_id) errs.ark_id = 'ARK ID is required.'
     if (form.ark_id && !/^\d+$/.test(form.ark_id)) errs.ark_id = 'ARK ID must contain only integers.'
     if (form.slip) {
@@ -242,7 +220,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
         onTypeChange={(v) => { setForm((p) => ({ ...p, channel_type: v, channel_id: '' })); if (local.channel_type) setLocal((p) => ({ ...p, channel_type: undefined })); if (local.channel_id) setLocal((p) => ({ ...p, channel_id: undefined })) }}
         onIdChange={f('channel_id')}
       />
-      {errors.channel_id && <p className="text-xs text-red-600 -mt-3">{errors.channel_id}</p>}
+      
 
       {/* ARK ID + Gateway — side by side */}
       <div className="grid grid-cols-2 gap-3">
@@ -266,7 +244,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
             value={form.gateway}
             onChange={(e) => f('gateway')(e.target.value)}
           >
-            <option value="">Select gateway…</option>
+            <option value="">Select gateway—</option>
             {gateways.map((gw) => (
               <option key={gw.id} value={gw.id}>{gw.name}</option>
             ))}
@@ -334,7 +312,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
         <textarea
           className={`input resize-none ${errors.comment ? 'border-red-300' : ''}`}
           rows={2}
-          placeholder="Optional comment…"
+          placeholder="Optional comment—"
           maxLength={2000}
           value={form.comment}
           onChange={(e) => f('comment')(e.target.value)}
@@ -345,16 +323,16 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
       {(error || errors.non_field) && <p className="text-red-500 text-sm">{errors.non_field || error}</p>}
       <button
         type="submit"
-        disabled={loading || (form.channel_type && !form.channel_id)}
+        disabled={loading}
         className="btn-primary w-full justify-center"
       >
-        {loading ? 'Logging…' : 'Log Deposit'}
+        {loading ? 'Logging—' : 'Log Deposit'}
       </button>
     </form>
   )
 }
 
-// ── Review Form (back office / admin) ──────────────────────────────────────
+// -- Review Form (back office / admin) --------------------------------------
 function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const { user, hasPermission } = useAuthStore()
   const canComplete = hasPermission('deposits', 'complete')
@@ -473,7 +451,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.review_slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
           <Paperclip size={15} className="text-gray-400 shrink-0" />
           <span className="text-sm text-gray-500 truncate">
-            {reviewSlip ? reviewSlip.name : (initial?.review_slip ? 'Replace existing receipt…' : 'Attach receipt (image / PDF, max 8 MB)')}
+            {reviewSlip ? reviewSlip.name : (initial?.review_slip ? 'Replace existing receipt—' : 'Attach receipt (image / PDF, max 8 MB)')}
           </span>
           <input
             type="file"
@@ -501,7 +479,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         <textarea
           className={`input resize-none ${errors.message ? 'border-red-300' : ''}`}
           rows={3}
-          placeholder="e.g. Payment confirmed, processing…"
+          placeholder="e.g. Payment confirmed, processing—"
           maxLength={2000}
           value={message}
           onChange={(e) => { setMessage(e.target.value); if (local.message) setLocal((p) => ({ ...p, message: undefined })) }}
@@ -515,12 +493,12 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         disabled={loading}
         className="btn-primary w-full justify-center mt-1"
       >
-        {loading ? 'Submitting…' : 'Submit Review'}
+        {loading ? 'Submitting—' : 'Submit Review'}
       </button>
     </form>
   )
 }
-// ── Edit Form ──────────────────────────────────────────────────────────────
+// -- Edit Form --------------------------------------------------------------
 function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const gateways = useGateways()
   // Resolve the initial channel_id from the correct FK field
@@ -545,7 +523,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
 
   const validate = () => {
     const errs = {}
-    if (form.channel_type && !form.channel_id) errs.channel_id = 'Please select a channel item.'
+    // channel item removed
     if (!form.ark_id) errs.ark_id = 'ARK ID is required.'
     if (form.ark_id && !/^\d+$/.test(form.ark_id)) errs.ark_id = 'ARK ID must contain only integers.'
     if (form.slip) {
@@ -596,7 +574,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         onTypeChange={(v) => { setForm((p) => ({ ...p, channel_type: v, channel_id: '' })); if (local.channel_id) setLocal((p) => ({ ...p, channel_id: undefined })) }}
         onIdChange={f('channel_id')}
       />
-      {errors.channel_id && <p className="text-xs text-red-600 -mt-3">{errors.channel_id}</p>}
+      
 
       {/* ARK ID + Gateway — side by side */}
       <div className="grid grid-cols-2 gap-3">
@@ -620,7 +598,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
             value={form.gateway}
             onChange={(e) => f('gateway')(e.target.value)}
           >
-            <option value="">Select gateway…</option>
+            <option value="">Select gateway—</option>
             {gateways.map((gw) => (
               <option key={gw.id} value={gw.id}>{gw.name}</option>
             ))}
@@ -636,7 +614,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
           <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
             <Paperclip size={14} className="text-gray-400 shrink-0" />
             <span className="text-xs text-gray-500 truncate">
-              {form.slip ? form.slip.name : (initial?.slip ? 'Replace existing slip…' : 'Attach slip (image / PDF)')}
+              {form.slip ? form.slip.name : (initial?.slip ? 'Replace existing slip—' : 'Attach slip (image / PDF)')}
             </span>
             <input
               type="file"
@@ -688,7 +666,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         <textarea
           className={`input resize-none ${errors.comment ? 'border-red-300' : ''}`}
           rows={2}
-          placeholder="Optional comment…"
+          placeholder="Optional comment—"
           maxLength={2000}
           value={form.comment}
           onChange={(e) => f('comment')(e.target.value)}
@@ -698,13 +676,13 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
 
       {(error || errors.non_field) && <p className="text-red-500 text-sm">{errors.non_field || error}</p>}
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
-        {loading ? 'Saving…' : 'Save Changes'}
+        {loading ? 'Saving—' : 'Save Changes'}
       </button>
     </form>
   )
 }
 
-// ── Deposit Chat (conversation between RM and reviewers) ────────────────────
+// -- Deposit Chat (conversation between RM and reviewers) --------------------
 function DepositChat({ depositId, currentUserId }) {
   const qc = useQueryClient()
   const [text, setText]   = useState('')
@@ -731,7 +709,7 @@ function DepositChat({ depositId, currentUserId }) {
     }
   }, [data, isLoading, qc])
 
-  // ── Live WebSocket subscription ────────────────────────────────────────
+  // -- Live WebSocket subscription ----------------------------------------
   useEffect(() => {
     const { accessToken } = useAuthStore.getState()
     if (!accessToken || !depositId) return
@@ -845,7 +823,7 @@ function DepositChat({ depositId, currentUserId }) {
       <div ref={scrollerRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         {isLoading && (
           <div className="flex items-center justify-center h-full text-xs text-gray-400 gap-2">
-            <Loader2 size={14} className="animate-spin" /> Loading conversation…
+            <Loader2 size={14} className="animate-spin" /> Loading conversation—
           </div>
         )}
         {!isLoading && messages.length === 0 && (
@@ -956,7 +934,7 @@ function DepositChat({ depositId, currentUserId }) {
             onChange={(e) => { setText(e.target.value); if (composerErr) setComposerErr('') }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
             maxLength={5000}
-            placeholder="Type a message…  (Enter to send)"
+            placeholder="Type a message—  (Enter to send)"
             className={`flex-1 resize-none text-sm px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent max-h-32 ${composerErr ? 'border-red-300' : 'border-gray-200'}`}
           />
           <button type="button" onClick={handleSend} disabled={!canSend}
@@ -967,14 +945,14 @@ function DepositChat({ depositId, currentUserId }) {
         {composerErr && <p className="mt-1.5 text-[11px] text-red-600">{composerErr}</p>}
         <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1.5">
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${wsLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-          {wsLive ? 'Live — connected' : 'Reconnecting…'}
+          {wsLive ? 'Live — connected' : 'Reconnecting—'}
         </p>
       </div>
     </div>
   )
 }
 
-// ── Deposit Timeline (View modal content) ──────────────────────────────────
+// -- Deposit Timeline (View modal content) ----------------------------------
 function DepositTimeline({ deposit, initialTab = 'timeline' }) {
   const [tab, setTab] = useState(initialTab)
   const { user } = useAuthStore()
@@ -1078,7 +1056,7 @@ function DepositTimeline({ deposit, initialTab = 'timeline' }) {
       {/* Activity timeline */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Activity Timeline</h3>
-        {isLoading && <p className="text-xs text-gray-400">Loading…</p>}
+        {isLoading && <p className="text-xs text-gray-400">Loading—</p>}
         {!isLoading && activities.length === 0 && (
           <p className="text-xs text-gray-400">No activity recorded yet.</p>
         )}
@@ -1125,7 +1103,7 @@ function DepositTimeline({ deposit, initialTab = 'timeline' }) {
   )
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────
+// -- Main Page --------------------------------------------------------------
 export default function Deposits() {
   const qc   = useQueryClient()
   const { user, hasPermission } = useAuthStore()
@@ -1150,6 +1128,7 @@ export default function Deposits() {
   const [channelFilter,   setChannelFilter]   = useState('')
   const [modal,           setModal]           = useState(null)
   const [delTarget,       setDelTarget]       = useState(null)
+  const [completeTarget,  setCompleteTarget]  = useState(null)
   const fmtDate = (d) => d
     ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
     : '—'
@@ -1252,7 +1231,7 @@ export default function Deposits() {
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[320px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input className="input pl-9" placeholder="Search gateway, channel, ARK ID…" value={search}
+            <input className="input pl-9" placeholder="Search gateway, channel, ARK ID—" value={search}
               onChange={(e) => setSearch(e.target.value)} />
           </div>
           <select className="input max-w-[160px]" value={gatewayFilter}
@@ -1282,7 +1261,6 @@ export default function Deposits() {
             <tr className="border-b border-gray-100 bg-gray-50 text-center">
               <SortableTh label="Gateway"        sortKey="gateway"        toggle={toggleSort} icon={sortIcon} left />
               <SortableTh label="Channel"         sortKey="channel"        toggle={toggleSort} icon={sortIcon} />
-              <SortableTh label="Channel Detail"  sortKey="channel_detail" toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="ARK ID"          sortKey="ark_id"         toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Slip"            sortKey="slip"           toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Comment"         sortKey="comment"        toggle={toggleSort} icon={sortIcon} />
@@ -1291,7 +1269,7 @@ export default function Deposits() {
               <SortableTh label="Problem"         sortKey="problem"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Ticket Status"   sortKey="ticket_status"  toggle={toggleSort} icon={sortIcon} />
               {(canWrite || canReview || canChat) && (
-                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-right">Actions</th>
+                <th className="px-4 py-2.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider text-center">Actions</th>
               )}
             </tr>
           </thead>
@@ -1317,11 +1295,8 @@ export default function Deposits() {
                     <span className="text-xs text-gray-400">—</span>
                   )}
                 </td>
-                {/* Channel Detail */}
-                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[160px] text-center">
-                  <span className="truncate block">{r.channel_label ?? '—'}</span>
-                </td>
-                <td className="px-4 py-2.5 text-xs text-gray-600 text-center">{r.ark_id || '—'}</td>
+                {/* Channel Detail - removed, channel item selection no longer used */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center">{r.ark_id || '-'}</td>
                 <td className="px-4 py-2.5 text-center">
                   {r.slip ? (
                     <a href={r.slip} target="_blank" rel="noopener noreferrer"
@@ -1369,7 +1344,7 @@ export default function Deposits() {
                 {/* Actions */}
                 {(canWrite || canReview || canChat) && (
                   <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1.5 justify-end">
+                    <div className="flex items-center gap-1.5 justify-center">
                       {/* View timeline */}
                       {canViewDetails && (
                       <button onClick={() => setModal({ mode: 'view', data: r })}
@@ -1389,17 +1364,17 @@ export default function Deposits() {
                           )}
                         </button>
                       )}
-                      {/* Toggle status: Not Received ↔ Completed (only with complete permission) */}
+                      {/* Toggle status: Not Added ? Completed (only with complete permission) */}
                       {canComplete && (
                         <button
-                          onClick={() => toggleStatusM.mutate({ id: r.id, currentStatus: r.status })}
+                          onClick={() => setCompleteTarget(r)}
                           disabled={toggleStatusM.isPending}
                           className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
                             r.status === 'completed'
                               ? 'bg-amber-50 text-amber-500 hover:bg-amber-100'
                               : 'bg-teal-50 text-teal-500 hover:bg-teal-100'
                           }`}
-                          title={r.status === 'completed' ? 'Mark as Not Received' : 'Mark as Completed'}
+                          title={r.status === 'completed' ? 'Mark as Not Added' : 'Mark as Completed'}
                         >
                           <ArrowLeftRight size={12} />
                         </button>
@@ -1480,6 +1455,21 @@ export default function Deposits() {
         loading={deleteM.isPending}
         title="Delete Deposit"
         message={`Delete this ${delTarget?.gateway_detail?.name ?? ''} deposit log? This cannot be undone.`}
+      />
+
+      {/* Mark as Completed / Revert Confirm */}
+      <ConfirmDialog
+        open={!!completeTarget}
+        onClose={() => setCompleteTarget(null)}
+        onConfirm={() => { toggleStatusM.mutate({ id: completeTarget.id, currentStatus: completeTarget.status }); setCompleteTarget(null) }}
+        loading={toggleStatusM.isPending}
+        title={completeTarget?.status === 'completed' ? 'Revert to Pending' : 'Mark as Completed'}
+        confirmLabel={completeTarget?.status === 'completed' ? 'Revert' : 'Complete'}
+        variant={completeTarget?.status === 'completed' ? 'danger' : 'success'}
+        message={completeTarget?.status === 'completed'
+          ? 'Are you sure you want to revert this deposit back to pending?'
+          : 'Are you sure you want to mark this deposit as completed?'
+        }
       />
     </div>
   )

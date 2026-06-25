@@ -111,12 +111,7 @@ class DepositLogSerializer(serializers.ModelSerializer):
         upi_source   = attrs.get('upi_source',   getattr(self.instance, 'upi_source',   None))
         bank_account = attrs.get('bank_account', getattr(self.instance, 'bank_account', None))
 
-        if channel_type == DepositLog.CHANNEL_QR and not qr_code:
-            raise serializers.ValidationError({'qr_code': 'A QR Code must be selected for channel type "qr".'})
-        if channel_type == DepositLog.CHANNEL_UPI and not upi_source:
-            raise serializers.ValidationError({'upi_source': 'A UPI Source must be selected for channel type "upi".'})
-        if channel_type == DepositLog.CHANNEL_BANK and not bank_account:
-            raise serializers.ValidationError({'bank_account': 'A Bank Account must be selected for channel type "bank".'})
+        # Channel item is optional — channel_type can be set without a specific item
 
         # Slip status consistency
         slip        = attrs.get('slip',        getattr(self.instance, 'slip',        None))
