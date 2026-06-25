@@ -232,10 +232,10 @@ export default function Dashboard() {
     }),
     [aggregatedWithdrawStatus],
   )
-const chanColors = useMemo(
-  () => aggregatedChannelMix.map((c) => CHANNEL_COLOR[c.channel] || C.slate),
-  [aggregatedChannelMix]
-)
+  const chanColors = useMemo(
+    () => aggregatedChannelMix.map((c) => CHANNEL_COLOR[c.channel] || C.slate),
+    [aggregatedChannelMix],
+  )
 
   // ── Totals use aggregated arrays ────────────────────────────────────────
   const depTotal = aggregatedDepositStatus.reduce((s, x) => s + (x.count || 0), 0)
@@ -399,23 +399,16 @@ const chanColors = useMemo(
           )}
         </ChartCard>
 
-      {/* Payment Channel Mix */}
-      <ChartCard title="Payment Channel Mix" hint="Deposits split by channel used" height={260}>
-        {aggregatedChannelMix.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <CenteredDonut
-            data={aggregatedChannelMix.map(item => ({
-              ...item,
-              label: item.label || item.channel || 'Unknown'
-            }))}
-            total={aggregatedChannelMix.reduce((s, x) => s + (x.count || 0), 0)}
-            centerLabel="Channels"
-            nameKey="label"
-            colors={chanColors}
-          />
-        )}
-      </ChartCard>
+        <ChartCard title="Payment Channel Mix" hint="Deposits split by channel used" height={260}>
+          {aggregatedChannelMix.length === 0 ? <EmptyState /> : (
+            <CenteredDonut
+              data={aggregatedChannelMix}
+              total={aggregatedChannelMix.reduce((s, x) => s + (x.count || 0), 0)}
+              centerLabel="Channels"
+              colors={chanColors}
+            />
+          )}
+        </ChartCard>
       </div>
 
       {/* Gateway volume bar */}
