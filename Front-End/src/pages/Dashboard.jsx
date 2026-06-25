@@ -29,14 +29,12 @@ const C = {
 }
 
 const STATUS_COLOR = {
-  // deposit
   pending:     C.red,
   for_review:  C.purple,
   in_progress: C.blue,
   completed:   C.green,
   approved:    C.green,
   rejected:    C.red,
-  // withdrawal-only
   slip_uploaded:          C.blue,
   bank_followup_required: C.red,
   email_sent_to_bank:     C.purple,
@@ -181,22 +179,67 @@ export default function Dashboard() {
   const trend           = d?.trend             ?? []
   const gatewayVolume   = d?.gateway_volume    ?? []
 
+  // ── Aggregated data (removes duplicates from backend) ───────────────────
+  const aggregatedDepositStatus = useMemo(() => {
+    const map = new Map()
+    depositStatus.forEach(item => {
+      const key = item.label || item.status
+      if (map.has(key)) {
+        map.get(key).count += (item.count || 0)
+      } else {
+        map.set(key, { ...item })
+      }
+    })
+    return Array.from(map.values())
+  }, [depositStatus])
+
+  const aggregatedWithdrawStatus = useMemo(() => {
+    const map = new Map()
+    withdrawStatus.forEach(item => {
+      const key = item.label || item.status
+      if (map.has(key)) {
+        map.get(key).count += (item.count || 0)
+      } else {
+        map.set(key, { ...item })
+      }
+    })
+    return Array.from(map.values())
+  }, [withdrawStatus])
+
+  const aggregatedChannelMix = useMemo(() => {
+    const map = new Map()
+    channelMix.forEach(item => {
+      const key = item.label || item.channel
+      if (map.has(key)) {
+        map.get(key).count += (item.count || 0)
+      } else {
+        map.set(key, { ...item })
+      }
+    })
+    return Array.from(map.values())
+  }, [channelMix])
+
+  // ── Colors now use aggregated arrays ────────────────────────────────────
   const depColors = useMemo(
-    () => depositStatus.map((s) => STATUS_COLOR[s.status] || C.slate), [depositStatus],
+    () => aggregatedDepositStatus.map((s) => STATUS_COLOR[s.status] || C.slate),
+    [aggregatedDepositStatus],
   )
   const wdColors = useMemo(
-    () => withdrawStatus.map((s) => {
+    () => aggregatedWithdrawStatus.map((s) => {
       if (s.status === 'closed')  return C.blue
       if (s.status === 'pending') return '#EF4444'
       return STATUS_COLOR[s.status] || C.slate
-    }), [withdrawStatus],
+    }),
+    [aggregatedWithdrawStatus],
   )
   const chanColors = useMemo(
-    () => channelMix.map((c) => CHANNEL_COLOR[c.channel] || C.slate), [channelMix],
+    () => aggregatedChannelMix.map((c) => CHANNEL_COLOR[c.channel] || C.slate),
+    [aggregatedChannelMix],
   )
 
-  const depTotal = depositStatus.reduce((s, x) => s + (x.count || 0), 0)
-  const wdTotal  = withdrawStatus.reduce((s, x) => s + (x.count || 0), 0)
+  // ── Totals use aggregated arrays ────────────────────────────────────────
+  const depTotal = aggregatedDepositStatus.reduce((s, x) => s + (x.count || 0), 0)
+  const wdTotal  = aggregatedWithdrawStatus.reduce((s, x) => s + (x.count || 0), 0)
 
   const periodHint = {
     week:  'Last 7 days',
@@ -262,13 +305,13 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Row: two status donuts */}
+      {/* Row: two status donuts — NOW USE AGGREGATED DATA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="Deposit Status" hint="Breakdown of deposit tickets by current status" height={260}>
-          <CenteredDonut data={depositStatus} total={depTotal} centerLabel="Deposits" colors={depColors} />
+          <CenteredDonut data={aggregatedDepositStatus} total={depTotal} centerLabel="Deposits" colors={depColors} />
         </ChartCard>
         <ChartCard title="Withdrawal Status" hint="Breakdown of withdrawal tickets by current status" height={260}>
-          <CenteredDonut data={withdrawStatus} total={wdTotal} centerLabel="Withdrawals" colors={wdColors} />
+          <CenteredDonut data={aggregatedWithdrawStatus} total={wdTotal} centerLabel="Withdrawals" colors={wdColors} />
         </ChartCard>
       </div>
 
@@ -341,7 +384,7 @@ export default function Dashboard() {
         </ChartCard>
       </div>
 
-      {/* Row: ticket split + channel mix */}
+      {/* Row: ticket split + channel mix — channel mix NOW USES AGGREGATED DATA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="Pending vs Closed Tickets" hint="Overall pipeline health" height={260}>
           {ticketSplit.every((s) => !s.count) ? <EmptyState /> : (
@@ -357,10 +400,10 @@ export default function Dashboard() {
         </ChartCard>
 
         <ChartCard title="Payment Channel Mix" hint="Deposits split by channel used" height={260}>
-          {channelMix.length === 0 ? <EmptyState /> : (
+          {aggregatedChannelMix.length === 0 ? <EmptyState /> : (
             <CenteredDonut
-              data={channelMix}
-              total={channelMix.reduce((s, x) => s + (x.count || 0), 0)}
+              data={aggregatedChannelMix}
+              total={aggregatedChannelMix.reduce((s, x) => s + (x.count || 0), 0)}
               centerLabel="Channels"
               colors={chanColors}
             />
