@@ -1399,18 +1399,18 @@ export default function Deposits() {
                           <CheckCircle2 size={12} />
                         </button>
                       )}
-                      {canWrite && (
-                        <>
-                          <button onClick={() => setModal({ mode: 'edit', data: r })}
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                            <SquarePen size={12} />
-                          </button>
-                          <button onClick={() => setDelTarget(r)}
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
-                            <Trash2 size={12} />
-                          </button>
-                        </>
-                      )}
+                    {canEdit && (
+                      <button onClick={() => setModal({ mode: 'edit', data: r })}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                        <SquarePen size={12} />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => setDelTarget(r)}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors">
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                     </div>
                   </td>
                 )}
