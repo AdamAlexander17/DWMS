@@ -348,7 +348,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const validate = () => {
     const errs = {}
     
-    // 🔴 CRITICAL: Require receipt when marking as "Added"
+    // 🔴 Block submission if "Added" is selected but no receipt exists (new or existing)
     if (decision === 'added' && !reviewSlip && !initial?.review_slip) {
       errs.review_slip = 'Receipt is required when marking as Added.'
     }
@@ -374,7 +374,67 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* ... existing deposit summary code ... */}
+      {/* Deposit summary */}
+      <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-sm space-y-1.5">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Gateway</span>
+          <span className="font-semibold text-gray-800">{initial?.gateway_detail?.name ?? initial?.gateway}</span>
+        </div>
+        {initial?.channel_type && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Channel</span>
+            <div className="flex items-center gap-1.5">
+              <span className={`inline-flex items-center justify-center gap-1 min-w-[96px] px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${CHANNEL_BADGE[initial.channel_type] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                {CHANNEL_LABEL[initial.channel_type]}
+              </span>
+              {initial?.channel_label && (
+                <span className="text-xs text-gray-600">{initial.channel_label}</span>
+              )}
+            </div>
+          </div>
+        )}
+        {(() => {
+          const key  = deriveTicketStatus(initial)
+          const cfg  = TICKET_STATUS_CONFIG[key] ?? TICKET_STATUS_CONFIG.pending
+          const Icon = cfg.Icon
+          return (
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Ticket Status</span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${cfg.bg} ${cfg.text}`}>
+                <Icon size={10} /> {cfg.label}
+              </span>
+            </div>
+          )
+        })()}
+        {/* RM's uploaded receipt */}
+        {initial?.slip && (
+          <div className="flex justify-between items-center pt-1.5 border-t border-gray-200">
+            <span className="text-gray-500">Receipt (by RM)</span>
+            <a
+              href={initial.slip}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-accent font-medium hover:underline"
+            >
+              <ExternalLink size={12} /> View Slip
+            </a>
+          </div>
+        )}
+        {initial?.problem_category && (
+          <div className="flex justify-between items-center pt-1.5 border-t border-gray-200">
+            <span className="text-gray-500">Problem Category</span>
+            <span className="text-xs font-semibold text-gray-800">
+              {PROBLEM_CATEGORY_OPTS.find(o => o.value === initial.problem_category)?.label || initial.problem_category}
+            </span>
+          </div>
+        )}
+        {initial?.comment && (
+          <div className="pt-1.5 border-t border-gray-200">
+            <p className="text-gray-400 text-xs mb-0.5">Comment</p>
+            <p className="text-gray-700">{initial.comment}</p>
+          </div>
+        )}
+      </div>
 
       {/* Decision dropdown */}
       <div>
@@ -402,7 +462,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           Upload Receipt {decision === 'added' && <span className="text-red-500">*</span>}
         </label>
-        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.review_slip ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-accent'}`}>
+        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.review_slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
           <Paperclip size={15} className="text-gray-400 shrink-0" />
           <span className="text-sm text-gray-500 truncate">
             {reviewSlip ? reviewSlip.name : (initial?.review_slip ? 'Replace existing receipt—' : 'Attach receipt (image / PDF, max 8 MB)')}
@@ -411,10 +471,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
             type="file"
             accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
             className="hidden"
-            onChange={(e) => { 
-              setReviewSlip(e.target.files?.[0] ?? null); 
-              if (local.review_slip) setLocal((p) => ({ ...p, review_slip: undefined })) 
-            }}
+            onChange={(e) => { setReviewSlip(e.target.files?.[0] ?? null); if (local.review_slip) setLocal((p) => ({ ...p, review_slip: undefined })) }}
           />
         </label>
         {errors.review_slip && <p className="mt-1 text-xs text-red-600">{errors.review_slip}</p>}
@@ -435,11 +492,11 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Message to RM</label>
         <textarea
           className={`input resize-none ${errors.message ? 'border-red-300' : ''}`}
-          rows={2}
+          rows={3}
           placeholder="e.g. Payment confirmed, processing—"
           maxLength={2000}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => { setMessage(e.target.value); if (local.message) setLocal((p) => ({ ...p, message: undefined })) }}
         />
         {errors.message && <p className="mt-1 text-xs text-red-600">{errors.message}</p>}
       </div>
@@ -448,7 +505,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       <button
         type="submit"
         disabled={loading}
-        className="btn-primary w-full justify-center"
+        className="btn-primary w-full justify-center mt-1"
       >
         {loading ? 'Submitting—' : 'Submit Review'}
       </button>
