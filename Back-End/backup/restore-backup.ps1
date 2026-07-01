@@ -90,7 +90,7 @@ try {
     if ($gzipPath) {
         # Use gzip pipe
         $process = Start-Process -NoNewWindow -PassThru -Wait -FilePath "cmd.exe" `
-            -ArgumentList "/c", "gzip -dc `"$BackupFile`" | mysql -u $DBUser -h $DBHost -P $DBPort -p $DBName"
+            -ArgumentList "/c", "gzip -dc `"$BackupFile`" | mysql -u $DBUser -h $DBHost -P $DBPort -proot $DBName"
         if ($process.ExitCode -ne 0) {
             Write-Log "ERROR: Restore failed with exit code $($process.ExitCode)"
             exit 1
@@ -100,7 +100,8 @@ try {
         # Use 7-Zip to decompress, pipe to mysql
         $tempSql = [System.IO.Path]::GetTempFileName() + ".sql"
         & $sevenZip e -so "$BackupFile" > $tempSql
-        & mysql -u $DBUser -h $DBHost -P $DBPort -p $DBName < $tempSql
+        $cmd = "cmd /c `"mysql -u $DBUser -h $DBHost -P $DBPort -p $DBName < `"$tempSql`"`""
+        Invoke-Expression $cmd
         Remove-Item $tempSql -ErrorAction SilentlyContinue
     }
     else {
