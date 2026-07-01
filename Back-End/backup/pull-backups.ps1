@@ -9,7 +9,7 @@
 # Configuration
 # ---------------------------------------------------------------------------
 $ProjectName = "dwms"
-$ServerIP = "<your-server-ip>"                          # Replace with your server IP
+$ServerIP = "136.244.85.226"                          # Production server IP
 $SSHKeyPath = "$env:USERPROFILE\.ssh\dwms_backup"       # SSH private key path
 $SSHUser = "root"                                       # SSH user on server (or dedicated backup user)
 $RemoteBackupPath = "/var/backups/$ProjectName"
