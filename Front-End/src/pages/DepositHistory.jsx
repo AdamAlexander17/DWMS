@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { Search, Paperclip, QrCode, Wallet, Building2, BadgeCheck, Trash2, ExternalLink, FileCheck2, Eye, User, Calendar, Plus, SquarePen, CheckCircle2, Clock, MessageSquare, Send, X, Loader2 } from 'lucide-react'
+import { Search, Paperclip, QrCode, Wallet, Building2, BadgeCheck, Trash2, ExternalLink, FileCheck2, Eye, User, Calendar, Plus, SquarePen, CheckCircle2, Clock, MessageSquare, Send, X, Loader2, Download } from 'lucide-react'
 import { getDeposits, deleteDeposit, getDepositActivities, getDepositMessages, postDepositMessage } from '../api/deposits'
 import { getGateways } from '../api/master'
 import Modal         from '../components/ui/Modal'
@@ -11,6 +11,22 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useAuthStore } from '../store/authStore'
 import { connectWS } from '../api/ws'
+
+// -- Download helper (works for cross-origin files like S3) -------------------
+function downloadFile(url, filename) {
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename || url.split('/').pop() || 'download'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove() }, 100)
+    })
+    .catch(() => { window.open(url, '_blank') }) // fallback: open in new tab
+}
 
 const CHANNEL_BADGE = {
   qr:   'bg-purple-50 text-purple-700 border-purple-200',
@@ -376,19 +392,31 @@ function HistoryTimeline({ deposit, initialTab = 'timeline' }) {
         {deposit.slip && (
           <div className="flex justify-between items-center">
             <span className="text-gray-500">RM Slip</span>
-            <a href={deposit.slip} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-medium">
-              <ExternalLink size={11} /> View
-            </a>
+            <div className="flex items-center gap-2">
+              <a href={deposit.slip} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-medium">
+                <ExternalLink size={11} /> View
+              </a>
+              <button onClick={() => downloadFile(deposit.slip, `rm-slip-${deposit.ark_id || 'file'}`)}
+                className="inline-flex items-center gap-1 text-xs text-green-600 hover:underline font-medium">
+                <Download size={11} /> Download
+              </button>
+            </div>
           </div>
         )}
         {deposit.review_slip && (
           <div className="flex justify-between items-center">
             <span className="text-gray-500">Backoffice Receipt</span>
-            <a href={deposit.review_slip} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline font-medium">
-              <ExternalLink size={11} /> View
-            </a>
+            <div className="flex items-center gap-2">
+              <a href={deposit.review_slip} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline font-medium">
+                <ExternalLink size={11} /> View
+              </a>
+              <button onClick={() => downloadFile(deposit.review_slip, `receipt-${deposit.ark_id || 'file'}`)}
+                className="inline-flex items-center gap-1 text-xs text-green-600 hover:underline font-medium">
+                <Download size={11} /> Download
+              </button>
+            </div>
           </div>
         )}
         {deposit.comment && (
@@ -429,10 +457,16 @@ function HistoryTimeline({ deposit, initialTab = 'timeline' }) {
                     </span>
                   </div>
                   {a.slip_url && (
-                    <a href={a.slip_url.startsWith('http') ? a.slip_url : a.slip_url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline mt-1">
-                      <Paperclip size={10} /> View slip
-                    </a>
+                    <div className="flex items-center gap-2 mt-1">
+                      <a href={a.slip_url.startsWith('http') ? a.slip_url : a.slip_url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline">
+                        <Paperclip size={10} /> View slip
+                      </a>
+                      <button onClick={() => downloadFile(a.slip_url, `slip-${a.id}`)}
+                        className="inline-flex items-center gap-1 text-[11px] text-green-600 hover:underline">
+                        <Download size={10} /> Download
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -563,9 +597,15 @@ function HistoryChat({ depositId, currentUserId }) {
                 <div className={`rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${mine ? 'bg-accent text-white rounded-br-md' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'}`}>
                   {m.message && <p className="whitespace-pre-wrap break-words leading-snug">{m.message}</p>}
                   {m.attachment_url && (
-                    <a href={m.attachment_url} target="_blank" rel="noreferrer" className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold ${mine ? 'text-white' : 'text-accent'}`}>
-                      <Paperclip size={10} /> {m.attachment_name || 'Attachment'}
-                    </a>
+                    <div className="flex items-center gap-2 mt-1">
+                      <a href={m.attachment_url} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1 text-[10px] font-bold ${mine ? 'text-white' : 'text-accent'}`}>
+                        <Paperclip size={10} /> {m.attachment_name || 'Attachment'}
+                      </a>
+                      <button onClick={() => downloadFile(m.attachment_url, m.attachment_name || 'attachment')}
+                        className={`inline-flex items-center gap-1 text-[10px] font-bold ${mine ? 'text-white hover:underline' : 'text-green-600 hover:text-green-700'}`}>
+                        <Download size={9} /> Download
+                      </button>
+                    </div>
                   )}
                 </div>
                 <p className={`text-[10px] text-gray-400 mt-1 px-1 ${mine ? 'text-right' : ''}`}>{fmtTime(m.created_at)}</p>

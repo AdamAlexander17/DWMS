@@ -32,6 +32,22 @@ function StatusChip({ status }) {
   )
 }
 
+// -- Download helper -----------------------------------------------------------
+function downloadFile(url, filename) {
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename || url.split('/').pop() || 'download'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove() }, 100)
+    })
+    .catch(() => { window.open(url, '_blank') })
+}
+
 function HistoryDetailModal({ withdrawal, initialTab = 'details' }) {
   const [tab, setTab] = useState(initialTab)
   const { user } = useAuthStore()

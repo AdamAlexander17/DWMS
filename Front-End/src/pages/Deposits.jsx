@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2, Eye, User, Calendar, ArrowLeftRight, MessageSquare, Send, X, Lock } from 'lucide-react'
+import { Plus, Search, SquarePen, Trash2, CheckCircle2, XCircle, Clock, Paperclip, QrCode, Wallet, Building2, Loader2, BadgeCheck, ExternalLink, FileCheck2, Eye, User, Calendar, ArrowLeftRight, MessageSquare, Send, X, Lock, Download } from 'lucide-react'
 import { createDeposit, deleteDeposit, getDeposit, getDeposits, updateDeposit, reviewDeposit, getDepositActivities, getDepositMessages, postDepositMessage } from '../api/deposits'
 import { getGateways }     from '../api/master'
 import { getQRCodes }      from '../api/payments'
@@ -18,6 +18,22 @@ import { connectWS } from '../api/ws'
 import { slipFile as vSlipFile, extractApiErrors } from '../utils/validators'
 
 // Gateway options are fetched from master API — see useGateways() hook below
+
+// -- Download helper (works for cross-origin files like S3) -------------------
+function downloadFile(url, filename) {
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename || url.split('/').pop() || 'download'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove() }, 100)
+    })
+    .catch(() => { window.open(url, '_blank') }) // fallback: open in new tab
+}
 
 // -- Notification sound (Web Audio API — no file needed) ---------------------
 function playNotifSound() {
@@ -886,8 +902,12 @@ function DepositChat({ depositId, currentUserId }) {
                         <p className={`text-[10px] ${mine ? 'text-white/70' : 'text-gray-500'}`}>{m.attachment_size_kb ? `${m.attachment_size_kb} KB` : ''}</p>
                         <a href={m.attachment_url} target="_blank" rel="noreferrer"
                           className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold ${mine ? 'text-white hover:underline' : 'text-accent hover:text-accent-dark'}`}>
-                          <ExternalLink size={9} /> Open / download
+                          <ExternalLink size={9} /> View
                         </a>
+                        <button onClick={() => downloadFile(m.attachment_url, m.attachment_name || 'attachment')}
+                          className={`mt-1 ml-2 inline-flex items-center gap-1 text-[10px] font-bold ${mine ? 'text-white hover:underline' : 'text-green-600 hover:text-green-700'}`}>
+                          <Download size={9} /> Download
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1056,19 +1076,31 @@ function DepositTimeline({ deposit, initialTab = 'timeline' }) {
         {deposit.slip && (
           <div className="flex justify-between items-center">
             <span className="text-gray-500">RM Slip</span>
-            <a href={deposit.slip} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-medium">
-              <ExternalLink size={11} /> View
-            </a>
+            <div className="flex items-center gap-2">
+              <a href={deposit.slip} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-medium">
+                <ExternalLink size={11} /> View
+              </a>
+              <button onClick={() => downloadFile(deposit.slip, `rm-slip-${deposit.ark_id || 'file'}`)}
+                className="inline-flex items-center gap-1 text-xs text-green-600 hover:underline font-medium">
+                <Download size={11} /> Download
+              </button>
+            </div>
           </div>
         )}
         {deposit.review_slip && (
           <div className="flex justify-between items-center">
             <span className="text-gray-500">Backoffice Receipt</span>
-            <a href={deposit.review_slip} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline font-medium">
-              <ExternalLink size={11} /> View
-            </a>
+            <div className="flex items-center gap-2">
+              <a href={deposit.review_slip} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline font-medium">
+                <ExternalLink size={11} /> View
+              </a>
+              <button onClick={() => downloadFile(deposit.review_slip, `receipt-${deposit.ark_id || 'file'}`)}
+                className="inline-flex items-center gap-1 text-xs text-green-600 hover:underline font-medium">
+                <Download size={11} /> Download
+              </button>
+            </div>
           </div>
         )}
         {deposit.comment && (
@@ -1112,10 +1144,16 @@ function DepositTimeline({ deposit, initialTab = 'timeline' }) {
                     </span>
                   </div>
                   {a.slip_url && (
-                    <a href={a.slip_url.startsWith('http') ? a.slip_url : a.slip_url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline mt-1">
-                      <Paperclip size={10} /> View slip
-                    </a>
+                    <div className="flex items-center gap-2 mt-1">
+                      <a href={a.slip_url.startsWith('http') ? a.slip_url : a.slip_url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline">
+                        <Paperclip size={10} /> View slip
+                      </a>
+                      <button onClick={() => downloadFile(a.slip_url, `slip-${a.id}`)}
+                        className="inline-flex items-center gap-1 text-[11px] text-green-600 hover:underline">
+                        <Download size={10} /> Download
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

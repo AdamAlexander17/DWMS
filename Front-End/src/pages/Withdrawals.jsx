@@ -5,7 +5,7 @@ import {
   Plus, Trash2, Search, X, CheckCircle2, XCircle, Clock,
   IndianRupee, User, Hash, Calendar, TrendingUp, SquarePen, Eye,
   Upload, FileText, AlertTriangle, Mail, PhoneOff, ExternalLink, MessageSquare,
-  Send, Paperclip, Lock, Lock as LockIcon, Info, Shield, Loader2,
+  Send, Paperclip, Lock, Lock as LockIcon, Info, Shield, Loader2, Download,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -26,6 +26,22 @@ import {
   clientArcId as vClientArcId, safeName as vSafeName, positiveAmount as vPositiveAmount,
   slipFile as vSlipFile, attachmentFile as vAttachmentFile, extractApiErrors,
 } from '../utils/validators'
+
+// -- Download helper (works for cross-origin files) ----------------------------
+function downloadFile(url, filename) {
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename || url.split('/').pop() || 'download'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove() }, 100)
+    })
+    .catch(() => { window.open(url, '_blank') })
+}
 
 // ── Status config ────────────────────────────────────────────────────────────
 const STATUS = {
@@ -56,7 +72,7 @@ function WithdrawalForm({ initial, onSubmit, onClose, loading, apiErrors = {} })
     if (!d) return ''
     const dt = new Date(d)
     const pad = (n) => String(n).padStart(2, '0')
-    return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+    return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`
   }
 
   const [form, setForm] = useState({
@@ -559,8 +575,14 @@ function MessageThread({ withdrawalId, currentUserId }) {
                           className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold ${
                             mine ? 'text-white hover:underline' : 'text-accent hover:text-accent-dark'
                           }`}>
-                          <ExternalLink size={9} /> Open / download
+                          <ExternalLink size={9} /> View
                         </a>
+                        <button onClick={() => downloadFile(m.attachment_url, m.attachment_name || 'attachment')}
+                          className={`mt-1 ml-2 inline-flex items-center gap-1 text-[10px] font-bold ${
+                            mine ? 'text-white hover:underline' : 'text-green-600 hover:text-green-700'
+                          }`}>
+                          <Download size={9} /> Download
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1023,7 +1045,7 @@ export default function Withdrawals() {
     { key: 'client', label: 'Client', sortable: true, field: 'client_name' },
     { key: 'arc', label: 'ARC ID', sortable: true, field: 'client_arc_id' },
     { key: 'amount', label: 'Amount', sortable: true, field: 'amount' },
-    { key: 'datetime', label: 'Date', sortable: true, field: 'withdrawal_datetime' },
+    { key: 'datetime', label: 'Withdrawal Date', sortable: true, field: 'withdrawal_datetime' },
     { key: 'status', label: 'Status', sortable: true, field: 'status' },
     { key: 'submitted', label: 'Submitted', sortable: true, field: 'submitted_by_name' },
     { key: 'actions', label: 'Actions', sortable: false },
@@ -1148,7 +1170,7 @@ export default function Withdrawals() {
                   <td className="px-4 py-2.5 text-center"><StatusChip status={r.status} /></td>
                   <td className="px-4 py-2.5 text-[11px] text-gray-400 whitespace-nowrap text-center">
                     <div className="font-medium text-gray-600">{r.submitted_by_name}</div>
-                    <div className="text-gray-300">{fmtDate(r.created_at)}</div>
+                    <div className="text-gray-300">{fmtDt(r.created_at)}</div>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1 justify-end">
