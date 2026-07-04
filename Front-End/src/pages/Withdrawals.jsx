@@ -789,7 +789,7 @@ function DetailModal({ withdrawal, currentUserId, canReview, onMarkClose, initia
           {/* Meta grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {[
-              { icon: Calendar,     label: 'Withdrawal Date', value: fmtDt(withdrawal.withdrawal_datetime) },
+              { icon: Calendar,     label: 'Withdrawal Date', value: fmtDate(withdrawal.withdrawal_datetime) },
               { icon: User,         label: 'Submitted By',     value: withdrawal.submitted_by_name },
               { icon: Clock,        label: 'Submitted On',     value: fmtDate(withdrawal.created_at) },
             ].map(({ icon: Icon, label, value }) => (
