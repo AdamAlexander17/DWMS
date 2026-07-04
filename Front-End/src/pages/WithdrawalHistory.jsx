@@ -245,6 +245,18 @@ function WdHistoryChat({ withdrawalId, currentUserId }) {
           <button type="button" onClick={() => fileInputRef.current?.click()} className="shrink-0 w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center"><Paperclip size={15} /></button>
           <textarea rows={1} value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+            onPaste={(e) => {
+              const items = e.clipboardData?.items
+              if (!items) return
+              for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                  e.preventDefault()
+                  const blob = item.getAsFile()
+                  if (blob) setFile(blob)
+                  return
+                }
+              }
+            }}
             maxLength={5000} placeholder="Type a message…  (Enter to send)"
             className="flex-1 resize-none text-sm px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-accent/30 max-h-32" />
           <button type="button" onClick={handleSend} disabled={!canSend}

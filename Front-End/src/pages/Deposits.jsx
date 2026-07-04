@@ -947,6 +947,18 @@ function DepositChat({ depositId, currentUserId }) {
             value={text}
             onChange={(e) => { setText(e.target.value); if (composerErr) setComposerErr('') }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+            onPaste={(e) => {
+              const items = e.clipboardData?.items
+              if (!items) return
+              for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                  e.preventDefault()
+                  const blob = item.getAsFile()
+                  if (blob) setFile(blob)
+                  return
+                }
+              }
+            }}
             maxLength={5000}
             placeholder="Type a message—  (Enter to send)"
             className={`flex-1 resize-none text-sm px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent max-h-32 ${composerErr ? 'border-red-300' : 'border-gray-200'}`}
