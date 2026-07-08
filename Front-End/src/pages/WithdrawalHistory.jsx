@@ -353,6 +353,7 @@ export default function WithdrawalHistory() {
     { key: 'wd_dt', label: 'Withdrawal Date', sortable: true, field: 'withdrawal_datetime' },
     { key: 'status', label: 'Status', sortable: true, field: 'status' },
     { key: 'submitted', label: 'Submitted By', sortable: true, field: 'submitted_by_name' },
+    { key: 'reviewed_by', label: 'Reviewed By', sortable: true, field: 'reviewed_by_name' },
     { key: 'closed', label: 'Closed On', sortable: true, field: 'updated_at' },
     { key: 'actions', label: 'Actions', sortable: false },
   ]
@@ -455,6 +456,13 @@ export default function WithdrawalHistory() {
                   <td className="px-4 py-2.5 text-center"><StatusChip status={r.status} /></td>
                   <td className="px-4 py-2.5 text-[11px] text-gray-500 whitespace-nowrap text-center">
                     {r.submitted_by_name}
+                  </td>
+                  <td className="px-4 py-2.5 text-[11px] text-gray-600 whitespace-nowrap text-center">
+                    {r.reviewed_by_name ? (
+                      <span className="font-medium text-gray-700">{r.reviewed_by_name}</span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-2.5 text-[11px] text-gray-400 whitespace-nowrap text-center">
                     {fmtDate(r.updated_at)}

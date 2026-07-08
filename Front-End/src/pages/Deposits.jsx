@@ -170,6 +170,7 @@ function ChannelSelector({ channelType, channelId, onTypeChange, onIdChange }) {
 // -- Create / Log Deposit Form ----------------------------------------------
 function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
   const gateways = useGateways()
+  const slipInputRef = useRef(null)
   const [form, setForm] = useState({
     gateway: '',
     channel_type: '',
@@ -183,6 +184,24 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
   const [local, setLocal] = useState({})
   const errors = { ...apiErrors, ...local }
   const f = (k) => (v) => { setForm((p) => ({ ...p, [k]: v })); if (local[k]) setLocal((p) => ({ ...p, [k]: undefined })) }
+
+  // Handle paste event for slip input
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    
+    for (let item of items) {
+      // Check if pasted item is an image or PDF
+      if (item.type.startsWith('image/') || item.type === 'application/pdf') {
+        const file = item.getAsFile()
+        if (file) {
+          f('slip')(file)
+          e.preventDefault()
+          break
+        }
+      }
+    }
+  }
 
   const validate = () => {
     const errs = {}
@@ -272,13 +291,29 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
       {/* Slip + Status — side by side */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip{form.rm_status === 'completed' && <span className="text-red-500"> *</span>}</label>
-          <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
+          <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}
+            onPaste={handlePaste}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-accent', 'bg-accent/5') }}
+            onDragLeave={(e) => { e.currentTarget.classList.remove('border-accent', 'bg-accent/5') }}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.currentTarget.classList.remove('border-accent', 'bg-accent/5')
+              const files = e.dataTransfer?.files
+              if (files && files.length > 0) {
+                const file = files[0]
+                if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+                  f('slip')(file)
+                }
+              }
+            }}
+          >
             <Paperclip size={14} className="text-gray-400 shrink-0" />
             <span className="text-xs text-gray-500 truncate">
               {form.slip ? form.slip.name : 'Attach slip (image / PDF)'}
             </span>
             <input
+              ref={slipInputRef}
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
               className="hidden"
@@ -351,6 +386,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
 // -- Review Form (back office / admin) --------------------------------------
 function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const { user, hasPermission } = useAuthStore()
+  const reviewSlipInputRef = useRef(null)
   const canComplete = hasPermission('deposits', 'complete')
   const options = canComplete
     ? REVIEW_DECISION_OPTS
@@ -361,19 +397,37 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const [local, setLocal] = useState({})
   const errors = { ...apiErrors, ...local }
 
+  // Handle paste event for review slip input
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    
+    for (let item of items) {
+      // Check if pasted item is an image or PDF
+      if (item.type.startsWith('image/') || item.type === 'application/pdf') {
+        const file = item.getAsFile()
+        if (file) {
+          setReviewSlip(file)
+          if (local.review_slip) setLocal((p) => ({ ...p, review_slip: undefined }))
+          e.preventDefault()
+          break
+        }
+      }
+    }
+  }
+
   const validate = () => {
     const errs = {}
     
-    // 🔴 Block submission if "Added" is selected but no receipt exists (new or existing)
-    if (decision === 'added' && !reviewSlip && !initial?.review_slip) {
-      errs.review_slip = 'Receipt is required when marking as Added.'
-    }
-    
+    // Validate uploaded file if one is provided
     if (reviewSlip) {
       const e = vSlipFile(reviewSlip)
       if (e) errs.review_slip = e
     }
+    
+    // Validate message length
     if (message && message.length > 2000) errs.message = 'Message must be at most 2000 characters.'
+    
     setLocal(errs)
     return Object.keys(errs).length === 0
   }
@@ -476,14 +530,31 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       {/* Back-office receipt upload */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Upload Receipt {decision === 'added' && <span className="text-red-500">*</span>}
+          Upload Receipt
         </label>
-        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.review_slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
+        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.review_slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}
+          onPaste={handlePaste}
+          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-accent', 'bg-accent/5') }}
+          onDragLeave={(e) => { e.currentTarget.classList.remove('border-accent', 'bg-accent/5') }}
+          onDrop={(e) => {
+            e.preventDefault()
+            e.currentTarget.classList.remove('border-accent', 'bg-accent/5')
+            const files = e.dataTransfer?.files
+            if (files && files.length > 0) {
+              const file = files[0]
+              if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+                setReviewSlip(file)
+                if (local.review_slip) setLocal((p) => ({ ...p, review_slip: undefined }))
+              }
+            }
+          }}
+        >
           <Paperclip size={15} className="text-gray-400 shrink-0" />
           <span className="text-sm text-gray-500 truncate">
             {reviewSlip ? reviewSlip.name : (initial?.review_slip ? 'Replace existing receipt—' : 'Attach receipt (image / PDF, max 8 MB)')}
           </span>
           <input
+            ref={reviewSlipInputRef}
             type="file"
             accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
             className="hidden"
@@ -531,6 +602,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
 // -- Edit Form --------------------------------------------------------------
 function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const gateways = useGateways()
+  const slipInputRef = useRef(null)
   // Resolve the initial channel_id from the correct FK field
   const initChannelId = initial?.channel_type === 'qr'   ? String(initial?.qr_code   ?? '')
                       : initial?.channel_type === 'upi'  ? String(initial?.upi_source  ?? '')
@@ -550,6 +622,24 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
   const [local, setLocal] = useState({})
   const errors = { ...apiErrors, ...local }
   const f = (k) => (v) => { setForm((p) => ({ ...p, [k]: v })); if (local[k]) setLocal((p) => ({ ...p, [k]: undefined })) }
+
+  // Handle paste event for slip input
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    
+    for (let item of items) {
+      // Check if pasted item is an image or PDF
+      if (item.type.startsWith('image/') || item.type === 'application/pdf') {
+        const file = item.getAsFile()
+        if (file) {
+          f('slip')(file)
+          e.preventDefault()
+          break
+        }
+      }
+    }
+  }
 
   const validate = () => {
     const errs = {}
@@ -641,12 +731,28 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
-          <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}>
+          <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}
+            onPaste={handlePaste}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-accent', 'bg-accent/5') }}
+            onDragLeave={(e) => { e.currentTarget.classList.remove('border-accent', 'bg-accent/5') }}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.currentTarget.classList.remove('border-accent', 'bg-accent/5')
+              const files = e.dataTransfer?.files
+              if (files && files.length > 0) {
+                const file = files[0]
+                if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+                  f('slip')(file)
+                }
+              }
+            }}
+          >
             <Paperclip size={14} className="text-gray-400 shrink-0" />
             <span className="text-xs text-gray-500 truncate">
               {form.slip ? form.slip.name : (initial?.slip ? 'Replace existing slip—' : 'Attach slip (image / PDF)')}
             </span>
             <input
+              ref={slipInputRef}
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
               className="hidden"

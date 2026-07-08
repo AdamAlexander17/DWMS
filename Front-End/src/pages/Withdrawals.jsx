@@ -216,7 +216,63 @@ function UploadSlipModal({ onSubmit, onClose, loading, apiErrors = {} }) {
   const [file, setFile] = useState(null)
   const [note, setNote] = useState('')
   const [local, setLocal] = useState({})
+  const [isDragging, setIsDragging] = useState(false)
   const errors = { ...apiErrors, ...local }
+  const fileInputRef = useRef(null)
+
+  const setFileAndClearError = (f) => {
+    setFile(f)
+    if (local.slip) setLocal((p) => ({ ...p, slip: undefined }))
+  }
+
+  const isValidFile = (file) => {
+    return file.type.startsWith('image/') || file.type === 'application/pdf'
+  }
+
+  // Handle paste event for slip input
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    
+    for (let item of items) {
+      if (isValidFile(item) || item.type === 'application/pdf') {
+        const f = item.getAsFile()
+        if (f) {
+          setFileAndClearError(f)
+          e.preventDefault()
+          break
+        }
+      }
+    }
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    
+    const files = e.dataTransfer?.files
+    if (files && files.length > 0) {
+      const droppedFile = files[0]
+      if (isValidFile(droppedFile)) {
+        setFileAndClearError(droppedFile)
+      } else {
+        setLocal((p) => ({ ...p, slip: 'Only image files (PNG, JPG, JPEG, WEBP) or PDF files are allowed.' }))
+      }
+    }
+  }
 
   const validate = () => {
     const errs = {}
@@ -239,6 +295,11 @@ function UploadSlipModal({ onSubmit, onClose, loading, apiErrors = {} }) {
     onSubmit(fd)
   }
 
+  const handleClearFile = () => {
+    setFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex gap-3 bg-blue-50 border border-blue-100 rounded-xl p-4">
@@ -252,16 +313,26 @@ function UploadSlipModal({ onSubmit, onClose, loading, apiErrors = {} }) {
         <label className="block text-xs font-semibold text-gray-700 mb-1.5">
           Slip File <span className="text-red-500">*</span>
         </label>
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
-          onChange={(e) => { setFile(e.target.files?.[0] ?? null); if (local.slip) setLocal((p) => ({ ...p, slip: undefined })) }}
-          className={`block w-full text-xs text-gray-600
-            file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
-            file:text-xs file:font-semibold file:bg-accent/10 file:text-accent
-            hover:file:bg-accent/20 transition-colors cursor-pointer
-            border rounded-lg ${errors.slip ? 'border-red-300' : 'border-gray-200'}`}
-        />
+        <div
+          onPaste={handlePaste}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-lg transition-colors p-6 text-center cursor-pointer
+            ${isDragging ? 'border-accent bg-accent/5' : errors.slip ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
+            onChange={(e) => setFileAndClearError(e.target.files?.[0] ?? null)}
+            onClick={(e) => e.stopPropagation()}
+            className={`block w-full text-xs text-gray-600
+              file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+              file:text-xs file:font-semibold file:bg-accent/10 file:text-accent
+              hover:file:bg-accent/20 transition-colors cursor-pointer`}
+          />
+        </div>
         {file && (
           <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1">
             <FileText size={11} /> {file.name} · {(file.size / 1024).toFixed(1)} KB

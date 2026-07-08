@@ -557,7 +557,9 @@ class WithdrawalViewSet(ModelViewSet):
         note = (s.validated_data.get('note') or '').strip()
 
         instance.status = 'closed'
-        instance.save(update_fields=['status', 'updated_at'])
+        instance.reviewed_by = request.user  # Set reviewed_by when closing
+        instance.reviewed_at = timezone.now()  # Set reviewed_at when closing
+        instance.save(update_fields=['status', 'updated_at', 'reviewed_by', 'reviewed_at'])
 
         if note:
             msg = WithdrawalMessage.objects.create(

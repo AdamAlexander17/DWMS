@@ -2,7 +2,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from common.permissions import IsAdmin
+from common.permissions import ModulePermission
 from common.responses import success_response
 
 from .filters import AuditLogFilter
@@ -16,10 +16,10 @@ from .serializers import AuditLogSerializer
 )
 class AuditLogViewSet(ReadOnlyModelViewSet):
     """
-    Read-only audit log viewer.  Admin access only.
+    Read-only audit log viewer. Uses dynamic role-based permissions.
     """
 
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, ModulePermission('audit_logs', 'view')]
     queryset = AuditLog.objects.select_related('user').all()
     serializer_class = AuditLogSerializer
     filterset_class = AuditLogFilter

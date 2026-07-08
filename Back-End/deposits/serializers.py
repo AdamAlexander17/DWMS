@@ -113,14 +113,6 @@ class DepositLogSerializer(serializers.ModelSerializer):
 
         # Channel item is optional — channel_type can be set without a specific item
 
-        # Slip status consistency
-        slip        = attrs.get('slip',        getattr(self.instance, 'slip',        None))
-        slip_status = attrs.get('slip_status', getattr(self.instance, 'slip_status', None))
-        if slip_status == DepositLog.SLIP_ADDED and not slip:
-            raise serializers.ValidationError(
-                {'slip': 'A slip file is required when slip_status is "added".'}
-            )
-
         # Clear irrelevant FK fields to keep data clean
         if channel_type != DepositLog.CHANNEL_QR:
             attrs['qr_code'] = None
