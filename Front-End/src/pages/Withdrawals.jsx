@@ -318,26 +318,37 @@ function UploadSlipModal({ onSubmit, onClose, loading, apiErrors = {} }) {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-lg transition-colors p-6 text-center cursor-pointer
-            ${isDragging ? 'border-accent bg-accent/5' : errors.slip ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}
+          className={`flex items-center gap-2 border-2 border-dashed rounded-lg transition-colors p-4 ${isDragging ? 'border-accent bg-accent/5' : errors.slip ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}
         >
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Click to select file"
+            className="p-2 hover:bg-gray-100 rounded transition-colors shrink-0"
+          >
+            <Paperclip size={16} className="text-gray-400" />
+          </button>
+          <span className="text-xs text-gray-500 truncate flex-1">
+            {file ? file.name : 'Attach slip (image / PDF, max 8 MB)'}
+          </span>
+          {file && (
+            <button
+              type="button"
+              onClick={() => handleClearFile()}
+              title="Remove file"
+              className="p-2 hover:bg-red-50 rounded transition-colors shrink-0"
+            >
+              <X size={16} className="text-red-400 hover:text-red-600" />
+            </button>
+          )}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/png,image/jpeg,image/jpg,image/webp,.pdf,application/pdf"
             onChange={(e) => setFileAndClearError(e.target.files?.[0] ?? null)}
-            onClick={(e) => e.stopPropagation()}
-            className={`block w-full text-xs text-gray-600
-              file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
-              file:text-xs file:font-semibold file:bg-accent/10 file:text-accent
-              hover:file:bg-accent/20 transition-colors cursor-pointer`}
+            className="hidden"
           />
         </div>
-        {file && (
-          <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1">
-            <FileText size={11} /> {file.name} · {(file.size / 1024).toFixed(1)} KB
-          </p>
-        )}
         {errors.slip && <p className="mt-1 text-xs text-red-600">{errors.slip}</p>}
         <p className="mt-1 text-[10px] text-gray-400">PDF, JPG, PNG or WEBP · max 8 MB.</p>
       </div>

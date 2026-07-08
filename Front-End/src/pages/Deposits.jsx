@@ -292,7 +292,8 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Slip</label>
-          <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}
+          <div 
+            className={`flex items-center gap-2 border border-dashed rounded-lg px-3 py-2.5 transition-colors h-[42px] ${errors.slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}
             onPaste={handlePaste}
             onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-accent', 'bg-accent/5') }}
             onDragLeave={(e) => { e.currentTarget.classList.remove('border-accent', 'bg-accent/5') }}
@@ -308,10 +309,30 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
               }
             }}
           >
-            <Paperclip size={14} className="text-gray-400 shrink-0" />
-            <span className="text-xs text-gray-500 truncate">
+            <button
+              type="button"
+              onClick={() => slipInputRef.current?.click()}
+              title="Click to select file"
+              className="p-1 hover:bg-gray-100 rounded transition-colors shrink-0"
+            >
+              <Paperclip size={14} className="text-gray-400" />
+            </button>
+            <span className="text-xs text-gray-500 truncate flex-1">
               {form.slip ? form.slip.name : 'Attach slip (image / PDF)'}
             </span>
+            {form.slip && (
+              <button
+                type="button"
+                onClick={() => {
+                  f('slip')(null)
+                  if (slipInputRef.current) slipInputRef.current.value = ''
+                }}
+                title="Remove file"
+                className="p-1 hover:bg-red-50 rounded transition-colors shrink-0"
+              >
+                <X size={14} className="text-red-400 hover:text-red-600" />
+              </button>
+            )}
             <input
               ref={slipInputRef}
               type="file"
@@ -319,7 +340,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
               className="hidden"
               onChange={(e) => f('slip')(e.target.files?.[0] ?? null)}
             />
-          </label>
+          </div>
           {errors.slip && <p className="mt-1 text-xs text-red-600">{errors.slip}</p>}
         </div>
         <div>
@@ -532,7 +553,8 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           Upload Receipt
         </label>
-        <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.review_slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}
+        <div 
+          className={`flex items-center gap-2 border border-dashed rounded-lg px-4 py-3 transition-colors ${errors.review_slip ? 'border-red-300' : 'border-gray-300 hover:border-accent'}`}
           onPaste={handlePaste}
           onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-accent', 'bg-accent/5') }}
           onDragLeave={(e) => { e.currentTarget.classList.remove('border-accent', 'bg-accent/5') }}
@@ -549,10 +571,31 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
             }
           }}
         >
-          <Paperclip size={15} className="text-gray-400 shrink-0" />
-          <span className="text-sm text-gray-500 truncate">
+          <button
+            type="button"
+            onClick={() => reviewSlipInputRef.current?.click()}
+            title="Click to select file"
+            className="p-1 hover:bg-gray-100 rounded transition-colors shrink-0"
+          >
+            <Paperclip size={15} className="text-gray-400" />
+          </button>
+          <span className="text-sm text-gray-500 truncate flex-1">
             {reviewSlip ? reviewSlip.name : (initial?.review_slip ? 'Replace existing receipt—' : 'Attach receipt (image / PDF, max 8 MB)')}
           </span>
+          {reviewSlip && (
+            <button
+              type="button"
+              onClick={() => {
+                setReviewSlip(null)
+                if (reviewSlipInputRef.current) reviewSlipInputRef.current.value = ''
+                if (local.review_slip) setLocal((p) => ({ ...p, review_slip: undefined }))
+              }}
+              title="Remove file"
+              className="p-1 hover:bg-red-50 rounded transition-colors shrink-0"
+            >
+              <X size={15} className="text-red-400 hover:text-red-600" />
+            </button>
+          )}
           <input
             ref={reviewSlipInputRef}
             type="file"
@@ -560,7 +603,7 @@ function ReviewForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
             className="hidden"
             onChange={(e) => { setReviewSlip(e.target.files?.[0] ?? null); if (local.review_slip) setLocal((p) => ({ ...p, review_slip: undefined })) }}
           />
-        </label>
+        </div>
         {errors.review_slip && <p className="mt-1 text-xs text-red-600">{errors.review_slip}</p>}
         {initial?.review_slip && !reviewSlip && (
           <a
