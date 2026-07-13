@@ -178,6 +178,8 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
     slip:         null,
     rm_status:    'not_received',
     ark_id:       '',
+    amount:       '',
+    utr_number:   '',
     problem_category: '',
     comment:      '',
   })
@@ -240,6 +242,8 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
       fd.append('slip_status', 'not_received')
     }
     fd.append('ark_id',      form.ark_id)
+    if (form.amount) fd.append('amount', form.amount)
+    if (form.utr_number) fd.append('utr_number', form.utr_number.toUpperCase())
     if (form.problem_category) fd.append('problem_category', form.problem_category)
     fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
@@ -361,6 +365,34 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Amount + UTR Number — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (₹)</label>
+          <input
+            className={`input ${errors.amount ? 'border-red-300' : ''}`}
+            placeholder="Enter amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={form.amount}
+            onChange={(e) => f('amount')(e.target.value)}
+          />
+          {errors.amount && <p className="mt-1 text-xs text-red-600">{errors.amount}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">UTR Number</label>
+          <input
+            className={`input ${errors.utr_number ? 'border-red-300' : ''}`}
+            placeholder="Enter UTR number (22 chars)"
+            maxLength={22}
+            value={form.utr_number}
+            onChange={(e) => f('utr_number')(e.target.value.toUpperCase())}
+          />
+          {errors.utr_number && <p className="mt-1 text-xs text-red-600">{errors.utr_number}</p>}
         </div>
       </div>
 
@@ -657,6 +689,8 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
     channel_type: initial?.channel_type ?? '',
     channel_id:   initChannelId,
     ark_id:       initial?.ark_id ?? '',
+    amount:       initial?.amount ?? '',
+    utr_number:   initial?.utr_number ?? '',
     problem_category: initial?.problem_category ?? '',
     comment:      initial?.comment      ?? '',
     slip:         null,
@@ -722,6 +756,8 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
       fd.append('status',      'pending')
     }
     fd.append('ark_id',      form.ark_id)
+    if (form.amount) fd.append('amount', form.amount)
+    if (form.utr_number) fd.append('utr_number', form.utr_number.toUpperCase())
     if (form.problem_category) fd.append('problem_category', form.problem_category)
     fd.append('comment',     form.comment)
     if (form.slip) fd.append('slip', form.slip)
@@ -837,6 +873,34 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
+      </div>
+
+      {/* Amount + UTR Number — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (₹)</label>
+          <input
+            className={`input ${errors.amount ? 'border-red-300' : ''}`}
+            placeholder="Enter amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={form.amount}
+            onChange={(e) => f('amount')(e.target.value)}
+          />
+          {errors.amount && <p className="mt-1 text-xs text-red-600">{errors.amount}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">UTR Number</label>
+          <input
+            className={`input ${errors.utr_number ? 'border-red-300' : ''}`}
+            placeholder="Enter UTR number (22 chars)"
+            maxLength={22}
+            value={form.utr_number}
+            onChange={(e) => f('utr_number')(e.target.value.toUpperCase())}
+          />
+          {errors.utr_number && <p className="mt-1 text-xs text-red-600">{errors.utr_number}</p>}
+        </div>
       </div>
 
       {/* Comment */}
@@ -1475,6 +1539,8 @@ export default function Deposits() {
               <SortableTh label="Gateway"        sortKey="gateway"        toggle={toggleSort} icon={sortIcon} left />
               <SortableTh label="Channel"         sortKey="channel"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="ARK ID"          sortKey="ark_id"         toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Amount (₹)"     sortKey="amount"         toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="UTR Number"      sortKey="utr_number"     toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Slip"            sortKey="slip"           toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Comment"         sortKey="comment"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Logged By"       sortKey="logged_by"      toggle={toggleSort} icon={sortIcon} />
@@ -1488,7 +1554,7 @@ export default function Deposits() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {records.length === 0 && (
-              <tr><td colSpan={canWrite || canReview || canChat ? 11 : 10} className="px-4 py-10 text-center text-gray-400 text-sm">
+              <tr><td colSpan={canWrite || canReview || canChat ? 13 : 12} className="px-4 py-10 text-center text-gray-400 text-sm">
                 {canCreate ? 'No deposits logged yet. Use "Log Deposit" to record a deposit.' : 'No deposit logs found.'}
               </td></tr>
             )}
@@ -1510,6 +1576,10 @@ export default function Deposits() {
                 </td>
                 {/* Channel Detail - removed, channel item selection no longer used */}
                 <td className="px-4 py-2.5 text-xs text-gray-600 text-center">{r.ark_id || '-'}</td>
+                {/* Amount */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center font-semibold">{r.amount ? `₹${parseFloat(r.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
+                {/* UTR Number */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center font-mono">{r.utr_number || '-'}</td>
                 <td className="px-4 py-2.5 text-center">
                   {r.slip ? (
                     <a href={r.slip} target="_blank" rel="noopener noreferrer"

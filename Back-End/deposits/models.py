@@ -115,6 +115,19 @@ class DepositLog(models.Model):
 
     comment = models.TextField(blank=True, default='')
 
+    # Deposit transaction details
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    utr_number = models.CharField(
+        max_length=22,
+        null=True,
+        blank=True,
+    )
+
     submitted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

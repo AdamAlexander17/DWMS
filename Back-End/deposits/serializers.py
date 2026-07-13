@@ -34,6 +34,8 @@ class DepositLogSerializer(serializers.ModelSerializer):
             'slip',
             'slip_status', 'slip_status_display',
             'ark_id',
+            'amount',
+            'utr_number',
             'problem_category',
             'comment',
             'submitted_by', 'submitted_by_name',
@@ -96,6 +98,23 @@ class DepositLogSerializer(serializers.ModelSerializer):
         value = validate_text(value, field='ARK ID', max_length=100, allow_blank=False)
         if not value.isdigit():
             raise serializers.ValidationError('ARK ID must contain only integers.')
+        return value
+
+    def validate_amount(self, value):
+        if value is None:
+            return value
+        if value <= 0:
+            raise serializers.ValidationError('Amount must be a positive number.')
+        return value
+
+    def validate_utr_number(self, value):
+        if value is None:
+            return value
+        value = str(value).strip().upper()
+        if len(value) != 22:
+            raise serializers.ValidationError('UTR Number must be exactly 22 characters.')
+        if not value.isalnum():
+            raise serializers.ValidationError('UTR Number must be alphanumeric only.')
         return value
 
     def validate_gateway(self, value):
