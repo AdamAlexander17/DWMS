@@ -111,8 +111,8 @@ class DepositLogSerializer(serializers.ModelSerializer):
         if value is None:
             return value
         value = str(value).strip().upper()
-        if len(value) != 22:
-            raise serializers.ValidationError('UTR Number must be exactly 22 characters.')
+        if len(value) < 16 or len(value) > 22:
+            raise serializers.ValidationError('UTR Number must be between 16 and 22 characters.')
         if not value.isalnum():
             raise serializers.ValidationError('UTR Number must be alphanumeric only.')
         return value
