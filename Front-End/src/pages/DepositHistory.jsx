@@ -100,6 +100,8 @@ export default function DepositHistory() {
     if (key === 'gateway')        return (row.gateway_detail?.name ?? '').toLowerCase()
     if (key === 'channel')        return (CHANNEL_LABEL[row.channel_type] ?? '').toLowerCase()
     if (key === 'channel_detail') return (row.channel_label ?? '').toLowerCase()
+    if (key === 'amount')         return row.amount ? parseFloat(row.amount) : 0
+    if (key === 'utr_number')     return (row.utr_number ?? '').toLowerCase()
     if (key === 'rm_slip')        return row.slip ? 1 : 0
     if (key === 'comment')        return (row.comment ?? '').toLowerCase()
     if (key === 'logged_by')      return (row.submitted_by_name ?? '').toLowerCase()
@@ -175,6 +177,8 @@ export default function DepositHistory() {
               <SortableTh label="Gateway"        sortKey="gateway"        toggle={toggleSort} icon={sortIcon} left />
               <SortableTh label="Channel"         sortKey="channel"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Channel Detail"  sortKey="channel_detail" toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="Amount"           sortKey="amount"         toggle={toggleSort} icon={sortIcon} />
+              <SortableTh label="UTR"              sortKey="utr_number"     toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="RM Slip"         sortKey="rm_slip"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Comment"         sortKey="comment"        toggle={toggleSort} icon={sortIcon} />
               <SortableTh label="Logged By"       sortKey="logged_by"      toggle={toggleSort} icon={sortIcon} />
@@ -187,7 +191,7 @@ export default function DepositHistory() {
           <tbody className="divide-y divide-gray-200">
             {records.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-gray-400 text-sm">
+                <td colSpan={12} className="px-4 py-10 text-center text-gray-400 text-sm">
                   No completed deposits yet.
                 </td>
               </tr>
@@ -215,6 +219,16 @@ export default function DepositHistory() {
                 {/* Channel Detail */}
                 <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[160px] text-center">
                   <span className="truncate block">{r.channel_label ?? '—'}</span>
+                </td>
+
+                {/* Amount */}
+                <td className="px-4 py-2.5 text-xs text-gray-700 text-center font-medium">
+                  {r.amount ? `₹${Number(r.amount).toLocaleString('en-IN')}` : '—'}
+                </td>
+
+                {/* UTR */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center font-mono">
+                  {r.utr_number || '—'}
                 </td>
 
                 {/* RM Slip */}
