@@ -387,7 +387,7 @@ function CreateForm({ onSubmit, loading, error, apiErrors = {} }) {
           <label className="block text-sm font-medium text-gray-700 mb-1.5">UTR Number</label>
           <input
             className={`input ${errors.utr_number ? 'border-red-300' : ''}`}
-            placeholder="Enter UTR number (16-22 chars)"
+            placeholder="Enter UTR number (max 22 chars)"
             maxLength={22}
             value={form.utr_number}
             onChange={(e) => f('utr_number')(e.target.value.toUpperCase())}
@@ -894,7 +894,7 @@ function EditForm({ initial, onSubmit, loading, error, apiErrors = {} }) {
           <label className="block text-sm font-medium text-gray-700 mb-1.5">UTR Number</label>
           <input
             className={`input ${errors.utr_number ? 'border-red-300' : ''}`}
-            placeholder="Enter UTR number (16-22 chars)"
+            placeholder="Enter UTR number (max 22 chars)"
             maxLength={22}
             value={form.utr_number}
             onChange={(e) => f('utr_number')(e.target.value.toUpperCase())}
